@@ -1,0 +1,5 @@
+CREATE TABLE Account (
+	id UUID PRIMARY KEY,
+	owner VARCHAR(100) NOT NULL,
+	created_at TIMESTAMPTZ NOT NULL
+)
