@@ -1,0 +1,13 @@
+%% Business logic: how value flows through the domain (no infrastructure)
+flowchart LR
+    Matches[Match results + minutes] --> Rating[OpenElo rating<br/>mocked for now]
+    Rating --> Snapshot[(Elo snapshot)]
+
+    Trader([Trader]) -- mint / redeem --> Curve[Bonding curve<br/>price = f supply]
+    Curve -- quote --> Trader
+    Curve --> Ledger[(Ledger<br/>wallets + shares)]
+    Curve -- fees --> Pool[Dividend pool<br/>capped by fees collected]
+
+    Snapshot --> Dividends[Dividend calculation<br/>pegged to Elo, never to price]
+    Pool --> Dividends
+    Dividends -- payouts --> Ledger

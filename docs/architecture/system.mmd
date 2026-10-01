@@ -1,0 +1,27 @@
+%% Full system architecture (see docs/adr/0001-service-decomposition.md)
+flowchart LR
+    Client([Client]) --> Gateway[gateway]
+    Gateway -. login .-> Keycloak[Keycloak]
+
+    Gateway --> Market[market-service]
+    Gateway --> Rating[rating-service]
+
+    Market --- MarketDB[(Postgres<br/>market)]
+    Rating --- RatingDB[(Postgres<br/>rating)]
+    Dividend[dividend-service] --- DividendDB[(Postgres<br/>dividend)]
+    Audit[audit-service] --- AuditDB[(Postgres<br/>audit)]
+
+    External[External football APIs] --> Ingestion[ingestion-service]
+
+    subgraph Kafka
+        T1{{match.completed}}
+        T2{{rating.snapshot.published}}
+        T3{{trade.executed}}
+        T4{{dividend.payout.requested}}
+    end
+
+    Ingestion --> T1 --> Rating
+    Rating --> T2 --> Dividend
+    Market -- outbox --> T3 --> Dividend
+    T3 --> Audit
+    Dividend --> T4 --> Market
