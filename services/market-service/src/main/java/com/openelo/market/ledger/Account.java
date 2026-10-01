@@ -19,6 +19,12 @@ public class Account {
 
 	}
 
+	public Account(String owner) {
+		this.id = UUID.randomUUID();
+		this.owner = owner;
+		this.createdAt = Instant.now();
+	}
+
 	public Instant getCreatedAt() {
 		return createdAt;
 	}
