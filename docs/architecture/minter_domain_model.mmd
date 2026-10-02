@@ -1,0 +1,41 @@
+classDiagram
+  direction LR
+
+  class User
+
+  class Market {
+    mint(user, player_share, shares)
+    redeem(user, player_share, shares)
+  }
+
+  class Account {
+    purpose
+  }
+  class Posting {
+    asset
+    amount
+  }
+
+  class Transaction {
+    type
+    created_at
+  }
+  class Deposit {
+    deposit(user, amount)
+  }
+  class Mint
+  class Redeem
+
+  User --> Market : trades with
+  User --> Deposit : calls deposit
+
+  Market ..> Mint : creates
+  Market ..> Redeem : creates
+
+  Transaction <|-- Deposit
+  Transaction <|-- Mint
+  Transaction <|-- Redeem
+
+  Transaction "1" *-- "2..*" Posting : contains
+  Posting --> Account
+  Account "*" --> "0..1" User : owned by
