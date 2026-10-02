@@ -4,24 +4,29 @@ classDiagram
   class User
 
   class Market {
-    mint(user, player_share, shares)
-    redeem(user, player_share, shares)
+    mint(user, player, shares)
+    redeem(user, player, shares)
+  }
+
+  class Deposit {
+    deposit(user, amount)
+  }
+
+  class Ledger {
+    post(type, postings)
+    balance(account, asset)
   }
 
   class Account {
     purpose
   }
-  class Posting {
-    asset
-    amount
-  }
-
   class Transaction {
     type
     created_at
   }
-  class Deposit {
-    deposit(user, amount)
+  class Posting {
+    asset
+    amount
   }
   class Mint
   class Redeem
@@ -29,13 +34,14 @@ classDiagram
   User --> Market : trades with
   User --> Deposit : calls deposit
 
-  Market ..> Mint : creates
-  Market ..> Redeem : creates
+  Market --> Ledger : posts to
+  Deposit --> Ledger : posts to
+
+  Ledger "1" *-- "*" Transaction : records
+  Transaction "1" *-- "2..*" Posting : contains
+  Posting --> Account
+  Account "*" --> "0..1" User : owned by
 
   Transaction <|-- Deposit
   Transaction <|-- Mint
   Transaction <|-- Redeem
-
-  Transaction "1" *-- "2..*" Posting : contains
-  Posting --> Account
-  Account "*" --> "0..1" User : owned by
