@@ -11,7 +11,6 @@ import jakarta.transaction.Transactional;
 @Service
 public class AccountService {
 
-	@Autowired
 	UserAccountRepository userAccounts;
 
 	public AccountService(UserAccountRepository userAccountRepository) {

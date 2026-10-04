@@ -1,6 +1,5 @@
 package com.openelo.market.ledger;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,15 +7,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class Ledger {
 
-	@Autowired
-	TranasactionRepository txs;
+	TranasactionRepository tranasactionRepository;
 
-	public Ledger(TranasactionRepository txs) {
-		this.txs = txs;
+	public Ledger(TranasactionRepository tranasactionRepository) {
+		this.tranasactionRepository = tranasactionRepository;
 	}
 
 	@Transactional(propagation = Propagation.MANDATORY)
 	public void post(ATransaction transaction) {
-		txs.save(transaction);
+		tranasactionRepository.save(transaction);
 	}
 }

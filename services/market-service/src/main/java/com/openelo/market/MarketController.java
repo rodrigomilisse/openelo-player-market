@@ -1,8 +1,6 @@
 package com.openelo.market;
 
 import java.util.UUID;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,20 +14,17 @@ import com.openelo.market.ledger.PlatformAccount;
 @RequestMapping("market")
 public class MarketController {
 
-	@Autowired
 	Market market;
 
 	// TODO temp
-	@Autowired
 	AccountRepository accountRepository;
 
-	@Autowired
-	UserRepository users;
+	UserRepository userRepository;
 
 	public MarketController(Market market, AccountRepository accountRepository, UserRepository userRepository) {
 		this.market = market;
 		this.accountRepository = accountRepository;
-		this.users = userRepository;
+		this.userRepository = userRepository;
 	}
 
 	record MarketRequest(UUID user, long amount, UUID playerShare) {
@@ -46,14 +41,14 @@ public class MarketController {
 	@PostMapping("mint")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void mint(@RequestBody MarketRequest request) {
-		User user = users.findById(request.user).orElseThrow();
+		User user = userRepository.findById(request.user).orElseThrow();
 		market.mint(user, request.amount, request.playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void redeem(@RequestBody MarketRequest request) {
-		User user = users.findById(request.user).orElseThrow();
+		User user = userRepository.findById(request.user).orElseThrow();
 		market.redeem(user, request.amount, request.playerShare);
 	}
 }
