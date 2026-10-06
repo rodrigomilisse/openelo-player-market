@@ -14,6 +14,8 @@ import jakarta.persistence.Table;
 @Inheritance(strategy = InheritanceType.JOINED)
 public abstract class AAccount implements IAccount {
 
+	public static final IAccount PLATFORM_ACCOUNT = new PlatformAccount(new UUID(0, 0));
+
 	@Id
 	protected UUID id;
 

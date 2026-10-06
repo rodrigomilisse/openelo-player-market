@@ -32,12 +32,12 @@ public abstract class ATransaction implements ITransaction {
 
 	}
 
-	protected Posting debit(IAccount account, long amount, UUID asset) {
-		return new Posting(account.getId(), Math.negateExact(amount), asset);
+	protected Posting debit(IAccount account, long amount, AssetId assetId) {
+		return new Posting(account.getId(), Math.negateExact(amount), assetId);
 	}
 
-	protected Posting credit(IAccount account, long amount, UUID asset) {
-		return new Posting(account.getId(), amount, asset);
+	protected Posting credit(IAccount account, long amount, AssetId assetId) {
+		return new Posting(account.getId(), amount, assetId);
 	}
 
 	@Override

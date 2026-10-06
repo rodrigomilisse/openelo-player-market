@@ -18,15 +18,11 @@ public class Mint extends ATransaction {
 	@JoinColumn(name = "user_account")
 	private UserAccount userAccount;
 
-	private static final IAccount platformAccount = new PlatformAccount(new UUID(0, 0));
-
-	private static final UUID credits = new UUID(0, 0);
-
 	protected Mint() {
 
 	}
 
-	public Mint(UserAccount userAccount, long shareAmount, UUID playerShare, long pricePerShare) {
+	public Mint(UserAccount userAccount, long shareAmount, AssetId playerShare, long pricePerShare) {
 
 		this.id = UUID.randomUUID();
 		this.userAccount = userAccount;
@@ -37,9 +33,9 @@ public class Mint extends ATransaction {
 
 		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
 
-		Posting removeCreditsFromUser = debit(userAccount, creditAmount, credits);
-		Posting removeFromShareFromPlatform = debit(platformAccount, shareAmount, playerShare);
-		Posting addCreditsToPlatform = credit(platformAccount, creditAmount, credits);
+		Posting removeCreditsFromUser = debit(userAccount, creditAmount, AssetId.CREDITS);
+		Posting removeFromShareFromPlatform = debit(AAccount.PLATFORM_ACCOUNT, shareAmount, playerShare);
+		Posting addCreditsToPlatform = credit(AAccount.PLATFORM_ACCOUNT, creditAmount, AssetId.CREDITS);
 		Posting addSharesToUser = credit(userAccount, shareAmount, playerShare);
 
 		this.postings.add(removeCreditsFromUser);

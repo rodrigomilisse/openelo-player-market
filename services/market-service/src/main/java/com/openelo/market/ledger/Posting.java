@@ -1,8 +1,6 @@
 package com.openelo.market.ledger;
 
-import java.time.Instant;
 import java.util.UUID;
-
 import jakarta.persistence.Embeddable;
 
 @Embeddable
@@ -12,15 +10,15 @@ public class Posting {
 
 	private long amount;
 
-	private UUID asset;
+	private AssetId assetId;
 
 	protected Posting() {
 	}
 
-	public Posting(UUID account, long amount, UUID asset) {
+	public Posting(UUID account, long amount, AssetId assetId) {
 		this.accountId = account;
 		this.amount = amount;
-		this.asset = asset;
+		this.assetId = assetId;
 	}
 
 	public UUID getAccount() {
@@ -31,7 +29,7 @@ public class Posting {
 		return this.amount;
 	}
 
-	public UUID getAsset() {
-		return this.asset;
+	public AssetId getAssetId() {
+		return this.assetId;
 	}
 }

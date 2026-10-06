@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.openelo.market.ledger.AssetId;
 import com.openelo.market.ledger.PlatformAccount;
 import com.openelo.market.ledger.UserAccount;
 import com.openelo.market.ledger.UserAccountRepository;
@@ -46,14 +47,17 @@ public class MarketController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public void mint(@RequestBody MarketRequest request) {
 		UserAccount account = getAccount(getUser(request.userId));
-		market.mint(account, request.amount, request.playerShare);
+		AssetId playerShare = new AssetId(request.playerShare);
+		market.mint(account, request.amount, playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void redeem(@RequestBody MarketRequest request) {
 		UserAccount account = getAccount(getUser(request.userId));
-		market.redeem(account, request.amount, request.playerShare);
+		AssetId player_share = new AssetId(request.playerShare);
+
+		market.redeem(account, request.amount, player_share);
 	}
 
 	private UserAccount getAccount(User user) {

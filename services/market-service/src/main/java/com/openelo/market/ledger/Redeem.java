@@ -18,15 +18,11 @@ public class Redeem extends ATransaction {
 	@JoinColumn(name = "user_account")
 	private UserAccount userAccount;
 
-	private static final IAccount platformAccount = new PlatformAccount(new UUID(0, 0));
-
-	private static final UUID credits = new UUID(0, 0);
-
 	protected Redeem() {
 
 	}
 
-	public Redeem(UserAccount userAccount, long shareAmount, UUID playerShare, long pricePerShare) {
+	public Redeem(UserAccount userAccount, long shareAmount, AssetId playerShare, long pricePerShare) {
 
 		this.id = UUID.randomUUID();
 		this.userAccount = userAccount;
@@ -38,9 +34,9 @@ public class Redeem extends ATransaction {
 		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
 
 		Posting removeSharesFromUser = debit(userAccount, shareAmount, playerShare);
-		Posting removeCreditsFromPlatform = debit(platformAccount, creditAmount, credits);
-		Posting addSharesToPlatform = credit(platformAccount, shareAmount, playerShare);
-		Posting addCreditsToUser = credit(userAccount, creditAmount, credits);
+		Posting removeCreditsFromPlatform = debit(AAccount.PLATFORM_ACCOUNT, creditAmount, AssetId.CREDITS);
+		Posting addSharesToPlatform = credit(AAccount.PLATFORM_ACCOUNT, shareAmount, playerShare);
+		Posting addCreditsToUser = credit(userAccount, creditAmount, AssetId.CREDITS);
 
 		this.postings.add(removeSharesFromUser);
 		this.postings.add(removeCreditsFromPlatform);
