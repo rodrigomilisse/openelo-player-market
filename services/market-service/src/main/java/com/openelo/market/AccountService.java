@@ -1,6 +1,5 @@
 package com.openelo.market;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.openelo.market.ledger.UserAccount;

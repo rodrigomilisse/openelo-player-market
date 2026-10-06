@@ -7,13 +7,10 @@ import com.openelo.market.ledger.Ledger;
 import com.openelo.market.ledger.Mint;
 import com.openelo.market.ledger.Redeem;
 import com.openelo.market.ledger.UserAccount;
-import com.openelo.market.ledger.UserAccountRepository;
 import jakarta.transaction.Transactional;
 
 @Service
 class Market {
-
-	UserAccountRepository userAccountRepository;
 
 	private final Ledger ledger;
 
@@ -25,28 +22,19 @@ class Market {
 		return 90;
 	}
 
-	public Market(UserAccountRepository userAccountRepository, Ledger ledger) {
-		this.userAccountRepository = userAccountRepository;
+	public Market(Ledger ledger) {
 		this.ledger = ledger;
 	}
 
 	@Transactional
-	public void mint(User user, long amount, UUID player_share) {
-		UserAccount account = userAccountRepository.findByOwnerId(user.getId()).orElseThrow();
+	public void mint(UserAccount userAccount, long amount, UUID player_share) {
 		long pricePerShare = quoteMint(player_share);
-
-		ledger.post(new Mint(account, amount, player_share, pricePerShare));
-
-		// TODO persist mint
+		ledger.post(new Mint(userAccount, amount, player_share, pricePerShare));
 	}
 
 	@Transactional
-	public void redeem(User user, long amount, UUID player_share) {
-		UserAccount account = userAccountRepository.findByOwnerId(user.getId()).orElseThrow();
+	public void redeem(UserAccount userAccount, long amount, UUID player_share) {
 		long pricePerShare = quoteRedeem(player_share);
-
-		ledger.post(new Redeem(account, amount, player_share, pricePerShare));
-
-		// TODO persist redemption
+		ledger.post(new Redeem(userAccount, amount, player_share, pricePerShare));
 	}
 }

@@ -32,6 +32,14 @@ public abstract class ATransaction implements ITransaction {
 
 	}
 
+	protected Posting debit(IAccount account, long amount, UUID asset) {
+		return new Posting(account.getId(), Math.negateExact(amount), asset);
+	}
+
+	protected Posting credit(IAccount account, long amount, UUID asset) {
+		return new Posting(account.getId(), amount, asset);
+	}
+
 	@Override
 	public UUID getId() {
 		return this.id;
