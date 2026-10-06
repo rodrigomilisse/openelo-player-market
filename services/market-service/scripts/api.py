@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+  ./api.py up                     start postgres (docker compose)
+  ./api.py down [-v]              stop postgres (-v also wipes the data)
+  ./api.py start                  start the server (mvnw spring-boot:run)
   ./api.py init
   ./api.py user alice
   ./api.py mint <user-id> 5
@@ -16,6 +19,9 @@ import sys
 import urllib.error
 import urllib.request
 
+SERVICE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+COMPOSE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "..", "..", "..", "infra", "compose.yml")
 URL = "http://localhost:8080"
 DB = "postgresql://market:market@localhost:5432/market"
 SHARE = "11111111-1111-1111-1111-111111111111"
@@ -38,12 +44,19 @@ def post(path, body=None):
 
 
 def sql(q):
-    subprocess.run(["psql", DB, "-c", q])
+    # PGHOST stops Debian's pg_wrapper warning about a missing local cluster
+    subprocess.run(["psql", DB, "-c", q], env={**os.environ, "PGHOST": "localhost"})
 
 
 cmd, *a = sys.argv[1:] or ["help"]
 
-if cmd == "init":
+if cmd == "up":
+    subprocess.run(["docker", "compose", "-f", COMPOSE, "up", "-d"])
+elif cmd == "down":
+    subprocess.run(["docker", "compose", "-f", COMPOSE, "down", *a])
+elif cmd == "start":
+    subprocess.run(["./mvnw", "spring-boot:run"], cwd=SERVICE_DIR)
+elif cmd == "init":
     post("/market/init")
 elif cmd == "user":
     post("/users", {"owner": a[0]})
