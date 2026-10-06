@@ -1,0 +1,1 @@
+ALTER TABLE postings DROP COLUMN created_at;

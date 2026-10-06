@@ -14,8 +14,6 @@ public class Posting {
 
 	private UUID asset;
 
-	private Instant createdAt;
-
 	protected Posting() {
 	}
 
@@ -23,7 +21,6 @@ public class Posting {
 		this.accountId = account;
 		this.amount = amount;
 		this.asset = asset;
-		this.createdAt = Instant.now();
 	}
 
 	public UUID getAccount() {
@@ -37,9 +34,4 @@ public class Posting {
 	public UUID getAsset() {
 		return this.asset;
 	}
-
-	public Instant getCreatedAt() {
-		return this.createdAt;
-	}
-
 }
