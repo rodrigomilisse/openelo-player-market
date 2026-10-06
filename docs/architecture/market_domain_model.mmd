@@ -1,0 +1,81 @@
+classDiagram
+  direction LR
+
+  class User {
+    id
+    username
+    createdAt
+  }
+
+  class UserController {
+    create(username)
+    list()
+  }
+  class AccountService {
+    createAccount(user)
+  }
+  class MarketController {
+    init()
+    mint(user, amount, playerShare)
+    redeem(user, amount, playerShare)
+  }
+  class Market {
+    quoteMint(playerShare)
+    quoteRedeem(playerShare)
+    mint(user, amount, playerShare)
+    redeem(user, amount, playerShare)
+  }
+  class Ledger {
+    post(transaction)
+  }
+
+  class Account {
+    <<abstract>>
+    id
+    createdAt
+  }
+  class UserAccount
+  class PlatformAccount
+
+  class Transaction {
+    <<abstract>>
+    id
+    createdAt
+  }
+  class Mint
+  class Redeem
+  class Deposit {
+    not implemented
+  }
+  class Posting {
+    <<value object>>
+    accountId
+    asset
+    amount
+    createdAt
+  }
+
+  UserController --> AccountService : creates account
+  UserController --> User : creates
+  AccountService --> UserAccount : creates
+
+  MarketController --> Market
+  Market --> UserAccount : finds by owner
+  Market --> Ledger : posts to
+  Market ..> Mint : creates
+  Market ..> Redeem : creates
+
+  Ledger --> Transaction : saves
+
+  Account <|-- UserAccount
+  Account <|-- PlatformAccount
+  UserAccount "*" --> "1" User : owner
+
+  Transaction <|-- Mint
+  Transaction <|-- Redeem
+  Transaction <|-- Deposit
+  Transaction "1" *-- "2..*" Posting : postings
+  Posting ..> Account : accountId
+
+  Mint "*" --> "1" UserAccount : userAccount
+  Redeem "*" --> "1" UserAccount : userAccount
