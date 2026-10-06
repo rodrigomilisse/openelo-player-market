@@ -1,12 +1,9 @@
 package com.openelo.market.ledger;
 
-import com.openelo.market.ledger.account.AAccount;
+import com.openelo.market.ledger.account.PlatformAccount;
 import com.openelo.market.ledger.account.UserAccount;
-
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.UUID;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -27,18 +24,16 @@ public class Redeem extends ATransaction {
 
 	public Redeem(UserAccount userAccount, long shareAmount, AssetId playerShare, long pricePerShare) {
 
-		this.id = UUID.randomUUID();
+		super(UUID.randomUUID());
 		this.userAccount = userAccount;
-
-		this.createdAt = Instant.now();
 
 		this.postings = new ArrayList<>(4);
 
 		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
 
 		Posting removeSharesFromUser = debit(userAccount, shareAmount, playerShare);
-		Posting removeCreditsFromPlatform = debit(AAccount.PLATFORM_ACCOUNT, creditAmount, AssetId.CREDITS);
-		Posting addSharesToPlatform = credit(AAccount.PLATFORM_ACCOUNT, shareAmount, playerShare);
+		Posting removeCreditsFromPlatform = debit(PlatformAccount.ID, creditAmount, AssetId.CREDITS);
+		Posting addSharesToPlatform = credit(PlatformAccount.ID, shareAmount, playerShare);
 		Posting addCreditsToUser = credit(userAccount, creditAmount, AssetId.CREDITS);
 
 		this.postings.add(removeSharesFromUser);

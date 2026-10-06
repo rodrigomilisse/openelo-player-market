@@ -1,10 +1,7 @@
 package com.openelo.market.ledger.account;
 
-import java.time.Instant;
 import java.util.UUID;
-
 import com.openelo.market.user.User;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -24,9 +21,8 @@ public class UserAccount extends AAccount {
 	}
 
 	public UserAccount(User owner) {
+		super(UUID.randomUUID());
 		this.owner = owner;
-		this.id = UUID.randomUUID();
-		this.createdAt = Instant.now();
 	}
 
 	public User getOwner() {

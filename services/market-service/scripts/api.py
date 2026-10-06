@@ -61,7 +61,7 @@ elif cmd == "init":
 elif cmd == "user":
     post("/users", {"owner": a[0]})
 elif cmd in ("mint", "redeem"):
-    post(f"/market/{cmd}", {"user": a[0], "amount": int(a[1]), "playerShare": SHARE})
+    post(f"/market/{cmd}", {"userId": a[0], "amount": int(a[1]), "playerShare": SHARE})
 elif cmd in TABLES:
     sql(f"select * from {cmd}")
 elif cmd == "db":

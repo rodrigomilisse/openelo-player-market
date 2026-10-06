@@ -1,8 +1,6 @@
 package com.openelo.market.ledger.account;
 
-import java.time.Instant;
 import java.util.UUID;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
@@ -10,13 +8,14 @@ import jakarta.persistence.Table;
 @Table(name = "platform_account")
 public class PlatformAccount extends AAccount {
 
+	public static final IAccount ID = new PlatformAccount(new UUID(0, 0));
+
 	protected PlatformAccount() {
 
 	}
 
 	public PlatformAccount(UUID platformUUID) {
-		this.id = platformUUID;
-		this.createdAt = Instant.now();
+		super(platformUUID);
 	}
 
 }

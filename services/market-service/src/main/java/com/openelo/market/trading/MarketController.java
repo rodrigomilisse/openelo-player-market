@@ -30,10 +30,12 @@ public class MarketController {
 
 	UserAccountRepository userAccountRepository;
 
-	public MarketController(Market market, AccountRepository accountRepository, UserRepository userRepository) {
+	public MarketController(Market market, AccountRepository accountRepository, UserRepository userRepository,
+			UserAccountRepository userAccountRepository) {
 		this.market = market;
 		this.accountRepository = accountRepository;
 		this.userRepository = userRepository;
+		this.userAccountRepository = userAccountRepository;
 	}
 
 	record MarketRequest(UUID userId, long amount, UUID playerShare) {

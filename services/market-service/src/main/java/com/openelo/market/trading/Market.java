@@ -1,14 +1,10 @@
 
 package com.openelo.market.trading;
 
-import java.util.UUID;
 import org.springframework.stereotype.Service;
-
 import com.openelo.market.ledger.AssetId;
-import com.openelo.market.ledger.account.IAccount;
 import com.openelo.market.ledger.Ledger;
 import com.openelo.market.ledger.Mint;
-import com.openelo.market.ledger.account.PlatformAccount;
 import com.openelo.market.ledger.Redeem;
 import com.openelo.market.ledger.account.UserAccount;
 import jakarta.transaction.Transactional;
