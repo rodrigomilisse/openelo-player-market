@@ -1,4 +1,4 @@
-package com.openelo.market;
+package com.openelo.market.user;
 
 import java.util.UUID;
 

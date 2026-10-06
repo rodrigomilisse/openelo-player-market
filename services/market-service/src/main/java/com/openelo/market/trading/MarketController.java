@@ -1,4 +1,8 @@
-package com.openelo.market;
+package com.openelo.market.trading;
+
+import com.openelo.market.ledger.account.AccountRepository;
+import com.openelo.market.user.User;
+import com.openelo.market.user.UserRepository;
 
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -9,9 +13,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.openelo.market.ledger.AssetId;
-import com.openelo.market.ledger.PlatformAccount;
-import com.openelo.market.ledger.UserAccount;
-import com.openelo.market.ledger.UserAccountRepository;
+import com.openelo.market.ledger.account.PlatformAccount;
+import com.openelo.market.ledger.account.UserAccount;
+import com.openelo.market.ledger.account.UserAccountRepository;
 
 @RestController
 @RequestMapping("market")

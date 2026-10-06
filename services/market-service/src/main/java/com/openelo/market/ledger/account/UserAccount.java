@@ -1,9 +1,9 @@
-package com.openelo.market.ledger;
+package com.openelo.market.ledger.account;
 
 import java.time.Instant;
 import java.util.UUID;
 
-import com.openelo.market.User;
+import com.openelo.market.user.User;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

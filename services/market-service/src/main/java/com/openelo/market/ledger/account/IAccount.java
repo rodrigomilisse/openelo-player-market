@@ -1,13 +1,11 @@
-package com.openelo.market;
+package com.openelo.market.ledger.account;
 
 import java.time.Instant;
 import java.util.UUID;
 
-public interface IUser {
+public interface IAccount {
 
 	public UUID getId();
-
-	public String getUsername();
 
 	public Instant getCreatedAt();
 }

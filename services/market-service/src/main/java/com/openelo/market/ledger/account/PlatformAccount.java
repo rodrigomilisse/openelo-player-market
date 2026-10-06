@@ -1,4 +1,4 @@
-package com.openelo.market.ledger;
+package com.openelo.market.ledger.account;
 
 import java.time.Instant;
 import java.util.UUID;

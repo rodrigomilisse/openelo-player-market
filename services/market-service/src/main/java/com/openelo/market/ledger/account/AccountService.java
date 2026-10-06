@@ -1,9 +1,11 @@
-package com.openelo.market;
+package com.openelo.market.ledger.account;
+
+import com.openelo.market.user.User;
 
 import org.springframework.stereotype.Service;
 
-import com.openelo.market.ledger.UserAccount;
-import com.openelo.market.ledger.UserAccountRepository;
+import com.openelo.market.ledger.account.UserAccount;
+import com.openelo.market.ledger.account.UserAccountRepository;
 
 import jakarta.transaction.Transactional;
 

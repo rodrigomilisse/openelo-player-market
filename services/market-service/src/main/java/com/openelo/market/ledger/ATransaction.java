@@ -1,5 +1,7 @@
 package com.openelo.market.ledger;
 
+import com.openelo.market.ledger.account.IAccount;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

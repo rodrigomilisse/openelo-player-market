@@ -1,4 +1,6 @@
-package com.openelo.market;
+package com.openelo.market.user;
+
+import com.openelo.market.ledger.account.AccountService;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;

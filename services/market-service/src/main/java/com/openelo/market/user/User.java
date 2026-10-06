@@ -1,4 +1,5 @@
-package com.openelo.market;
+package com.openelo.market.user;
+
 
 import java.time.Instant;
 import java.util.UUID;
