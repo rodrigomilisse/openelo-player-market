@@ -1,5 +1,6 @@
 package com.openelo.market.trading;
 
+import com.openelo.market.user.IUser;
 import com.openelo.market.user.User;
 import com.openelo.market.user.UserRepository;
 
@@ -31,7 +32,7 @@ public class MarketController {
 		this.walletRepository = walletRepository;
 	}
 
-	record MarketRequest(UUID userId, long amount, UUID playerShare) {
+	record MarketRequest(Id<IUser> userId, long amount, Id<IAsset> playerShare) {
 	}
 
 	// // TODO temp
@@ -45,17 +46,16 @@ public class MarketController {
 	@PostMapping("mint")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void mint(@RequestBody MarketRequest request) {
-		Id<IAccount> account = getAccount(getUser(request.userId));
-		Id<IAsset> playerShare = new Id<>(request.playerShare);
+		Id<IAccount> account = getAccount(getUser(request.userId.value()));
+		Id<IAsset> playerShare = request.playerShare;
 		market.mint(account, request.amount, playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void redeem(@RequestBody MarketRequest request) {
-		Id<IAccount> account = getAccount(getUser(request.userId));
-		Id<IAsset> player_share = new Id<>(request.playerShare);
-
+		Id<IAccount> account = getAccount(getUser(request.userId.value()));
+		Id<IAsset> player_share = request.playerShare;
 		market.redeem(account, request.amount, player_share);
 	}
 
