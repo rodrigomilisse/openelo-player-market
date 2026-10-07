@@ -1,40 +1,58 @@
 
 package com.openelo.market.trading;
 
+import java.util.UUID;
+
 import org.springframework.stereotype.Service;
-import com.openelo.market.ledger.AssetId;
+
+import com.openelo.market.common.IAsset;
+import com.openelo.market.common.Id;
+import com.openelo.market.ledger.IAccount;
+import com.openelo.market.ledger.IRecordedTransaction;
 import com.openelo.market.ledger.Ledger;
-import com.openelo.market.ledger.Mint;
-import com.openelo.market.ledger.Redeem;
-import com.openelo.market.ledger.account.UserAccount;
+
 import jakarta.transaction.Transactional;
 
 @Service
 class Market {
+	public static final Id<IAsset> CREDITS = new Id<>(new UUID(0, 0));
+
+	public static Id<IAccount> PLATFORM_ACCOUNT_ID;
 
 	private final Ledger ledger;
 
-	public long quoteMint(AssetId player_share) {
+	private final MarketTransactionRepository marketTransactions;
+
+	public long quoteMint(Id<IAsset> player_share) {
 		return 100;
 	}
 
-	public long quoteRedeem(AssetId player_share) {
+	public long quoteRedeem(Id<IAsset> player_share) {
 		return 90;
 	}
 
-	public Market(Ledger ledger) {
+	public Market(Ledger ledger, MarketTransactionRepository marketTransactions) {
 		this.ledger = ledger;
+		this.marketTransactions = marketTransactions;
+		// TODO temp so that the field can remain static
+		Market.PLATFORM_ACCOUNT_ID = ledger.openAccount(true);
 	}
 
 	@Transactional
-	public void mint(UserAccount userAccount, long amount, AssetId player_share) {
+	public void mint(Id<IAccount> userAccount, long amount, Id<IAsset> player_share) {
 		long pricePerShare = quoteMint(player_share);
-		ledger.post(new Mint(userAccount, amount, player_share, pricePerShare));
+		Mint mint = new Mint(userAccount, amount, player_share, pricePerShare);
+		Id<IRecordedTransaction> transactionId = ledger.post(mint);
+		mint.setLedgerTransactionId(transactionId);
+		marketTransactions.save(mint);
 	}
 
 	@Transactional
-	public void redeem(UserAccount userAccount, long amount, AssetId player_share) {
+	public void redeem(Id<IAccount> userAccount, long amount, Id<IAsset> player_share) {
 		long pricePerShare = quoteRedeem(player_share);
-		ledger.post(new Redeem(userAccount, amount, player_share, pricePerShare));
+		Redeem redeem = new Redeem(userAccount, amount, player_share, pricePerShare);
+		Id<IRecordedTransaction> transactionId = ledger.post(redeem);
+		redeem.setLedgerTransactionId(transactionId);
+		marketTransactions.save(redeem);
 	}
 }

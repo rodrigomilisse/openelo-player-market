@@ -3,13 +3,13 @@
   ./api.py up                     start postgres (docker compose)
   ./api.py down [-v]              stop postgres (-v also wipes the data)
   ./api.py start                  start the server (mvnw spring-boot:run)
-  ./api.py init
-  ./api.py user alice
+  ./api.py user alice             sign up (creates user, ledger account, wallet)
   ./api.py mint <user-id> 5
   ./api.py redeem <user-id> 2
+  ./api.py balances               balance per account and asset, with its owner
   ./api.py <table>                select * from that table
-                                  (users accounts user_accounts platform_account
-                                   transactions mints redeems postings)
+                                  (users wallets accounts ledger_transactions postings
+                                   market_transactions mints redeems)
   ./api.py db "select ..."        any SQL
 """
 import json
@@ -25,8 +25,18 @@ COMPOSE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 URL = "http://localhost:8080"
 DB = "postgresql://market:market@localhost:5432/market"
 SHARE = "11111111-1111-1111-1111-111111111111"
-TABLES = ["users", "accounts", "user_accounts", "platform_account",
-          "transactions", "mints", "redeems", "postings"]
+TABLES = ["users", "wallets", "accounts", "ledger_transactions", "postings",
+          "market_transactions", "mints", "redeems"]
+
+# accounts without a wallet are platform accounts (one is created per server start)
+BALANCES = """
+select coalesce(u.username, '(platform)') as owner, p.account_id, p.asset_id, sum(p.amount) as balance
+from postings p
+left join wallets w on w.account_id = p.account_id
+left join users u on u.id = w.user_id
+group by 1, 2, 3
+order by 1, 3
+"""
 
 
 def post(path, body=None):
@@ -56,12 +66,12 @@ elif cmd == "down":
     subprocess.run(["docker", "compose", "-f", COMPOSE, "down", *a])
 elif cmd == "start":
     subprocess.run(["./mvnw", "spring-boot:run"], cwd=SERVICE_DIR)
-elif cmd == "init":
-    post("/market/init")
 elif cmd == "user":
     post("/users", {"owner": a[0]})
 elif cmd in ("mint", "redeem"):
     post(f"/market/{cmd}", {"userId": a[0], "amount": int(a[1]), "playerShare": SHARE})
+elif cmd == "balances":
+    sql(BALANCES)
 elif cmd in TABLES:
     sql(f"select * from {cmd}")
 elif cmd == "db":

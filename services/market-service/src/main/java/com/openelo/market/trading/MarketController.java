@@ -1,6 +1,5 @@
 package com.openelo.market.trading;
 
-import com.openelo.market.ledger.account.AccountRepository;
 import com.openelo.market.user.User;
 import com.openelo.market.user.UserRepository;
 
@@ -12,10 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.openelo.market.ledger.AssetId;
-import com.openelo.market.ledger.account.PlatformAccount;
-import com.openelo.market.ledger.account.UserAccount;
-import com.openelo.market.ledger.account.UserAccountRepository;
+import com.openelo.market.common.IAsset;
+import com.openelo.market.common.Id;
+import com.openelo.market.ledger.IAccount;
 
 @RestController
 @RequestMapping("market")
@@ -23,51 +21,46 @@ public class MarketController {
 
 	Market market;
 
-	// TODO temp
-	AccountRepository accountRepository;
-
 	UserRepository userRepository;
 
-	UserAccountRepository userAccountRepository;
+	WalletRepository walletRepository;
 
-	public MarketController(Market market, AccountRepository accountRepository, UserRepository userRepository,
-			UserAccountRepository userAccountRepository) {
+	MarketController(Market market, UserRepository userRepository, WalletRepository walletRepository) {
 		this.market = market;
-		this.accountRepository = accountRepository;
 		this.userRepository = userRepository;
-		this.userAccountRepository = userAccountRepository;
+		this.walletRepository = walletRepository;
 	}
 
 	record MarketRequest(UUID userId, long amount, UUID playerShare) {
 	}
 
-	// TODO temp
-	@PostMapping("init")
-	@ResponseStatus(HttpStatus.CREATED)
-	public void init() {
-		PlatformAccount platformAccount = new PlatformAccount(new UUID(0, 0));
-		accountRepository.save(platformAccount);
-	}
+	// // TODO temp
+	// @PostMapping("init")
+	// @ResponseStatus(HttpStatus.CREATED)
+	// public void init() {
+	// Id<LedgerAccount> platformAccount = market.PLATFORM_ACCOUNT;
+	// accountRepository.save(platformAccount);
+	// }
 
 	@PostMapping("mint")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void mint(@RequestBody MarketRequest request) {
-		UserAccount account = getAccount(getUser(request.userId));
-		AssetId playerShare = new AssetId(request.playerShare);
+		Id<IAccount> account = getAccount(getUser(request.userId));
+		Id<IAsset> playerShare = new Id<>(request.playerShare);
 		market.mint(account, request.amount, playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void redeem(@RequestBody MarketRequest request) {
-		UserAccount account = getAccount(getUser(request.userId));
-		AssetId player_share = new AssetId(request.playerShare);
+		Id<IAccount> account = getAccount(getUser(request.userId));
+		Id<IAsset> player_share = new Id<>(request.playerShare);
 
 		market.redeem(account, request.amount, player_share);
 	}
 
-	private UserAccount getAccount(User user) {
-		return userAccountRepository.findByOwnerId(user.getId()).orElseThrow();
+	private Id<IAccount> getAccount(User user) {
+		return walletRepository.findByUserId(user.getId().value()).orElseThrow().getAccountId();
 	}
 
 	private User getUser(UUID userId) {

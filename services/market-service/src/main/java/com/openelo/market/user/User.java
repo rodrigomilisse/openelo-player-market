@@ -1,13 +1,13 @@
 package com.openelo.market.user;
 
-import java.util.UUID;
+import com.openelo.market.common.BaseEntity;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import com.openelo.market.BaseEntity;
 
 @Entity
 @Table(name = "users")
-public class User extends BaseEntity implements IUser {
+public class User extends BaseEntity<IUser> implements IUser {
 
 	private String username;
 
@@ -16,7 +16,6 @@ public class User extends BaseEntity implements IUser {
 	}
 
 	public User(String username) {
-		super(UUID.randomUUID());
 		this.username = username;
 	}
 

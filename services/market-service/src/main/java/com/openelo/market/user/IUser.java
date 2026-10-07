@@ -1,11 +1,12 @@
 package com.openelo.market.user;
 
 import java.time.Instant;
-import java.util.UUID;
+
+import com.openelo.market.common.Id;
 
 public interface IUser {
 
-	public UUID getId();
+	public Id<IUser> getId();
 
 	public String getUsername();
 

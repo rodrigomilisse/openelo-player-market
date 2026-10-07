@@ -1,5 +1,5 @@
-package com.openelo.market.ledger;
+package com.openelo.market.trading;
 
-public abstract class AMarketTransaction extends ATransaction {
+public abstract class AMarketTransaction<T> extends ATransaction<T> {
 
 }

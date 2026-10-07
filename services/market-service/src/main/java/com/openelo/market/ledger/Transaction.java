@@ -1,19 +1,22 @@
 package com.openelo.market.ledger;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 
-import com.openelo.market.BaseEntity;
+import com.openelo.market.common.BaseEntity;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Table;
 
-@Entity
-public class Transaction extends BaseEntity {
+@Table(name = "ledger_transactions")
+@Entity // TODO "public" is a temporary helper for market to have access to ITransaction
+		// type
+public class Transaction extends BaseEntity<IRecordedTransaction> implements ITransaction {
 
 	@ElementCollection(fetch = FetchType.LAZY)
 	@CollectionTable(name = "postings", joinColumns = @JoinColumn(name = "transaction_id"))
@@ -23,14 +26,23 @@ public class Transaction extends BaseEntity {
 	}
 
 	public Transaction(ITransaction transaction) {
-		super(UUID.randomUUID());
 		// explicit copy
 		postings = new ArrayList<>();
-		transaction.getPostings().forEach(postings::add);
+		transaction.getPostings().forEach(p -> postings.add(copy(p)));
 	}
 
-	private Posting copy(Posting posting) {
-		return new Posting(posting.getAccount(), posting.getAmount(), posting.getAssetId());
+	// TODO temporary helper for market to easily construct Transactions
+	public Transaction(Iterable<? extends IPosting> postings) {
+		this.postings = new ArrayList<>();
+		postings.forEach(p -> this.postings.add(copy(p)));
 	}
 
+	private Posting copy(IPosting posting) {
+		return new Posting(posting);
+	}
+
+	@Override
+	public Iterable<? extends IPosting> getPostings() {
+		return Collections.unmodifiableList(postings);
+	}
 }

@@ -1,51 +1,39 @@
-package com.openelo.market;
+package com.openelo.market.common;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.data.domain.Persistable;
-import jakarta.persistence.Transient;
-import jakarta.persistence.Id;
+
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.UuidGenerator.Style;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.MappedSuperclass;
-import jakarta.persistence.PostLoad;
-import jakarta.persistence.PostPersist;
 
 @MappedSuperclass
-public abstract class BaseEntity implements Persistable<UUID> {
+@EntityListeners(AuditingEntityListener.class)
+public abstract class BaseEntity<T> {
 
-	@Id
+	@jakarta.persistence.Id
+	@GeneratedValue
+	@UuidGenerator(style = Style.VERSION_7)
 	private UUID id;
 
+	@CreatedDate
 	private Instant createdAt;
-
-	@Transient
-	boolean isNew;
 
 	protected BaseEntity() {
 
 	}
 
-	protected BaseEntity(UUID id) {
-		this.id = id;
-		this.createdAt = Instant.now();
-	}
-
-	@Override
-	public UUID getId() {
-		return id;
+	public com.openelo.market.common.Id<T> getId() {
+		return new com.openelo.market.common.Id<>(id);
 	}
 
 	public Instant getCreatedAt() {
 		return createdAt;
 	}
 
-	@Override
-	public boolean isNew() {
-		return isNew;
-	}
-
-	@PostPersist
-	@PostLoad
-	private void markNotNew() {
-		isNew = false;
-	}
 }
