@@ -1,0 +1,147 @@
+%% market-service package / dependency view (architecture, not the domain model — see market_domain_model.mmd)
+%% flowchart instead of classDiagram: classDiagram can't nest boxes (service > package) or colour single edges
+%% edge colours: grey = inside a package, blue = cross-package through the public API,
+%% red dashed = cross-package into a concrete class (coupling to remove), light grey = shared kernel
+flowchart LR
+    Client([HTTP client])
+
+    subgraph svc["market-service"]
+        direction LR
+
+        subgraph trading["trading"]
+            direction TB
+            T_MC["<b>MarketController</b> «controller»<br/>POST /market/mint<br/>POST /market/redeem"]
+            T_SC["<b>SignUpController</b> «controller»<br/>POST /users"]
+            T_SU["<b>SignUp</b> «service»<br/>signUp(username)<br/>user + account + wallet in one tx"]
+            T_M["<b>Market</b> «service»<br/>CREDITS, PLATFORM_ACCOUNT_ID (static)<br/>quoteMint / quoteRedeem (fixed 100 / 90)<br/>mint() / redeem()"]
+            T_W["<b>Wallet</b> «entity» wallets<br/>userId: Id#lt;IUser#gt; (null = platform)<br/>accountId: Id#lt;IAccount#gt;"]
+            T_WR[("WalletRepository<br/>findByUserId")]
+            T_AT["<b>ATransaction#lt;T#gt;</b> «abstract entity»<br/>market_transactions (JOINED)<br/>ledgerTransactionId<br/>postings (@Transient)<br/>debit() / credit()"]
+            T_Mint["<b>Mint</b> «entity» mints<br/>userAccountId"]
+            T_Redeem["<b>Redeem</b> «entity» redeems<br/>userAccountId"]
+            T_Dep["<b>Deposit</b><br/>stub, not an entity"]
+            T_AMT["<b>AMarketTransaction#lt;T#gt;</b><br/>unused"]
+            T_MTR[("MarketTransactionRepository")]
+        end
+
+        subgraph ledger["ledger"]
+            direction TB
+            L_Ledger["<b>Ledger</b> «service» (facade)<br/>post(ITransaction): Id#lt;IRecordedTransaction#gt;<br/>openAccount(allowedNegative): Id#lt;IAccount#gt;<br/>find(id) TODO · balance TODO"]
+            L_AS["<b>AccountService</b> «service»<br/>openAccount(allowedNegative)"]
+            L_IT["<b>ITransaction</b> «interface»<br/>getPostings()"]
+            L_IRT["<b>IRecordedTransaction</b> «interface»"]
+            L_IP["<b>IPosting</b> «interface»<br/>accountId: Id#lt;IAccount#gt;<br/>amount: long<br/>assetId: Id#lt;IAsset#gt;"]
+            L_IA["<b>IAccount</b> «interface»"]
+            L_Tx["<b>Transaction</b> «entity» ledger_transactions<br/>id: Id#lt;IRecordedTransaction#gt;<br/>immutable copy of the posted ITransaction"]
+            L_Po["<b>Posting</b> «embeddable» postings"]
+            L_Ac["<b>Account</b> «entity» accounts<br/>allowedNegative"]
+            L_TxR[("TranasactionRepository")]
+            L_AcR[("AccountRepository")]
+        end
+
+        subgraph user["user"]
+            direction TB
+            U_Ctrl["<b>UserController</b> «controller»<br/>GET /users"]
+            U_IUser["<b>IUser</b> «interface»<br/>getId() · getUsername() · getCreatedAt()"]
+            U_User["<b>User</b> «entity» users<br/>username"]
+            U_Repo[("UserRepository")]
+        end
+
+        subgraph common["common (shared kernel)"]
+            direction TB
+            C_Base["<b>BaseEntity#lt;T#gt;</b> «mapped superclass»<br/>id: UUIDv7 · createdAt (auditing)<br/>getId(): Id#lt;T#gt;"]
+            C_Id["<b>Id#lt;T#gt;</b> «record»<br/>value: UUID (phantom-typed)"]
+            C_IAsset["<b>IAsset</b> «marker interface»"]
+            C_Conv["<b>IdConverter</b><br/>Id ↔ UUID column"]
+            C_Cfg["<b>TimeConfig / PersistenceConfig</b><br/>Clock → auditing timestamps"]
+        end
+    end
+
+    %% 0-2 entry points
+    Client -->|"mint / redeem"| T_MC
+    Client -->|"sign up"| T_SC
+    Client -->|"list"| U_Ctrl
+
+    %% 3-17 inside trading
+    T_MC -->|"mint / redeem(accountId, amount, playerShare)"| T_M
+    T_MC -->|"findByUserId"| T_WR
+    T_SC -->|"signUp(username)"| T_SU
+    T_SU -->|"save(new Wallet)"| T_WR
+    T_WR --> T_W
+    T_M -.->|creates| T_Mint
+    T_M -.->|creates| T_Redeem
+    T_M -->|save| T_MTR
+    T_MTR --> T_AT
+    T_Mint -.->|extends| T_AT
+    T_Redeem -.->|extends| T_AT
+    T_Dep -.->|extends| T_AT
+    T_AMT -.->|extends| T_AT
+    T_Mint -.->|"static CREDITS, PLATFORM_ACCOUNT_ID"| T_M
+    T_Redeem -.-> T_M
+
+    %% 18-30 inside ledger
+    L_Ledger -->|openAccount| L_AS
+    L_Ledger -->|"post: copies ITransaction into"| L_Tx
+    L_Ledger -->|save| L_TxR
+    L_AS -->|save| L_AcR
+    L_TxR --> L_Tx
+    L_AcR --> L_Ac
+    L_Tx -.->|implements| L_IT
+    L_IRT -.->|extends| L_IT
+    L_Tx -->|"1 → 2..* embedded"| L_Po
+    L_Po -.->|implements| L_IP
+    L_Ac -.->|implements| L_IA
+    L_IT -->|getPostings| L_IP
+    L_IP -.->|accountId| L_IA
+
+    %% 31-33 inside user
+    U_User -.->|implements| U_IUser
+    U_Repo --> U_User
+    U_Ctrl --> U_Repo
+
+    %% 34-36 inside common
+    C_Base --> C_Id
+    C_Conv --> C_Id
+    C_Cfg -.->|createdAt| C_Base
+
+    %% 37-42 cross-package via public API (blue)
+    T_M ==>|"post(tx) · openAccount(true)"| L_Ledger
+    T_SU ==>|"openAccount(false)"| L_Ledger
+    T_AT ==>|implements| L_IT
+    T_AT ==>|ledgerTransactionId| L_IRT
+    T_W ==>|accountId| L_IA
+    T_W ==>|userId| U_IUser
+
+    %% 43-45 cross-package into concrete classes (red)
+    T_AT ==>|"new Posting(...)"| L_Po
+    T_SU ==>|"save(new User)"| U_Repo
+    T_MC ==>|"findById → User"| U_Repo
+
+    %% 46-48 every package builds on the shared kernel
+    trading ==>|"BaseEntity · Id · IAsset"| common
+    ledger ==> common
+    user ==> common
+
+    linkStyle 37,38,39,40,41,42 stroke:#2563eb,stroke-width:2.5px
+    linkStyle 43,44,45 stroke:#dc2626,stroke-width:2.5px,stroke-dasharray:6 4
+    linkStyle 46,47,48 stroke:#9ca3af,stroke-width:3px
+
+    classDef iface fill:#eef2ff,stroke:#6366f1,stroke-dasharray:4 3
+    classDef entity fill:#ecfdf5,stroke:#059669
+    classDef svcls fill:#fff7ed,stroke:#ea580c
+    classDef ctrl fill:#fdf4ff,stroke:#a21caf
+    classDef repo fill:#f8fafc,stroke:#64748b
+    classDef stub fill:#f3f4f6,stroke:#9ca3af,color:#6b7280,stroke-dasharray:2 2
+
+    class L_IT,L_IRT,L_IP,L_IA,U_IUser,C_IAsset iface
+    class T_W,T_AT,T_Mint,T_Redeem,L_Tx,L_Po,L_Ac,U_User,C_Base,C_Id entity
+    class T_SU,T_M,L_Ledger,L_AS,C_Conv,C_Cfg svcls
+    class T_MC,T_SC,U_Ctrl ctrl
+    class T_WR,T_MTR,L_TxR,L_AcR,U_Repo repo
+    class T_Dep,T_AMT stub
+
+    style svc fill:none,stroke:#111827,stroke-width:2px
+    style trading fill:#fffbeb,stroke:#d97706
+    style ledger fill:#f0f9ff,stroke:#0284c7
+    style user fill:#fdf2f8,stroke:#db2777
+    style common fill:#f9fafb,stroke:#6b7280

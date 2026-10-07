@@ -1,81 +1,146 @@
+%% market-service conceptual domain model (target, from docs/Spec.md §3), with implementation status
+%% business concepts only: no controllers, repositories or JPA. For the code structure see market_service_packages.mmd
+%% colours: green = implemented, blue = partially implemented, red dashed = not implemented, grey = owned by another service
 classDiagram
   direction LR
 
-  class User {
-    id
-    username
-    createdAt
+  namespace Trading {
+    class Trader {
+      username
+    }
+    class Wallet {
+      links a party to its ledger account
+    }
+    class Trade {
+      <<abstract>>
+      executedAt
+    }
+    class Mint {
+      shares
+      pricePerShare
+    }
+    class Redeem {
+      shares
+      pricePerShare
+    }
+    class MatchedTrade {
+      peer-to-peer, buyer and seller
+      shares
+      price
+    }
+    class Deposit {
+      credits
+    }
+    class PlayerShare {
+      outstandingSupply
+    }
+    class BondingCurve {
+      startPrice (calibrated once)
+      mintPrice(supply)
+      redeemPrice(supply) = k × mintPrice(supply)
+    }
+    class Fee {
+      rate (curve > matched)
+      amount
+    }
   }
 
-  class UserController {
-    create(username)
-    list()
-  }
-  class AccountService {
-    createAccount(user)
-  }
-  class MarketController {
-    init()
-    mint(user, amount, playerShare)
-    redeem(user, amount, playerShare)
-  }
-  class Market {
-    quoteMint(playerShare)
-    quoteRedeem(playerShare)
-    mint(user, amount, playerShare)
-    redeem(user, amount, playerShare)
-  }
-  class Ledger {
-    post(transaction)
-  }
-
-  class Account {
-    <<abstract>>
-    id
-    createdAt
-  }
-  class UserAccount
-  class PlatformAccount
-
-  class Transaction {
-    <<abstract>>
-    id
-    createdAt
-  }
-  class Mint
-  class Redeem
-  class Deposit {
-    not implemented
-  }
-  class Posting {
-    <<value object>>
-    accountId
-    asset
-    amount
-    createdAt
+  namespace Ledger {
+    class Account {
+      purpose
+      allowedNegative
+      balance(asset)
+    }
+    class AccountPurpose {
+      <<enumeration>>
+      TRADER
+      CURVE_RESERVE
+      FEE_REVENUE
+      DIVIDEND_POOL
+    }
+    class Transaction {
+      immutable
+    }
+    class Posting {
+      <<value object>>
+      amount
+    }
+    class Asset {
+      <<abstract>>
+    }
+    class Credits
   }
 
-  UserController --> AccountService : creates account
-  UserController --> User : creates
-  AccountService --> UserAccount : creates
+  namespace Dividends {
+    class DividendPool {
+      period
+      capacity = fees collected
+    }
+    class DividendPayout {
+      credits
+    }
+  }
 
-  MarketController --> Market
-  Market --> UserAccount : finds by owner
-  Market --> Ledger : posts to
-  Market ..> Mint : creates
-  Market ..> Redeem : creates
+  namespace rating_service {
+    class Player
+    class EloSnapshot {
+      elo
+      period
+    }
+  }
 
-  Ledger --> Transaction : saves
+  Trader "0..1" -- "1" Wallet : owns (platform wallets have none)
+  Wallet "1" --> "1" Account
+  Trader "1" --> "*" Trade : initiates
 
-  Account <|-- UserAccount
-  Account <|-- PlatformAccount
-  UserAccount "*" --> "1" User : owner
+  Trade <|-- Mint
+  Trade <|-- Redeem
+  Trade <|-- MatchedTrade
+  Trade <|-- Deposit
+  Trade <|-- DividendPayout
+  Trade "1" --> "1" Transaction : recorded as
+  Trade "1" --> "0..1" Fee : charges
 
-  Transaction <|-- Mint
-  Transaction <|-- Redeem
-  Transaction <|-- Deposit
-  Transaction "1" *-- "2..*" Posting : postings
-  Posting ..> Account : accountId
+  Mint "*" --> "1" PlayerShare
+  Redeem "*" --> "1" PlayerShare
+  MatchedTrade "*" --> "1" PlayerShare
+  PlayerShare "1" *-- "1" BondingCurve : priced by
+  PlayerShare "*" --> "1" Player : represents
 
-  Mint "*" --> "1" UserAccount : userAccount
-  Redeem "*" --> "1" UserAccount : userAccount
+  Transaction "1" *-- "2..*" Posting
+  Posting "*" --> "1" Account
+  Posting "*" --> "1" Asset
+  Account --> AccountPurpose
+  Asset <|-- Credits
+  Asset <|-- PlayerShare
+
+  Fee "*" --> "1" DividendPool : funds
+  DividendPool "1" --> "*" DividendPayout : pays
+  DividendPayout "*" --> "1" EloSnapshot : pegged to
+  EloSnapshot "*" --> "1" Player
+
+  note for Transaction "INV postings sum to 0 per asset (not enforced)"
+  note for Account "INV balance ≥ 0 unless allowedNegative (not enforced)<br/>INV curve reserve and dividend pool never mix<br/>(today: one shared PLATFORM account)"
+  note for BondingCurve "INV the only source of curve prices, no operator discretion<br/>INV mint then redeem always loses a fixed %<br/>(today: hardcoded 100 / 90)"
+  note for PlayerShare "INV Mint raises supply, Redeem lowers it<br/>(today: just an Id, no supply)"
+  note for DividendPool "INV payouts ≤ fees collected that period<br/>INV pegged to Elo, never to share price"
+  style Trader fill:#dcfce7,stroke:#16a34a,color:#14532d
+  style Wallet fill:#dcfce7,stroke:#16a34a,color:#14532d
+  style Trade fill:#dcfce7,stroke:#16a34a,color:#14532d
+  style Posting fill:#dcfce7,stroke:#16a34a,color:#14532d
+  style Mint fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  style Redeem fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  style Account fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  style Transaction fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  style Asset fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  style Credits fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  style PlayerShare fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style BondingCurve fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style MatchedTrade fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style Deposit fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style Fee fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style AccountPurpose fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style DividendPool fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style DividendPayout fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style Player fill:#f3f4f6,stroke:#9ca3af,color:#4b5563
+  style EloSnapshot fill:#f3f4f6,stroke:#9ca3af,color:#4b5563
