@@ -14,7 +14,8 @@ public class Ledger {
 	}
 
 	@Transactional(propagation = Propagation.MANDATORY)
-	public void post(ATransaction transaction) {
-		tranasactionRepository.save(transaction);
+	public void post(ITransaction transaction) {
+		Transaction ledgerTransaction = new Transaction(transaction);
+		tranasactionRepository.save(ledgerTransaction);
 	}
 }
