@@ -14,7 +14,6 @@ import jakarta.persistence.Table;
 @Table(name = "wallets")
 class Wallet extends BaseEntity<Wallet> {
 
-	// null for the platform wallet
 	private UUID userId;
 
 	private UUID accountId;
@@ -25,6 +24,10 @@ class Wallet extends BaseEntity<Wallet> {
 	Wallet(Id<IUser> user, Id<IAccount> account) {
 		this.userId = user.value();
 		this.accountId = account.value();
+	}
+
+	Id<IUser> getUserId() {
+		return new Id<>(userId);
 	}
 
 	Id<IAccount> getAccountId() {

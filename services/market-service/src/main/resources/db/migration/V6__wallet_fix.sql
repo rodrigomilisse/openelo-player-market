@@ -1,0 +1,1 @@
+ALTER TABLE wallets ALTER COLUMN user_id SET NOT NULL;

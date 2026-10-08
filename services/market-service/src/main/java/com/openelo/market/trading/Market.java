@@ -34,7 +34,8 @@ class Market {
 	public Market(Ledger ledger, MarketTransactionRepository marketTransactions) {
 		this.ledger = ledger;
 		this.marketTransactions = marketTransactions;
-		// TODO temp so that the field can remain static
+		// TODO temp, in the future platform account creation is an admin/configuration
+		// responsibility outside the markert
 		Market.PLATFORM_ACCOUNT_ID = ledger.openAccount(true);
 	}
 

@@ -9,7 +9,16 @@ classDiagram
       username
     }
     class Wallet {
-      links a party to its ledger account
+      links a trader to their ledger account
+    }
+    class PlatformAccount {
+      purpose
+    }
+    class PlatformPurpose {
+      <<enumeration>>
+      CURVE_RESERVE
+      FEE_REVENUE
+      DIVIDEND_POOL
     }
     class Trade {
       <<abstract>>
@@ -47,16 +56,8 @@ classDiagram
 
   namespace Ledger {
     class Account {
-      purpose
       allowedNegative
       balance(asset)
-    }
-    class AccountPurpose {
-      <<enumeration>>
-      TRADER
-      CURVE_RESERVE
-      FEE_REVENUE
-      DIVIDEND_POOL
     }
     class Transaction {
       immutable
@@ -89,8 +90,10 @@ classDiagram
     }
   }
 
-  Trader "0..1" -- "1" Wallet : owns (platform wallets have none)
+  Trader "1" -- "1" Wallet : owns
   Wallet "1" --> "1" Account
+  PlatformAccount "1" --> "1" Account
+  PlatformAccount --> PlatformPurpose
   Trader "1" --> "*" Trade : initiates
 
   Trade <|-- Mint
@@ -110,7 +113,6 @@ classDiagram
   Transaction "1" *-- "2..*" Posting
   Posting "*" --> "1" Account
   Posting "*" --> "1" Asset
-  Account --> AccountPurpose
   Asset <|-- Credits
   Asset <|-- PlayerShare
 
@@ -139,7 +141,8 @@ classDiagram
   style MatchedTrade fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
   style Deposit fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
   style Fee fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
-  style AccountPurpose fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style PlatformAccount fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
+  style PlatformPurpose fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
   style DividendPool fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
   style DividendPayout fill:#fee2e2,stroke:#dc2626,stroke-dasharray:5 4,color:#7f1d1d
   style Player fill:#f3f4f6,stroke:#9ca3af,color:#4b5563

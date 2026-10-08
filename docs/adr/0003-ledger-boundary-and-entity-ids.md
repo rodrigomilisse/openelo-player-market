@@ -52,10 +52,19 @@ everything may use `common`. `ledger` and `user` never import each other.
   may go negative). Enforcing that policy belongs in the ledger, because a
   check done by callers races under concurrency; choosing the policy per
   account belongs to the caller that creates it.
-- Who owns an account is a `trading` concern: a `wallets` table
-  (`user_id` nullable, `account_id`, `purpose`). The platform account is a
-  wallet with no user, created at startup through `ledger.openAccount()`.
-  There are no fixed or configured account UUIDs.
+- Who owns an account is a `trading` concern. A `wallets` table links a user to
+  their account (`user_id`, `account_id`, both required); every wallet belongs
+  to a user.
+- Platform accounts are not wallets. A separate `trading`-owned table will list
+  which accounts belong to the platform (`platform_accounts`), so no table
+  needs a nullable owner. Not built yet: today `Market` opens a new platform
+  account at every startup and keeps its id in memory. Creating platform
+  accounts is meant to become an admin/configuration responsibility.
+- Proposed, not decided: a `purpose` column on `platform_accounts` to find an
+  account by role (curve reserve, fee revenue, dividend pool).
+- The schema has no nullable columns: an optional relationship gets its own
+  table instead of a nullable foreign key.
+- There are no fixed or configured account UUIDs.
 
 ### 4. Entities and persistence
 
