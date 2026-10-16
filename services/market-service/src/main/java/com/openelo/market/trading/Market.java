@@ -4,6 +4,7 @@ package com.openelo.market.trading;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
@@ -31,12 +32,14 @@ class Market {
 		return 90;
 	}
 
-	public Market(Ledger ledger, MarketTransactionRepository marketTransactions) {
+	public Market(Ledger ledger, MarketTransactionRepository marketTransactions,
+			TransactionTemplate transactionTemplate) {
 		this.ledger = ledger;
 		this.marketTransactions = marketTransactions;
 		// TODO temp, in the future platform account creation is an admin/configuration
 		// responsibility outside the markert
-		Market.PLATFORM_ACCOUNT_ID = ledger.openAccount(true);
+		// no proxy exists yet during construction, so @Transactional can't be used here
+		Market.PLATFORM_ACCOUNT_ID = transactionTemplate.execute(status -> ledger.openAccount(true));
 	}
 
 	@Transactional

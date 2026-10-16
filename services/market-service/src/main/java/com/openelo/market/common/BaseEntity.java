@@ -14,7 +14,7 @@ import jakarta.persistence.MappedSuperclass;
 
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
-public abstract class BaseEntity<T> {
+public abstract class BaseEntity<T> implements Recorded<T> {
 
 	@jakarta.persistence.Id
 	@GeneratedValue

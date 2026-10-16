@@ -1,4 +1,6 @@
 package com.openelo.market.ledger;
 
-public interface IAccount {
+import com.openelo.market.common.Recorded;
+
+public interface IAccount extends Recorded<IAccount> {
 }

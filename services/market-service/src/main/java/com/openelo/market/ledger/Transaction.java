@@ -16,7 +16,7 @@ import jakarta.persistence.Table;
 @Table(name = "ledger_transactions")
 @Entity // TODO "public" is a temporary helper for market to have access to ITransaction
 		// type
-public class Transaction extends BaseEntity<IRecordedTransaction> implements ITransaction {
+public class Transaction extends BaseEntity<IRecordedTransaction> implements IRecordedTransaction {
 
 	@ElementCollection(fetch = FetchType.LAZY)
 	@CollectionTable(name = "postings", joinColumns = @JoinColumn(name = "transaction_id"))
