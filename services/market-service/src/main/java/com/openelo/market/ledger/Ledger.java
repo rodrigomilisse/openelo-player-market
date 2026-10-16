@@ -1,9 +1,5 @@
 package com.openelo.market.ledger;
 
-import java.lang.foreign.Linker.Option;
-import java.util.Objects;
-import java.util.Optional;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;

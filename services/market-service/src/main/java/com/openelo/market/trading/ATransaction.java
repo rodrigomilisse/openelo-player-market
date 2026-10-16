@@ -3,6 +3,7 @@ package com.openelo.market.trading;
 import com.openelo.market.common.BaseEntity;
 import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
+import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.IPosting;
 import com.openelo.market.ledger.IRecordedTransaction;
 import com.openelo.market.ledger.ITransaction;
@@ -16,14 +17,10 @@ import jakarta.persistence.InheritanceType;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 
-@Entity
+@Entity // TODO holds no real data, not even pk
 @Table(name = "market_transactions")
 @Inheritance(strategy = InheritanceType.JOINED)
 public abstract class ATransaction<T> extends BaseEntity<T> implements ITransaction {
-
-	// @ElementCollection(fetch = FetchType.LAZY)
-	// @CollectionTable(name = "postings", joinColumns = @JoinColumn(name =
-	// "transaction_id"))
 
 	@Transient
 	protected List<IPosting> postings;
@@ -34,12 +31,12 @@ public abstract class ATransaction<T> extends BaseEntity<T> implements ITransact
 
 	}
 
-	protected Posting debit(/* TODO temporary name resolution */Id<com.openelo.market.ledger.IAccount> accountId,
+	protected Posting debit(Id<IAccount> accountId,
 			long amount, Id<IAsset> assetId) {
 		return new Posting(accountId, Math.negateExact(amount), assetId);
 	}
 
-	protected Posting credit(/* TODO temporary name resolution */Id<com.openelo.market.ledger.IAccount> accountId,
+	protected Posting credit(Id<IAccount> accountId,
 			long amount, Id<IAsset> assetId) {
 		return new Posting(accountId, amount, assetId);
 	}
