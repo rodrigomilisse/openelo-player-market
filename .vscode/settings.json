@@ -1,5 +1,6 @@
 {
 	"git.ignoreLimitWarning": true,
 	"git.openRepositoryInParentFolders": "never",
-	"workbench.editor.closeEmptyGroups": true
+	"workbench.editor.closeEmptyGroups": true,
+	"editor.semanticHighlighting.enabled": true
 }

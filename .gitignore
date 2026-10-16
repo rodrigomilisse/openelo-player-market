@@ -8,4 +8,5 @@ build/
 *.iml
 .env
 .vscode/
+.github/
 puppeteer-config.json
