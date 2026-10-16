@@ -10,3 +10,5 @@ build/
 .vscode/
 .github/
 puppeteer-config.json
+docs/schema/
+
