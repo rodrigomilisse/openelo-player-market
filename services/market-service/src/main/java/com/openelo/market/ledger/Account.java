@@ -9,12 +9,6 @@ import jakarta.persistence.Table;
 @Table(name = "accounts")
 public class Account extends BaseEntity<IAccount> implements IAccount {
 
-	boolean allowedNegative;
-
 	protected Account() {
-	}
-
-	Account(boolean allowedNegative) {
-		this.allowedNegative = allowedNegative;
 	}
 }

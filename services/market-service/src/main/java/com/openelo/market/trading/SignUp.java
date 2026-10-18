@@ -14,8 +14,6 @@ import jakarta.transaction.Transactional;
 @Service
 class SignUp {
 
-	private static final boolean ALLOWED_NEGATIVE = false;
-
 	private final UserRepository users;
 
 	private final WalletRepository wallets;
@@ -28,11 +26,12 @@ class SignUp {
 		this.ledger = ledger;
 	}
 
-	// user, ledger account and the wallet linking them commit together or not at all
+	// user, ledger account and the wallet linking them commit together or not at
+	// all
 	@Transactional
 	public Id<IUser> signUp(String username) {
 		User user = users.save(new User(username));
-		Id<IAccount> account = ledger.openAccount(ALLOWED_NEGATIVE);
+		Id<IAccount> account = ledger.openAccount();
 		wallets.save(new Wallet(user.getId(), account));
 		return user.getId();
 	}

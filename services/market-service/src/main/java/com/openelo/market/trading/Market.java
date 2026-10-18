@@ -39,7 +39,7 @@ class Market {
 		// TODO temp, in the future platform account creation is an admin/configuration
 		// responsibility outside the markert
 		// no proxy exists yet during construction, so @Transactional can't be used here
-		Market.PLATFORM_ACCOUNT_ID = transactionTemplate.execute(status -> ledger.openAccount(true));
+		Market.PLATFORM_ACCOUNT_ID = transactionTemplate.execute(status -> ledger.openAccount());
 	}
 
 	@Transactional

@@ -27,12 +27,8 @@ public class Ledger {
 		return transactionRepository.save(ledgerTransaction).getId();
 	}
 
-	public Id<IAccount> openAccount(boolean allowedNegative) {
-		return accountRepository.save(new Account(allowedNegative)).getId();
-	}
-
 	public Id<IAccount> openAccount() {
-		return openAccount(false);
+		return accountRepository.save(new Account()).getId();
 	}
 
 	@Transactional(readOnly = true)
