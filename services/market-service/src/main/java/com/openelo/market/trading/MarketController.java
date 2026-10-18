@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
-import com.openelo.market.ledger.IAccount;
 
 @RestController
 @RequestMapping("market")
@@ -22,48 +21,24 @@ public class MarketController {
 
 	Market market;
 
-	UserRepository userRepository;
-
-	WalletRepository walletRepository;
-
 	MarketController(Market market, UserRepository userRepository, WalletRepository walletRepository) {
 		this.market = market;
-		this.userRepository = userRepository;
-		this.walletRepository = walletRepository;
 	}
 
 	record MarketRequest(Id<IUser> userId, long amount, Id<IAsset> playerShare) {
 	}
 
-	// // TODO temp
-	// @PostMapping("init")
-	// @ResponseStatus(HttpStatus.CREATED)
-	// public void init() {
-	// Id<LedgerAccount> platformAccount = market.PLATFORM_ACCOUNT;
-	// accountRepository.save(platformAccount);
-	// }
-
 	@PostMapping("mint")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void mint(@RequestBody MarketRequest request) {
-		Id<IAccount> account = getAccount(getUser(request.userId.value()));
-		Id<IAsset> playerShare = request.playerShare;
-		market.mint(account, request.amount, playerShare);
+		// TODO validate args
+		market.mint(request.userId, request.amount, request.playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void redeem(@RequestBody MarketRequest request) {
-		Id<IAccount> account = getAccount(getUser(request.userId.value()));
-		Id<IAsset> player_share = request.playerShare;
-		market.redeem(account, request.amount, player_share);
-	}
-
-	private Id<IAccount> getAccount(User user) {
-		return walletRepository.findByUserId(user.getId().value()).orElseThrow().getAccountId();
-	}
-
-	private User getUser(UUID userId) {
-		return userRepository.findById(userId).orElseThrow();
+		// TODO validate args
+		market.redeem(request.userId, request.amount, request.playerShare);
 	}
 }
