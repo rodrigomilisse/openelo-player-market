@@ -28,16 +28,12 @@ public class Redeem extends ATransaction<Redeem> {
 
 		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
 
-		Posting removeSharesFromUser = debit(userAccount, shareAmount, playerShare);
-		Posting removeCreditsFromPlatform = debit(Market.PLATFORM_ACCOUNT_ID, creditAmount, Market.CREDITS);
-		Posting addSharesToPlatform = credit(Market.PLATFORM_ACCOUNT_ID, shareAmount, playerShare);
-		Posting addCreditsToUser = credit(userAccount, creditAmount, Market.CREDITS);
+		Posting sharesToPlatform = new Posting(userAccount, Market.PLATFORM_ACCOUNT_ID, shareAmount, playerShare);
+		Posting creditsToUser = new Posting(Market.PLATFORM_ACCOUNT_ID, userAccount, creditAmount,
+				Market.CREDITS);
 
-		this.postings.add(removeSharesFromUser);
-		this.postings.add(removeCreditsFromPlatform);
-		this.postings.add(addSharesToPlatform);
-		this.postings.add(addCreditsToUser);
-
+		this.postings.add(sharesToPlatform);
+		this.postings.add(creditsToUser);
 	}
 
 	public Id<IAccount> getUserAccount() {

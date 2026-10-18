@@ -5,7 +5,9 @@ import com.openelo.market.common.Id;
 
 public interface IPosting {
 
-	Id<IAccount> getAccountId();
+	Id<IAccount> getFromAccountId();
+
+	Id<IAccount> getToAccountId();
 
 	long getAmount();
 

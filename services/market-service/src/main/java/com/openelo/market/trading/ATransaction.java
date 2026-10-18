@@ -1,13 +1,10 @@
 package com.openelo.market.trading;
 
 import com.openelo.market.common.BaseEntity;
-import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
-import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.IPosting;
 import com.openelo.market.ledger.IRecordedTransaction;
 import com.openelo.market.ledger.ITransaction;
-import com.openelo.market.ledger.Posting;
 
 import java.util.List;
 import java.util.UUID;
@@ -29,16 +26,6 @@ public abstract class ATransaction<T> extends BaseEntity<T> implements ITransact
 
 	protected ATransaction() {
 
-	}
-
-	protected Posting debit(Id<IAccount> accountId,
-			long amount, Id<IAsset> assetId) {
-		return new Posting(accountId, Math.negateExact(amount), assetId);
-	}
-
-	protected Posting credit(Id<IAccount> accountId,
-			long amount, Id<IAsset> assetId) {
-		return new Posting(accountId, amount, assetId);
 	}
 
 	@Override

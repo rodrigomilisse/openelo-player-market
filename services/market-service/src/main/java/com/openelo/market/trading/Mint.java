@@ -27,15 +27,12 @@ public class Mint extends ATransaction<Mint> {
 
 		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
 
-		Posting removeCreditsFromUser = debit(userAccount, creditAmount, Market.CREDITS);
-		Posting removeFromShareFromPlatform = debit(Market.PLATFORM_ACCOUNT_ID, shareAmount, playerShare);
-		Posting addCreditsToPlatform = credit(Market.PLATFORM_ACCOUNT_ID, creditAmount, Market.CREDITS);
-		Posting addSharesToUser = credit(userAccount, shareAmount, playerShare);
+		Posting creditsToPlatform = new Posting(userAccount, Market.PLATFORM_ACCOUNT_ID, creditAmount, Market.CREDITS);
+		Posting sharesToUser = new Posting(Market.PLATFORM_ACCOUNT_ID, userAccount, shareAmount,
+				playerShare);
 
-		this.postings.add(removeCreditsFromUser);
-		this.postings.add(removeFromShareFromPlatform);
-		this.postings.add(addCreditsToPlatform);
-		this.postings.add(addSharesToUser);
+		this.postings.add(creditsToPlatform);
+		this.postings.add(sharesToUser);
 	}
 
 	public Id<IAccount> getUserAccount() {

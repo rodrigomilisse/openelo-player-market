@@ -10,7 +10,9 @@ import jakarta.persistence.Embeddable;
 @Embeddable // TODO "public" is temporary helper for market to easily get an IPosting type
 public class Posting implements IPosting {
 
-	private UUID accountId;
+	private UUID fromAccountId;
+
+	private UUID toAccountId;
 
 	private long amount;
 
@@ -20,21 +22,28 @@ public class Posting implements IPosting {
 	}
 
 	public Posting(IPosting posting) {
-		this.accountId = posting.getAccountId().value();
+		this.fromAccountId = posting.getFromAccountId().value();
+		this.toAccountId = posting.getToAccountId().value();
 		this.amount = posting.getAmount();
 		this.assetId = posting.getAssetId().value();
 	}
 
 	// TODO temporary helper for market to easily construct postings
-	public Posting(Id<IAccount> accountId, long amount, Id<IAsset> assetId) {
-		this.accountId = accountId.value();
+	public Posting(Id<IAccount> fromAccountId, Id<IAccount> toAccountId, long amount, Id<IAsset> assetId) {
+		this.fromAccountId = fromAccountId.value();
+		this.toAccountId = toAccountId.value();
 		this.amount = amount;
 		this.assetId = assetId.value();
 	}
 
 	@Override
-	public Id<IAccount> getAccountId() {
-		return new Id<>(accountId);
+	public Id<IAccount> getFromAccountId() {
+		return new Id<>(fromAccountId);
+	}
+
+	@Override
+	public Id<IAccount> getToAccountId() {
+		return new Id<>(toAccountId);
 	}
 
 	@Override
