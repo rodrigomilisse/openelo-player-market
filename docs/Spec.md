@@ -48,25 +48,39 @@ The founding design constraint, learned from studying Football Index's 2021 coll
 
 ## 3. Monetization & Market Mechanics
 
-**Two revenue streams**: a spread/fee on ordinary trading activity, and profit from primary issuance ("IPO").
+Details and reasoning: [ADR-0009](adr/0009-bonding-curve-pool-accounts.md) (where the curve's money lives) and [ADR-0010](adr/0010-market-mechanics-heat-priced-issuance.md) (how the market behaves).
+
+**Revenue**: two kinds of income — a fee on peer-to-peer (P2P) trades, and profit from issuing new shares (the heat premium plus a mint fee, see below). The platform's cut starts at **0%**: while the platform grows, everything collected funds dividends. A later cut is a business decision, announced in advance.
 
 **Dividends**
 
-- Paid from a capped pool, funded by that period's collected trading fees (pari-mutuel structure) — payout can never exceed what's actually been collected.
-- Pegged strictly to a player's *current* OpenElo level (like a steady dividend-paying equity), never to his share's trading price. This is the single most important fix relative to Football Index: it removes the self-referential loop where price and payout inflate each other.
+- Paid from **one capped pool for the whole market**, funded by that period's collected fees and issuance premiums (pari-mutuel structure) — payout can never exceed what's actually been collected.
+- Split between players by their *current* OpenElo level only (like a steady dividend-paying equity), never by a share's trading price or by how much a player is traded. This is the single most important fix relative to Football Index: it removes the self-referential loop where price and payout inflate each other. One shared pool keeps it that way — a per-player pool would tie each player's payout to its own trading activity.
+- How a player's slice is split per share (divided by that player's supply, or per share by Elo alone) is still open; it decides who bears the dilution from new issuance.
+- When a player retires, dividends fade through the Elo decay rule (§2). The market itself doesn't change: no buyback, no final settlement price.
 
-**Pricing system: calibration sets the starting point, the bonding curve sets everything after**
+**Pricing system: calibration sets the starting point, the curve and its heat set everything after**
 
 - The nominal (displayed) price a new player enters the market at should be scaled to resemble a real transfer fee for intuitiveness — set via a one-time calibration function fit by regressing historical (Elo-at-transfer, age) pairs against real transfer fees. This calibration only ever sets the *first point* on that player's pricing curve (supply = 0); it isn't touched again afterward.
-- From that starting point onward, price moves according to a public, fixed, monotonically increasing bonding curve — price as a function of cumulative shares sold, same formula and shape for every player, only the calibrated starting point differs. This is what removes operator discretion (and the resulting conflict of interest) over who gets a favorable price as demand comes in — nobody, including the operator, picks a price or a quantity, the curve does.
+- From that starting point onward, a public, fixed, monotonically increasing **base curve** gives each share a price as a function of supply — same formula and shape for every player, only the calibrated starting point differs. Redeeming pays this base curve back down: redeeming n shares at supply s pays the base prices of positions s−n … s−1, with no fee.
+- **New shares cost the base curve × (1 + heat).** Heat measures recent demand for new shares: every share minted adds to it (less per share the larger the supply, with a small virtual supply so the first shares don't explode it), and it halves over a fixed period. The constants are public and the same for every player. The effect, with no extra rules: the earliest buyers pay the bare curve and are rewarded most; later buyers are never locked out but pay more, either a heated mint price or a P2P price set by earlier holders; a sudden breakout creates only a little new supply before the rise moves to P2P prices; and a forgotten player cools back to the bare curve and can be revived.
+- Nobody, including the operator, picks a price or a quantity — the base curve and heat do. This is what removes operator discretion (and the resulting conflict of interest) over who gets a favorable price as demand comes in.
 - Nominal price must be clearly disclosed as **not** a legal claim on, or convertible into, any real transfer — this needs to be explicit and repeated in-product, not just in terms of service.
 
-**Primary issuance (IPO)**
+**Issuance and redemption (the curve)**
 
-- The curve should be **permanently two-sided** (mint and redeem, always available, no fixed close), not a one-time event handing off to secondary trading. This guarantees a counterparty always exists, solving the illiquidity problem for thinly-traded/obscure players — the curve is a backstop of last resort, not the primary venue; real peer-to-peer secondary trading is expected to dominate volume for popular players and undercut the curve's spread naturally.
-- Mechanic: redeem price is a constant multiple of mint price at the *current* supply level (e.g. redeem = 0.99 × mint), not tied to any individual share's original purchase price — minting moves the curve up, redeeming moves it back down, and every unit's redeem value is simply whatever the live curve says at the current outstanding supply. This guarantees, for any single mint-then-redeem round trip, that it costs the trader a small, fixed percentage regardless of where on the curve it happens — which is exactly the property that removes the adverse-selection risk we were originally worried about, since nobody can extract a profit by round-tripping against the curve itself. Separately worth flagging as a second-order consideration (not a blocker): this guarantees solvency per-trade, but a full simultaneous mass-redemption event is a different, more extreme tail scenario whose safety depends on the exact shape of the mint curve — worth checking against the specific curve you land on, rather than assumed automatically safe for any constant multiple. This mechanism is separate and independently funded from the dividend pool; keep the two liabilities from blending.
-- Charge a smaller fee on organic peer-to-peer matched trades than on mint/redeem trades against the curve, since matched trades don't require the operator to carry inventory or adverse-selection risk the way standing as a market-maker does.
-- Every quote the operator honors must come from the fixed public formula only — never a blended or discretionary "market price" — or the solvency guarantee and the no-discretion property both break at once.
+- The curve is **permanently two-sided** (mint and redeem, always available, never closed). This guarantees a counterparty always exists, solving the illiquidity problem for thinly-traded/obscure players — the curve is a backstop of last resort, not the primary venue. Heat keeps minting from being the cheap way in while a player is in demand, so P2P trading carries most of a popular player's career: shares are minted when a player is new, traded between users, and redeemed at the end.
+- Each player's curve holds exactly the base-curve price of every share it has issued, so it can always pay for redeeming every outstanding share — a full simultaneous mass redemption is covered whatever the curve's shape. The heat premium and the mint fee never enter it. This reserve is separate from the dividend pool; keep the two liabilities from blending.
+- An order is priced share by share, heat included, so a large order can't buy every share at the first share's price, and a mint-then-redeem round trip always costs at least the mint fee.
+- Every quote the operator honors must come from the public formula only — never a blended or discretionary "market price" — or the solvency guarantee and the no-discretion property both break at once.
+
+**Trading between users (P2P)**
+
+- The platform never trades on the book: no orders, no inventory, no "simulated" liquidity. Its only liquidity is the curve, whose quotes are shown as depth so thin markets still show real prices. The book is anonymous.
+- P2P trades pay a smaller fee than minting, since matched trades don't require the operator to carry inventory or adverse-selection risk.
+- Trading does not pause during matches: users trade against each other or against the formula, never against an operator quoting on the news.
+- Inactive holders are never forced to sell; minting is always available at some price, so they can't block buyers.
+- Current leanings, not final: 24/7 trading, a continuous limit order book, the curve and the book as separate venues, open orders backed by escrow postings, and a taker-only P2P fee.
 
 ---
 
