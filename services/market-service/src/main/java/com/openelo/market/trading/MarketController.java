@@ -1,10 +1,8 @@
 package com.openelo.market.trading;
 
 import com.openelo.market.user.IUser;
-import com.openelo.market.user.User;
 import com.openelo.market.user.UserRepository;
 
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

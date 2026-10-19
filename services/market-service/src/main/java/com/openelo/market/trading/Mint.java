@@ -14,15 +14,12 @@ import jakarta.persistence.Table;
 @Table(name = "mints")
 public class Mint extends ATransaction<Mint> {
 
-	private UUID userAccountId;
-
 	protected Mint() {
 
 	}
 
 	public Mint(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long pricePerShare) {
 
-		this.userAccountId = userAccount.value();
 		this.postings = new ArrayList<>(4);
 
 		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
@@ -33,9 +30,5 @@ public class Mint extends ATransaction<Mint> {
 
 		this.postings.add(creditsToPlatform);
 		this.postings.add(sharesToUser);
-	}
-
-	public Id<IAccount> getUserAccount() {
-		return new Id<>(userAccountId);
 	}
 }

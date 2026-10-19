@@ -23,7 +23,7 @@ class Market {
 
 	private final Ledger ledger;
 
-	private final MarketTransactionRepository marketTransactions;
+	private final MarketTransactionRepository marketTransactionRepository;
 
 	private final WalletRepository walletRepository;
 
@@ -38,7 +38,7 @@ class Market {
 	public Market(Ledger ledger, MarketTransactionRepository marketTransactions, WalletRepository walletRepository,
 			TransactionTemplate transactionTemplate) {
 		this.ledger = ledger;
-		this.marketTransactions = marketTransactions;
+		this.marketTransactionRepository = marketTransactions;
 		this.walletRepository = walletRepository;
 		// TODO temp, in the future platform account creation is an admin/configuration
 		// responsibility outside the markert
@@ -59,7 +59,7 @@ class Market {
 		Mint mint = new Mint(userAccount, amount, player_share, pricePerShare);
 		Id<IRecordedTransaction> transactionId = ledger.post(mint);
 		mint.setLedgerTransactionId(transactionId);
-		marketTransactions.save(mint);
+		marketTransactionRepository.save(mint);
 	}
 
 	@Transactional
@@ -72,6 +72,6 @@ class Market {
 
 		Id<IRecordedTransaction> transactionId = ledger.post(redeem);
 		redeem.setLedgerTransactionId(transactionId);
-		marketTransactions.save(redeem);
+		marketTransactionRepository.save(redeem);
 	}
 }

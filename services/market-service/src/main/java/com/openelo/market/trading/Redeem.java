@@ -15,14 +15,11 @@ import jakarta.persistence.Table;
 @Table(name = "redeems")
 public class Redeem extends ATransaction<Redeem> {
 
-	private UUID userAccountId;
-
 	protected Redeem() {
 
 	}
 
 	public Redeem(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long pricePerShare) {
-		this.userAccountId = userAccount.value();
 
 		this.postings = new ArrayList<>(4);
 
@@ -34,9 +31,5 @@ public class Redeem extends ATransaction<Redeem> {
 
 		this.postings.add(sharesToPlatform);
 		this.postings.add(creditsToUser);
-	}
-
-	public Id<IAccount> getUserAccount() {
-		return new Id<>(this.userAccountId);
 	}
 }
