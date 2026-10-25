@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### manual dev clock (openelo.clock.mode=manual) ###
+.manual-clock
+.manual-clock.tmp

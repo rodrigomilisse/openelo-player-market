@@ -2,7 +2,12 @@
 """
   ./api.py up                     start postgres (docker compose)
   ./api.py down [-v]              stop postgres (-v also wipes the data)
-  ./api.py start                  start the server (mvnw spring-boot:run)
+  ./api.py start [manual]         start the server (mvnw spring-boot:run);
+                                  manual = use the manual dev clock
+  ./api.py time                   show the manual clock
+  ./api.py time 1y                move it: 1y 3mo 2d 4h 30min, -1d to go back
+  ./api.py time 05mar26 14:30     jump to a date (ddmmmyy or ddmmmyyyy) and/or time (UTC)
+  ./api.py time -1d --force       going back in time needs --force
   ./api.py user alice             sign up (creates user, ledger account, wallet)
   ./api.py mint <user-id> 5
   ./api.py redeem <user-id> 2
@@ -39,10 +44,10 @@ order by 1, 3
 """
 
 
-def post(path, body=None):
+def post(path, body=None, method="POST"):
     req = urllib.request.Request(
-        URL + path, method="POST",
-        data=json.dumps(body).encode() if body is not None else b"",
+        URL + path, method=method,
+        data=json.dumps(body).encode() if body is not None else None,
         headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req) as r:
@@ -65,7 +70,16 @@ if cmd == "up":
 elif cmd == "down":
     subprocess.run(["docker", "compose", "-f", COMPOSE, "down", *a])
 elif cmd == "start":
-    subprocess.run(["./mvnw", "spring-boot:run"], cwd=SERVICE_DIR)
+    run = ["./mvnw", "spring-boot:run"]
+    if a[:1] == ["manual"]:
+        run.append("-Dspring-boot.run.arguments=--openelo.clock.mode=manual")
+    subprocess.run(run, cwd=SERVICE_DIR)
+elif cmd == "time":
+    words = [w for w in a if w != "--force"]
+    if words:
+        post("/dev/clock", {"command": " ".join(words), "force": "--force" in a})
+    else:
+        post("/dev/clock", method="GET")
 elif cmd == "user":
     post("/users", {"owner": a[0]})
 elif cmd in ("mint", "redeem"):
