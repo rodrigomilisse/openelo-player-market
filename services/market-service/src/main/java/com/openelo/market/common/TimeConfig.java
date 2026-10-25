@@ -8,8 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// openelo.clock.mode picks the Clock every time-dependent bean receives:
-// system (default) is real UTC time, manual only moves when told to (ClockController)
 @Configuration
 public class TimeConfig {
 

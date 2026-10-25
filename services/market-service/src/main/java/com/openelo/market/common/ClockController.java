@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// Only exists with openelo.clock.mode=manual. Commands: see ClockCommands.
 @RestController
 @RequestMapping("dev/clock")
 @ConditionalOnProperty(name = "openelo.clock.mode", havingValue = "manual")

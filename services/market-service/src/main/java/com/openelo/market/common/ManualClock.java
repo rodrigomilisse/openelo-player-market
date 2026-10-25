@@ -14,9 +14,7 @@ import java.time.format.DateTimeParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// Development clock: stands still until set. The current instant is saved to a
-// file on every change and read back at startup, so restarts (including devtools
-// restarts) never move time.
+// the instant is saved on every change so devtools restarts don't reset the fake time
 public class ManualClock extends Clock {
 
 	private static final Logger log = LoggerFactory.getLogger(ManualClock.class);
@@ -57,7 +55,6 @@ public class ManualClock extends Clock {
 		return ZoneOffset.UTC;
 	}
 
-	// a view in another zone that still follows this clock
 	@Override
 	public Clock withZone(ZoneId zone) {
 		ManualClock source = this;

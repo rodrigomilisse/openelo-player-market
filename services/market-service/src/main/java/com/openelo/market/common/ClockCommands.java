@@ -11,12 +11,6 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// Parses manual clock commands. All times are UTC. Several commands can be given
-// at once, separated by spaces, and are applied left to right ("05mar26 14:30").
-//   1y 3mo 2d 4h 30min   move forward; a leading - moves back (-1d)
-//   05mar26 / 05mar2026  jump to that date, keeping the time of day;
-//                        two-digit years mean 1950-2049
-//   14:30                jump to that time of day, keeping the date
 final class ClockCommands {
 
 	private static final Pattern DURATION = Pattern.compile("(-?)(\\d+)(min|h|d|mo|y)");
