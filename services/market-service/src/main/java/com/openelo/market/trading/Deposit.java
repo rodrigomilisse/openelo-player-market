@@ -2,7 +2,6 @@ package com.openelo.market.trading;
 
 import java.util.ArrayList;
 
-import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.Posting;

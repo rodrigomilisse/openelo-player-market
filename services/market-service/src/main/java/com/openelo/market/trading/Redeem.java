@@ -6,7 +6,6 @@ import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.Posting;
 
 import java.util.ArrayList;
-import java.util.UUID;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
