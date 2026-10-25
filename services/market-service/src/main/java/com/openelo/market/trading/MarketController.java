@@ -1,5 +1,6 @@
 package com.openelo.market.trading;
 
+import com.openelo.market.pricing.ShareService;
 import com.openelo.market.user.IUser;
 import com.openelo.market.user.UserRepository;
 
@@ -19,11 +20,23 @@ public class MarketController {
 
 	Market market;
 
-	MarketController(Market market, UserRepository userRepository, WalletRepository walletRepository) {
+	ShareService shareService;
+
+	MarketController(Market market, ShareService shareService, UserRepository userRepository, WalletRepository walletRepository) {
 		this.market = market;
+		this.shareService = shareService;
 	}
 
 	record MarketRequest(Id<IUser> userId, long amount, Id<IAsset> playerShare) {
+	}
+
+	record ShareResponse(Id<IAsset> shareId) {
+	}
+
+	@PostMapping("shares")
+	@ResponseStatus(HttpStatus.CREATED)
+	public ShareResponse list() {
+		return new ShareResponse(shareService.listShare());
 	}
 
 	@PostMapping("mint")

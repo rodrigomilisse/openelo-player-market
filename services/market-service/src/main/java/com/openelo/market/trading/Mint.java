@@ -4,8 +4,8 @@ import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.Posting;
+import com.openelo.market.pricing.ShareService;
 import java.util.ArrayList;
-import java.util.UUID;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -18,14 +18,12 @@ public class Mint extends ATransaction<Mint> {
 
 	}
 
-	public Mint(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long pricePerShare) {
+	public Mint(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long creditAmount) {
 
 		this.postings = new ArrayList<>(4);
 
-		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
-
 		Posting creditsToPlatform = new Posting(userAccount, Market.PLATFORM_ACCOUNT_ID, creditAmount, Market.CREDITS);
-		Posting sharesToUser = new Posting(Market.PLATFORM_ACCOUNT_ID, userAccount, shareAmount,
+		Posting sharesToUser = new Posting(ShareService.getPoolAccountId(playerShare), userAccount, shareAmount,
 				playerShare);
 
 		this.postings.add(creditsToPlatform);

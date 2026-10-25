@@ -9,8 +9,9 @@
   ./api.py time 05mar26 14:30     jump to a date (ddmmmyy or ddmmmyyyy) and/or time (UTC)
   ./api.py time -1d --force       going back in time needs --force
   ./api.py user alice             sign up (creates user, ledger account, wallet)
-  ./api.py mint <user-id> 5
-  ./api.py redeem <user-id> 2
+  ./api.py share                  list a new share (opens its pool account; prints the share id)
+  ./api.py mint <user-id> <share-id> 5
+  ./api.py redeem <user-id> <share-id> 2
   ./api.py balances               balance per account and asset, with its owner
   ./api.py <table>                select * from that table
                                   (users wallets accounts ledger_transactions postings
@@ -29,7 +30,6 @@ COMPOSE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "..", "..", "..", "infra", "compose.yml")
 URL = "http://localhost:8080"
 DB = "postgresql://market:market@localhost:5432/market"
-SHARE = "11111111-1111-1111-1111-111111111111"
 TABLES = ["users", "wallets", "accounts", "ledger_transactions", "postings",
           "market_transactions", "mints", "redeems"]
 
@@ -82,8 +82,10 @@ elif cmd == "time":
         post("/dev/clock", method="GET")
 elif cmd == "user":
     post("/users", {"owner": a[0]})
+elif cmd == "share":
+    post("/market/shares")
 elif cmd in ("mint", "redeem"):
-    post(f"/market/{cmd}", {"userId": a[0], "amount": int(a[1]), "playerShare": SHARE})
+    post(f"/market/{cmd}", {"userId": a[0], "playerShare": a[1], "amount": int(a[2])})
 elif cmd == "balances":
     sql(BALANCES)
 elif cmd in TABLES:

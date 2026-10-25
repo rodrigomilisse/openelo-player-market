@@ -4,6 +4,7 @@ import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.Posting;
+import com.openelo.market.pricing.ShareService;
 
 import java.util.ArrayList;
 
@@ -18,17 +19,15 @@ public class Redeem extends ATransaction<Redeem> {
 
 	}
 
-	public Redeem(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long pricePerShare) {
+	public Redeem(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long creditAmount) {
 
 		this.postings = new ArrayList<>(4);
 
-		long creditAmount = Math.multiplyExact(shareAmount, pricePerShare);
-
-		Posting sharesToPlatform = new Posting(userAccount, Market.PLATFORM_ACCOUNT_ID, shareAmount, playerShare);
+		Posting sharesToPool = new Posting(userAccount, ShareService.getPoolAccountId(playerShare), shareAmount, playerShare);
 		Posting creditsToUser = new Posting(Market.PLATFORM_ACCOUNT_ID, userAccount, creditAmount,
 				Market.CREDITS);
 
-		this.postings.add(sharesToPlatform);
+		this.postings.add(sharesToPool);
 		this.postings.add(creditsToUser);
 	}
 }

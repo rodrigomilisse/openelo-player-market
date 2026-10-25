@@ -11,6 +11,7 @@ import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.IRecordedTransaction;
 import com.openelo.market.ledger.Ledger;
+import com.openelo.market.pricing.Quoter;
 import com.openelo.market.user.IUser;
 
 import jakarta.transaction.Transactional;
@@ -27,19 +28,14 @@ class Market {
 
 	private final WalletRepository walletRepository;
 
-	public long quoteMint(Id<IAsset> player_share) {
-		return 100;
-	}
-
-	public long quoteRedeem(Id<IAsset> player_share) {
-		return 90;
-	}
+	private final Quoter quoter;
 
 	public Market(Ledger ledger, MarketTransactionRepository marketTransactions, WalletRepository walletRepository,
-			TransactionTemplate transactionTemplate) {
+			Quoter quoter, TransactionTemplate transactionTemplate) {
 		this.ledger = ledger;
 		this.marketTransactionRepository = marketTransactions;
 		this.walletRepository = walletRepository;
+		this.quoter = quoter;
 		// TODO temp, in the future platform account creation is an admin/configuration
 		// responsibility outside the markert
 		// no proxy exists yet during construction, so @Transactional can't be used here
@@ -54,9 +50,9 @@ class Market {
 	public void mint(Id<IUser> userId, long amount, Id<IAsset> player_share) {
 
 		Id<IAccount> userAccount = getAccount(userId);
-		long pricePerShare = quoteMint(player_share);
+		long cost = quoter.mint(player_share, amount);
 
-		Mint mint = new Mint(userAccount, amount, player_share, pricePerShare);
+		Mint mint = new Mint(userAccount, amount, player_share, cost);
 		Id<IRecordedTransaction> transactionId = ledger.post(mint);
 		mint.setLedgerTransactionId(transactionId);
 		marketTransactionRepository.save(mint);
@@ -66,9 +62,9 @@ class Market {
 	public void redeem(Id<IUser> userId, long amount, Id<IAsset> player_share) {
 
 		Id<IAccount> userAccount = getAccount(userId);
-		long pricePerShare = quoteRedeem(player_share);
+		long proceeds = quoter.redeem(player_share, amount);
 
-		Redeem redeem = new Redeem(userAccount, amount, player_share, pricePerShare);
+		Redeem redeem = new Redeem(userAccount, amount, player_share, proceeds);
 
 		Id<IRecordedTransaction> transactionId = ledger.post(redeem);
 		redeem.setLedgerTransactionId(transactionId);
