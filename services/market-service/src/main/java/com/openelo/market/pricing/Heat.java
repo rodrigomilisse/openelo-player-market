@@ -53,6 +53,11 @@ final class Heat implements QuoteComponent {
 		return 0;
 	}
 
+	@Override
+	public QuoteRole role() {
+		return QuoteRole.REVENUE;
+	}
+
 	// the start of the window that is open now
 	private Instant currentWindowStart() {
 		return clock.instant().minus(WINDOW);

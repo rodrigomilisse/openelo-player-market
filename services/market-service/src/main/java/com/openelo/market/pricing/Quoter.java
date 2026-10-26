@@ -20,19 +20,22 @@ public final class Quoter {
 		this.components = components;
 	}
 
-	public long quoteMint(Id<IAsset> share, long shareAmount) {
+	public Quote quoteMint(Id<IAsset> share, long shareAmount) {
 		requireNatural(shareAmount);
-		return total(component -> component.walkUp(share, shareAmount));
+		long backing = total(QuoteRole.BACKING, component -> component.walkUp(share, shareAmount));
+		long revenue = total(QuoteRole.REVENUE, component -> component.walkUp(share, shareAmount));
+		return new Quote(backing, revenue);
 	}
 
 	public long quoteRedeem(Id<IAsset> share, long shareAmount) {
 		requireNatural(shareAmount);
 		requireAvailable(share, shareAmount);
-		return total(component -> component.walkDown(share, shareAmount));
+		return total(QuoteRole.BACKING, component -> component.walkDown(share, shareAmount));
 	}
 
-	private long total(ToLongFunction<QuoteComponent> price) {
-		return components.stream().mapToLong(price).reduce(0L, Math::addExact);
+	private long total(QuoteRole role, ToLongFunction<QuoteComponent> price) {
+		return components.stream().filter(component -> component.role() == role).mapToLong(price)
+				.reduce(0L, Math::addExact);
 	}
 
 	private void requireAvailable(Id<IAsset> share, long shareAmount) {

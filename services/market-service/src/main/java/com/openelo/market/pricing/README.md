@@ -17,16 +17,16 @@ account is the ledger account whose id is the share's id (`ShareService`). Desig
 - [x] Heat derived from mint history (nothing stored)
 - [x] Integer arithmetic only; the order's premium in closed form, exact because prices are multiples of the price unit
 - [ ] Cooling form chosen: hard window today, linear ramp as the smoother alternative
-- [ ] Mint fee (mint only, announced in advance)
+- [x] Mint fee (mint only): 10% of the base curve cost as a placeholder
 - [ ] Constants (window, heat per share, fees) chosen from a target plus simulation
 
 ### Trading and accounts
 - [x] Shares issued from their own pool account (listing opens it; account id = share id)
-- [ ] Credits held by the pool too, not the shared platform account
+- [x] The credits that back redeems are held by the pool
 - [ ] Link from a share to its player
 - [ ] `platform_accounts` table, with a persisted fee account
-- [ ] Mint posts the base price to the pool and the premium plus fee to the fee account (today: the whole cost goes to the platform account)
-- [ ] Redeem pays the base curve back down, no fee
+- [x] Mint posts the base price to the pool and the surcharge plus fee to the platform account (a persisted fee account is still to come)
+- [x] Redeem pays the base curve back down from the pool, no fee
 - [ ] One dividend pool for the whole market, split by Elo; platform cut 0%
 
 ### Market (leaning, not decided)

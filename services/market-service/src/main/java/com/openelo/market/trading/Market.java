@@ -11,6 +11,7 @@ import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.IRecordedTransaction;
 import com.openelo.market.ledger.Ledger;
+import com.openelo.market.pricing.Quote;
 import com.openelo.market.pricing.Quoter;
 import com.openelo.market.pricing.ShareService;
 import com.openelo.market.user.IUser;
@@ -54,9 +55,9 @@ class Market {
 	public void mint(Id<IUser> userId, long shareAmount, Id<IAsset> player_share) {
 
 		Id<IAccount> userAccount = getAccount(userId);
-		long cost = quoter.quoteMint(player_share, shareAmount);
+		Quote quote = quoter.quoteMint(player_share, shareAmount);
 
-		Mint mint = new Mint(shareService, userAccount, shareAmount, player_share, cost);
+		Mint mint = new Mint(shareService, userAccount, shareAmount, player_share, quote);
 		Id<IRecordedTransaction> transactionId = ledger.post(mint);
 		mint.setLedgerTransactionId(transactionId);
 		marketTransactionRepository.save(mint);

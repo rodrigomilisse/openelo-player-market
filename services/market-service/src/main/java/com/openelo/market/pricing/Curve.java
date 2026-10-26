@@ -23,6 +23,11 @@ final class Curve implements QuoteComponent {
 		this.shareService = shareService;
 	}
 
+	@Override
+	public QuoteRole role() {
+		return QuoteRole.BACKING;
+	}
+
 	// Naturally: price(supply) + price(supply + 1) + … for shareAmount shares.
 	@Override
 	public long walkUp(Id<IAsset> share, long shareAmount) {

@@ -9,4 +9,6 @@ interface QuoteComponent {
 	long walkUp(Id<IAsset> share, long shareAmount);
 
 	long walkDown(Id<IAsset> share, long shareAmount);
+
+	QuoteRole role();
 }

@@ -26,7 +26,7 @@ public class Redeem extends ATransaction<Redeem> {
 
 		Posting sharesToPool = new Posting(userAccount, shareService.getPoolAccountId(playerShare), shareAmount,
 				playerShare);
-		Posting creditsToUser = new Posting(Market.PLATFORM_ACCOUNT_ID, userAccount, creditAmount,
+		Posting creditsToUser = new Posting(shareService.getPoolAccountId(playerShare), userAccount, creditAmount,
 				Market.CREDITS);
 
 		this.postings.add(sharesToPool);
