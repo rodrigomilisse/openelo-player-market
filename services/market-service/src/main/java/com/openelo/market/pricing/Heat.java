@@ -14,12 +14,13 @@ final class Heat implements QuoteComponent {
 
 	private static final Duration WINDOW = Duration.ofDays(30);
 
-	// heat is a whole number in which HEAT_SCALE means 100%; every price is a
-	// multiple of
+	// heat is an integer in which HEAT_SCALE means 100%; every price is a multiple of
 	// Curve.PRICE_UNIT, so removing the scale from a price times a heat is exact
 	private static final long HEAT_SCALE = Curve.PRICE_UNIT;
 
-	private static final long HEAT_PER_SHARE = 1;
+	// each share adds 0.1% of heat, written as a division of the price unit so the rate stays an
+	// integer
+	private static final long HEAT_RATE = Math.divideExact(Curve.PRICE_UNIT, 1000);
 
 	private final ShareService shareService;
 
@@ -34,7 +35,7 @@ final class Heat implements QuoteComponent {
 	}
 
 	// TODO revisit how the heat is calculated (see the pricing README)
-	// Naturally: every share pays its price times its heat, which is HEAT_PER_SHARE
+	// Naturally: every share pays its price times its heat, which is HEAT_RATE
 	// for each share
 	// before it (the ones minted inside the window plus the ones ahead of it in the
 	// same order),
@@ -42,8 +43,8 @@ final class Heat implements QuoteComponent {
 	@Override
 	public long walkUp(Id<IAsset> share, long shareAmount) {
 		long recentShares = shareService.getMintedSince(share, currentWindowStart());
-		long firstHeat = Math.multiplyExact(recentShares, HEAT_PER_SHARE);
-		long scaledPremium = curve.sumPricesTimesHeat(share, shareAmount, firstHeat, HEAT_PER_SHARE);
+		long firstHeat = Math.multiplyExact(recentShares, HEAT_RATE);
+		long scaledPremium = curve.sumPricesTimesHeat(share, shareAmount, firstHeat, HEAT_RATE);
 		return Math.divideExact(scaledPremium, HEAT_SCALE);
 	}
 

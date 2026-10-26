@@ -8,11 +8,12 @@ import com.openelo.market.common.Id;
 @Component
 final class Fee implements QuoteComponent {
 
-	// the fee is a whole number out of FEE_SCALE; every base cost is a multiple of
+	// the fee is an integer out of FEE_SCALE; every base cost is a multiple of
 	// Curve.PRICE_UNIT, so taking the rate of it is exact
 	private static final long FEE_SCALE = Curve.PRICE_UNIT;
 
-	private static final long FEE_RATE = 100;
+	// 10% of the scale, written as a division of the price unit so the rate stays an integer
+	private static final long FEE_RATE = Math.divideExact(Curve.PRICE_UNIT, 10);
 
 	private final Curve curve;
 
