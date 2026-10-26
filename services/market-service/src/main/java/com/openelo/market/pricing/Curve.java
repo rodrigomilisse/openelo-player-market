@@ -49,10 +49,9 @@ final class Curve implements QuoteComponent {
 		return Math.addExact(startCost, slopeCost);
 	}
 
-	// Naturally: price(supply + index) × (sharesBefore + index) for every share in
-	// the order, the
-	// first share having index 0, added up.
-	long sumPricesTimesSharesBefore(Id<IAsset> share, long shareAmount, long sharesBefore) {
+	// Naturally: price(supply + index) × (firstHeat + heatPerShare × index) for every share in the
+	// order, the first share having index 0, added up.
+	long sumPricesTimesHeat(Id<IAsset> share, long shareAmount, long firstHeat, long heatPerShare) {
 		long supply = shareService.getSupply(share);
 		long indexSum = Series.ofIndices(shareAmount);
 		long squareSum = Series.ofSquaredIndices(shareAmount);
@@ -60,8 +59,9 @@ final class Curve implements QuoteComponent {
 		long startTimesIndex = Math.multiplyExact(START, indexSum);
 		long slopeTimesIndex = Math.multiplyExact(SLOPE, positionTimesIndexSum);
 		long pricesTimesIndex = Math.addExact(startTimesIndex, slopeTimesIndex);
-		long pricesTimesSharesBefore = Math.multiplyExact(sharesBefore, sumPrices(supply, shareAmount));
-		return Math.addExact(pricesTimesSharesBefore, pricesTimesIndex);
+		long pricesTimesFirstHeat = Math.multiplyExact(firstHeat, sumPrices(supply, shareAmount));
+		long pricesTimesHeatStep = Math.multiplyExact(heatPerShare, pricesTimesIndex);
+		return Math.addExact(pricesTimesFirstHeat, pricesTimesHeatStep);
 	}
 
 	private static final class Series {

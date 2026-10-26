@@ -42,8 +42,8 @@ final class Heat implements QuoteComponent {
 	@Override
 	public long walkUp(Id<IAsset> share, long shareAmount) {
 		long recentShares = shareService.getMintedSince(share, currentWindowStart());
-		long pricesTimesSharesBefore = curve.sumPricesTimesSharesBefore(share, shareAmount, recentShares);
-		long scaledPremium = Math.multiplyExact(pricesTimesSharesBefore, HEAT_PER_SHARE);
+		long firstHeat = Math.multiplyExact(recentShares, HEAT_PER_SHARE);
+		long scaledPremium = curve.sumPricesTimesHeat(share, shareAmount, firstHeat, HEAT_PER_SHARE);
 		return Math.divideExact(scaledPremium, HEAT_SCALE);
 	}
 
