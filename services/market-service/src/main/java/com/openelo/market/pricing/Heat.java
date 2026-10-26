@@ -33,6 +33,7 @@ final class Heat implements QuoteComponent {
 		this.clock = clock;
 	}
 
+	// TODO revisit how the heat is calculated (see the pricing README)
 	// Naturally: every share pays its price times its heat, which is HEAT_PER_SHARE
 	// for each share
 	// before it (the ones minted inside the window plus the ones ahead of it in the

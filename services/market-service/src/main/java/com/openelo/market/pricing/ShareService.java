@@ -37,8 +37,12 @@ public class ShareService {
 		return new Id<>(share.value());
 	}
 
-	// Read once per transaction: the components of a quote all ask for it, and a mint or redeem reads
-	// the supply before it posts. A flow that posts and then reads again would see the old value.
+	// TODO revisit whether remembering the supply per transaction is the best way to share it between
+	// the quote components (see the pricing README)
+	// Read once per transaction: the components of a quote all ask for it, and a
+	// mint or redeem reads
+	// the supply before it posts. A flow that posts and then reads again would see
+	// the old value.
 	public long getSupply(Id<IAsset> share) {
 		return suppliesInThisTransaction().computeIfAbsent(share, this::readSupply);
 	}

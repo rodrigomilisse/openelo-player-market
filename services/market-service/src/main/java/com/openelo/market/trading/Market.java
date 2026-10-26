@@ -54,7 +54,7 @@ class Market {
 	public void mint(Id<IUser> userId, long shareAmount, Id<IAsset> player_share) {
 
 		Id<IAccount> userAccount = getAccount(userId);
-		long cost = quoter.mint(player_share, shareAmount);
+		long cost = quoter.quoteMint(player_share, shareAmount);
 
 		Mint mint = new Mint(shareService, userAccount, shareAmount, player_share, cost);
 		Id<IRecordedTransaction> transactionId = ledger.post(mint);
@@ -66,7 +66,7 @@ class Market {
 	public void redeem(Id<IUser> userId, long shareAmount, Id<IAsset> player_share) {
 
 		Id<IAccount> userAccount = getAccount(userId);
-		long proceeds = quoter.redeem(player_share, shareAmount);
+		long proceeds = quoter.quoteRedeem(player_share, shareAmount);
 
 		Redeem redeem = new Redeem(shareService, userAccount, shareAmount, player_share, proceeds);
 

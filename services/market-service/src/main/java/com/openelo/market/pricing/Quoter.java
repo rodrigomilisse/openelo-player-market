@@ -20,12 +20,12 @@ public final class Quoter {
 		this.components = components;
 	}
 
-	public long mint(Id<IAsset> share, long shareAmount) {
+	public long quoteMint(Id<IAsset> share, long shareAmount) {
 		requireNatural(shareAmount);
 		return total(component -> component.walkUp(share, shareAmount));
 	}
 
-	public long redeem(Id<IAsset> share, long shareAmount) {
+	public long quoteRedeem(Id<IAsset> share, long shareAmount) {
 		requireNatural(shareAmount);
 		requireAvailable(share, shareAmount);
 		return total(component -> component.walkDown(share, shareAmount));

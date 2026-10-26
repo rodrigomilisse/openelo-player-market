@@ -39,3 +39,8 @@ account is the ledger account whose id is the share's id (`ShareService`). Desig
 ## Notes (proposed, not built)
 
 - **Bound the history read.** Only mints newer than X contribute heat (older ones count as 0), or only the last Y mints count. A thin market can use the Y-mints rule so old purchases still matter a little; a busy one can use the time rule, since its recent mints carry nearly all the heat. The same rule lets the query load only recent transactions.
+
+## To revisit
+
+- **Sharing the supply between quote components.** Today `ShareService.getSupply` remembers the value per transaction so that every component of a quote reads it once. Not sure this is the best way.
+- **The heat calculation.** Not convinced the current approach is the best one. Known open questions: the cooling form (hard window or linear ramp), the closed form being tied to the placeholder curve, and the constants (window, heat per share).
