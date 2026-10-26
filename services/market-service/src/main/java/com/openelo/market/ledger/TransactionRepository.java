@@ -1,11 +1,22 @@
 package com.openelo.market.ledger;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
+	@Query(value = """
+			SELECT COALESCE(SUM(p.amount), 0)
+			FROM postings p
+			JOIN ledger_transactions t ON t.id = p.transaction_id
+			WHERE p.from_account_id = :accountId
+			  AND p.asset_id = :assetId
+			  AND t.created_at > :since
+			""", nativeQuery = true)
+	long getOutflow(UUID accountId, UUID assetId, Instant since);
+
 	// Native so it reads postings directly. Postings are an @ElementCollection, not
 	// an entity, so JPQL can only reach them through their owning transaction,
 	// which joins ledger_transactions for nothing.

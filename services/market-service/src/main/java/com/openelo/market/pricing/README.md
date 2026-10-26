@@ -12,19 +12,20 @@ account is the ledger account whose id is the share's id (`ShareService`). Desig
 - [x] Orders priced over the range they walk, not one price × amount
 - [x] Time as an injected `Clock`
 - [ ] Base curve shape chosen (linear placeholder today)
-- [ ] Heat: mint price = curve × (1 + heat), heat added per share minted, halving every τ
-- [ ] Virtual supply s₀ in the heat step
-- [ ] Heat building up share by share within an order
-- [ ] Heat derived from mint history (nothing stored)
+- [x] Heat: mint premium over the curve; every share minted in the window adds the same heat (linear)
+- [x] Heat building up share by share within an order
+- [x] Heat derived from mint history (nothing stored)
+- [x] Integer arithmetic only; the order's premium in closed form, exact because prices are multiples of the price unit
+- [ ] Cooling form chosen: hard window today, linear ramp as the smoother alternative
 - [ ] Mint fee (mint only, announced in advance)
-- [ ] Constants (step, s₀, τ, fees) chosen from a target plus simulation
+- [ ] Constants (window, heat per share, fees) chosen from a target plus simulation
 
 ### Trading and accounts
 - [x] Shares issued from their own pool account (listing opens it; account id = share id)
 - [ ] Credits held by the pool too, not the shared platform account
 - [ ] Link from a share to its player
 - [ ] `platform_accounts` table, with a persisted fee account
-- [ ] Mint posts the base price to the pool and the premium plus fee to the fee account
+- [ ] Mint posts the base price to the pool and the premium plus fee to the fee account (today: the whole cost goes to the platform account)
 - [ ] Redeem pays the base curve back down, no fee
 - [ ] One dividend pool for the whole market, split by Elo; platform cut 0%
 
@@ -34,3 +35,7 @@ account is the ledger account whose id is the share's id (`ShareService`). Desig
 - [ ] Escrow postings for open orders
 - [ ] Taker-only P2P fee, lower than minting
 - [ ] Curve quotes shown as depth; anonymous book; platform never trades
+
+## Notes (proposed, not built)
+
+- **Bound the history read.** Only mints newer than X contribute heat (older ones count as 0), or only the last Y mints count. A thin market can use the Y-mints rule so old purchases still matter a little; a busy one can use the time rule, since its recent mints carry nearly all the heat. The same rule lets the query load only recent transactions.

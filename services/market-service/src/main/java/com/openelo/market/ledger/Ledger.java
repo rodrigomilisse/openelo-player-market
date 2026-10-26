@@ -1,5 +1,7 @@
 package com.openelo.market.ledger;
 
+import java.time.Instant;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,9 +47,19 @@ public class Ledger {
 
 	@Transactional(readOnly = true)
 	public Long getBalance(Id<IAccount> accountId, Id<IAsset> assetId) {
+		requireAccount(accountId);
+		return transactionRepository.getBalance(accountId.value(), assetId.value());
+	}
+
+	@Transactional(readOnly = true)
+	public long getOutflow(Id<IAccount> accountId, Id<IAsset> assetId, Instant since) {
+		requireAccount(accountId);
+		return transactionRepository.getOutflow(accountId.value(), assetId.value(), since);
+	}
+
+	private void requireAccount(Id<IAccount> accountId) {
 		if (!accountRepository.existsById(accountId.value())) {
 			throw new AccountNotFoundException(accountId);
 		}
-		return transactionRepository.getBalance(accountId.value(), assetId.value());
 	}
 }

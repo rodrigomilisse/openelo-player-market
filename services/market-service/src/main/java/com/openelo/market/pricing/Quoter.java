@@ -1,30 +1,31 @@
 package com.openelo.market.pricing;
 
-import java.time.Clock;
-
 import org.springframework.stereotype.Service;
 
 import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
+import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.Ledger;
 
 @Service
-public class Quoter {
-
-	private static final long START_PRICE = 100;
+public final class Quoter {
 
 	private final Ledger ledger;
 
-	private final Clock clock;
+	private final Heat heat;
 
-	public Quoter(Ledger ledger, Clock clock) {
+	Quoter(Ledger ledger, Heat heat) {
 		this.ledger = ledger;
-		this.clock = clock;
+		this.heat = heat;
 	}
 
 	public long mint(Id<IAsset> share, long amount) {
 		requirePositive(amount);
-		return Curve.sum(START_PRICE, supply(share), amount);
+		long supply = supply(share);
+		long baseCost = Curve.sum(supply, amount);
+		long currentHeat = heat.current(share);
+		long premium = Heat.premium(supply, amount, currentHeat);
+		return Math.addExact(baseCost, premium);
 	}
 
 	public long redeem(Id<IAsset> share, long amount) {
@@ -33,11 +34,14 @@ public class Quoter {
 		if (amount > supply) {
 			throw new IllegalArgumentException("Cannot redeem " + amount + " shares, only " + supply + " exist");
 		}
-		return Curve.sum(START_PRICE, supply - amount, amount);
+		long remainingSupply = Math.subtractExact(supply, amount);
+		return Curve.sum(remainingSupply, amount);
 	}
 
 	private long supply(Id<IAsset> share) {
-		return -ledger.getBalance(ShareService.getPoolAccountId(share), share);
+		Id<IAccount> pool = ShareService.getPoolAccountId(share);
+		long poolBalance = ledger.getBalance(pool, share);
+		return Math.negateExact(poolBalance);
 	}
 
 	private static void requirePositive(long amount) {
