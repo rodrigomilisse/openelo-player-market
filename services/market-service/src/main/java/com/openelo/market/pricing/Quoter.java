@@ -1,52 +1,50 @@
 package com.openelo.market.pricing;
 
+import java.util.List;
+import java.util.function.ToLongFunction;
+
 import org.springframework.stereotype.Service;
 
 import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
-import com.openelo.market.ledger.IAccount;
-import com.openelo.market.ledger.Ledger;
 
 @Service
 public final class Quoter {
 
-	private final Ledger ledger;
+	private final ShareService shareService;
 
-	private final Heat heat;
+	private final List<QuoteComponent> components;
 
-	Quoter(Ledger ledger, Heat heat) {
-		this.ledger = ledger;
-		this.heat = heat;
+	Quoter(ShareService shareService, List<QuoteComponent> components) {
+		this.shareService = shareService;
+		this.components = components;
 	}
 
-	public long mint(Id<IAsset> share, long amount) {
-		requirePositive(amount);
-		long supply = supply(share);
-		long baseCost = Curve.sum(supply, amount);
-		long currentHeat = heat.current(share);
-		long premium = Heat.premium(supply, amount, currentHeat);
-		return Math.addExact(baseCost, premium);
+	public long mint(Id<IAsset> share, long shareAmount) {
+		requireNatural(shareAmount);
+		return total(component -> component.walkUp(share, shareAmount));
 	}
 
-	public long redeem(Id<IAsset> share, long amount) {
-		requirePositive(amount);
-		long supply = supply(share);
-		if (amount > supply) {
-			throw new IllegalArgumentException("Cannot redeem " + amount + " shares, only " + supply + " exist");
+	public long redeem(Id<IAsset> share, long shareAmount) {
+		requireNatural(shareAmount);
+		requireAvailable(share, shareAmount);
+		return total(component -> component.walkDown(share, shareAmount));
+	}
+
+	private long total(ToLongFunction<QuoteComponent> price) {
+		return components.stream().mapToLong(price).reduce(0L, Math::addExact);
+	}
+
+	private void requireAvailable(Id<IAsset> share, long shareAmount) {
+		long supply = shareService.getSupply(share);
+		if (shareAmount > supply) {
+			throw new IllegalArgumentException("Cannot redeem " + shareAmount + " shares, only " + supply + " exist");
 		}
-		long remainingSupply = Math.subtractExact(supply, amount);
-		return Curve.sum(remainingSupply, amount);
 	}
 
-	private long supply(Id<IAsset> share) {
-		Id<IAccount> pool = ShareService.getPoolAccountId(share);
-		long poolBalance = ledger.getBalance(pool, share);
-		return Math.negateExact(poolBalance);
-	}
-
-	private static void requirePositive(long amount) {
-		if (amount <= 0) {
-			throw new IllegalArgumentException("Amount must be positive, was " + amount);
+	private void requireNatural(long shareAmount) {
+		if (shareAmount < 0) {
+			throw new IllegalArgumentException("Share amount cannot be negative, was " + shareAmount);
 		}
 	}
 }

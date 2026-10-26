@@ -18,12 +18,13 @@ public class Mint extends ATransaction<Mint> {
 
 	}
 
-	public Mint(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long creditAmount) {
+	public Mint(ShareService shareService, Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare,
+			long creditAmount) {
 
 		this.postings = new ArrayList<>(4);
 
 		Posting creditsToPlatform = new Posting(userAccount, Market.PLATFORM_ACCOUNT_ID, creditAmount, Market.CREDITS);
-		Posting sharesToUser = new Posting(ShareService.getPoolAccountId(playerShare), userAccount, shareAmount,
+		Posting sharesToUser = new Posting(shareService.getPoolAccountId(playerShare), userAccount, shareAmount,
 				playerShare);
 
 		this.postings.add(creditsToPlatform);

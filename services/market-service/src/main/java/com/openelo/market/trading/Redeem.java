@@ -19,11 +19,13 @@ public class Redeem extends ATransaction<Redeem> {
 
 	}
 
-	public Redeem(Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare, long creditAmount) {
+	public Redeem(ShareService shareService, Id<IAccount> userAccount, long shareAmount, Id<IAsset> playerShare,
+			long creditAmount) {
 
 		this.postings = new ArrayList<>(4);
 
-		Posting sharesToPool = new Posting(userAccount, ShareService.getPoolAccountId(playerShare), shareAmount, playerShare);
+		Posting sharesToPool = new Posting(userAccount, shareService.getPoolAccountId(playerShare), shareAmount,
+				playerShare);
 		Posting creditsToUser = new Posting(Market.PLATFORM_ACCOUNT_ID, userAccount, creditAmount,
 				Market.CREDITS);
 

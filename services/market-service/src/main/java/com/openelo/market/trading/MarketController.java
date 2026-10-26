@@ -27,7 +27,7 @@ public class MarketController {
 		this.shareService = shareService;
 	}
 
-	record MarketRequest(Id<IUser> userId, long amount, Id<IAsset> playerShare) {
+	record MarketRequest(Id<IUser> userId, long shareAmount, Id<IAsset> playerShare) {
 	}
 
 	record ShareResponse(Id<IAsset> shareId) {
@@ -43,13 +43,13 @@ public class MarketController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public void mint(@RequestBody MarketRequest request) {
 		// TODO validate args
-		market.mint(request.userId, request.amount, request.playerShare);
+		market.mint(request.userId, request.shareAmount, request.playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void redeem(@RequestBody MarketRequest request) {
 		// TODO validate args
-		market.redeem(request.userId, request.amount, request.playerShare);
+		market.redeem(request.userId, request.shareAmount, request.playerShare);
 	}
 }
