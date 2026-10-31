@@ -47,9 +47,8 @@ class OrderBook {
 
 	// each open order has a share left, so shareAmount bounds how many are needed
 	List<OpenOrder> findOpenAt(LimitOrder taker, long price, long shareAmount) {
-		Side restingSide = taker.getSide().opposite();
+		Level level = new Level(taker.getShareId().value(), taker.getSide().opposite(), price);
 		Limit limit = Limit.of(Math.toIntExact(shareAmount));
-		return openOrderRepository.findOpenAt(taker.getShareId().value(), restingSide, price, BEFORE_EVERY_ORDER,
-				limit);
+		return openOrderRepository.findOpenAt(level, BEFORE_EVERY_ORDER, limit);
 	}
 }

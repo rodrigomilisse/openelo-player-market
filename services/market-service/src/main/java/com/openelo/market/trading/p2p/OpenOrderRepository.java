@@ -19,14 +19,14 @@ interface OpenOrderRepository extends Repository<OpenOrder, UUID> {
 	// rare, but a frozen dev clock stamps every order alike.
 	@Query("""
 			select o from OpenOrder o join EscrowHold h on h.orderId = o.orderId
-			where h.shareId = :shareId and h.side = :side and h.limitPrice = :price
+			where h.level = :level
 			  and h.orderCreatedAt >= coalesce((
 			      select f.orderCreatedAt from EscrowHold f
-			      where f.shareId = :shareId and f.side = :side and f.limitPrice = :price
+			      where f.level = :level
 			        and exists (select t.id from Trade t where t.makerOrderId = f.orderId)
 			      order by f.orderCreatedAt desc
 			      limit 1),
 			    :beforeEveryOrder)
 			order by h.orderCreatedAt, h.orderId""")
-	List<OpenOrder> findOpenAt(UUID shareId, Side side, long price, Instant beforeEveryOrder, Limit limit);
+	List<OpenOrder> findOpenAt(Level level, Instant beforeEveryOrder, Limit limit);
 }

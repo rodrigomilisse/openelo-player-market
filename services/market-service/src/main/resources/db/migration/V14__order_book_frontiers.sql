@@ -38,3 +38,15 @@ CREATE INDEX trades_taker_order_idx ON trades (taker_order_id);
 
 -- a trade's share posting
 CREATE INDEX postings_transaction_idx ON postings (transaction_id);
+
+-- A level's frontier: its latest order that has been a maker. Everything before it is closed
+-- (ADR-0012); '-infinity' when nothing at the level has been filled yet.
+CREATE FUNCTION level_frontier(share UUID, resting_side side, price BIGINT) RETURNS TIMESTAMPTZ
+LANGUAGE sql STABLE AS $$
+	SELECT coalesce((
+		SELECT h.order_created_at FROM escrow_holds h
+		WHERE h.share_id = share AND h.side = resting_side AND h.limit_price = price
+			AND EXISTS (SELECT 1 FROM trades t WHERE t.maker_order_id = h.order_id)
+		ORDER BY h.order_created_at DESC
+		LIMIT 1), '-infinity')
+$$;

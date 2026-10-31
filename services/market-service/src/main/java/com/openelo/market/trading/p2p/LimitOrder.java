@@ -2,18 +2,14 @@ package com.openelo.market.trading.p2p;
 
 import java.util.UUID;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import com.openelo.market.common.BaseEntity;
 import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
 import com.openelo.market.trading.Platform;
 import com.openelo.market.user.IUser;
 
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 @Entity
@@ -22,15 +18,10 @@ class LimitOrder extends BaseEntity<LimitOrder> {
 
 	private UUID userId;
 
-	private UUID shareId;
-
-	@Enumerated(EnumType.STRING)
-	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
-	private Side side;
+	@Embedded
+	private Level level;
 
 	private long quantity;
-
-	private long limitPrice;
 
 	protected LimitOrder() {
 
@@ -38,22 +29,24 @@ class LimitOrder extends BaseEntity<LimitOrder> {
 
 	LimitOrder(Id<IUser> userId, Id<IAsset> shareId, Side side, long quantity, long limitPrice) {
 		this.userId = userId.value();
-		this.shareId = shareId.value();
-		this.side = side;
+		this.level = new Level(shareId.value(), side, limitPrice);
 		this.quantity = quantity;
-		this.limitPrice = limitPrice;
 	}
 
 	Id<IUser> getUserId() {
 		return new Id<>(userId);
 	}
 
+	Level getLevel() {
+		return level;
+	}
+
 	Id<IAsset> getShareId() {
-		return new Id<>(shareId);
+		return new Id<>(level.shareId());
 	}
 
 	Side getSide() {
-		return side;
+		return level.side();
 	}
 
 	long getQuantity() {
@@ -61,14 +54,14 @@ class LimitOrder extends BaseEntity<LimitOrder> {
 	}
 
 	long getLimitPrice() {
-		return limitPrice;
+		return level.limitPrice();
 	}
 
 	Id<IAsset> lockedAsset(Platform platform) {
-		return side == Side.BUY ? platform.getCreditsId() : getShareId();
+		return getSide() == Side.BUY ? platform.getCreditsId() : getShareId();
 	}
 
 	long lockedAmount(long shareAmount) {
-		return side == Side.BUY ? Math.multiplyExact(limitPrice, shareAmount) : shareAmount;
+		return getSide() == Side.BUY ? Math.multiplyExact(getLimitPrice(), shareAmount) : shareAmount;
 	}
 }

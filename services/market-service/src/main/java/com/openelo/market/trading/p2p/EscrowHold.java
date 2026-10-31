@@ -4,9 +4,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.Posting;
@@ -14,9 +11,8 @@ import com.openelo.market.trading.ATransaction;
 import com.openelo.market.trading.Platform;
 import com.openelo.market.trading.WalletService;
 
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 @Entity
@@ -27,13 +23,8 @@ class EscrowHold extends ATransaction<EscrowHold> {
 
 	// the order's level and posting time, copied so the book can be indexed
 	// by them; a foreign key keeps them equal to the order's (ADR-0013)
-	private UUID shareId;
-
-	@Enumerated(EnumType.STRING)
-	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
-	private Side side;
-
-	private long limitPrice;
+	@Embedded
+	private Level level;
 
 	private Instant orderCreatedAt;
 
@@ -43,9 +34,7 @@ class EscrowHold extends ATransaction<EscrowHold> {
 
 	EscrowHold(WalletService walletService, Platform platform, LimitOrder order, long shareAmount) {
 		this.orderId = order.getId().value();
-		this.shareId = order.getShareId().value();
-		this.side = order.getSide();
-		this.limitPrice = order.getLimitPrice();
+		this.level = order.getLevel();
 		this.orderCreatedAt = order.getCreatedAt();
 
 		Id<IAccount> account = walletService.getAccount(order.getUserId());
