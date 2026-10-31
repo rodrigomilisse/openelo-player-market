@@ -12,7 +12,7 @@ import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
-// a row of the open_orders view, derived from the order, its trades and its cancellation
+// maps the open_orders view, so it is never written
 @Entity
 @Immutable
 @Table(name = "open_orders")

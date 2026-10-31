@@ -14,8 +14,7 @@ import com.openelo.market.trading.WalletService;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-// An incoming (taker) order matched against a resting (maker) one, at the maker's price.
-// The taker pays the fee; the maker gets exactly their limit price, out of escrow.
+// The taker pays the fee; the maker gets exactly their limit price.
 @Entity
 @Table(name = "trades")
 class Trade extends ATransaction<Trade> {

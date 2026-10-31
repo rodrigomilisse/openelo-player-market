@@ -1,9 +1,8 @@
 package com.openelo.market.trading.p2p;
 
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
 import com.openelo.market.common.IAsset;
@@ -19,8 +18,6 @@ import com.openelo.market.user.IUser;
 
 import jakarta.transaction.Transactional;
 
-// P2P trading: a limit order is matched on arrival against the resting ones, best price
-// then earliest first, at the resting order's price. Whatever is left rests in escrow.
 @Service
 class P2pVenue {
 
@@ -36,17 +33,20 @@ class P2pVenue {
 
 	private final OpenOrderRepository openOrderRepository;
 
+	private final OrderBook orderBook;
+
 	private final Quoter quoter;
 
 	P2pVenue(Ledger ledger, MarketTransactionRepository marketTransactionRepository, WalletService walletService,
 			Platform platform, LimitOrderRepository limitOrderRepository, OpenOrderRepository openOrderRepository,
-			Quoter quoter) {
+			OrderBook orderBook, Quoter quoter) {
 		this.ledger = ledger;
 		this.marketTransactionRepository = marketTransactionRepository;
 		this.walletService = walletService;
 		this.platform = platform;
 		this.limitOrderRepository = limitOrderRepository;
 		this.openOrderRepository = openOrderRepository;
+		this.orderBook = orderBook;
 		this.quoter = quoter;
 	}
 
@@ -76,7 +76,20 @@ class P2pVenue {
 
 	private long match(LimitOrder taker) {
 		long remaining = taker.getQuantity();
-		for (OpenOrder resting : findCrossing(taker)) {
+		Optional<Long> level = orderBook.findFirstLevel(taker);
+		while (level.isPresent()) {
+			remaining = matchLevel(taker, level.get(), remaining);
+			if (remaining == 0) {
+				break;
+			}
+			level = orderBook.findNextLevel(taker, level.get());
+		}
+		return remaining;
+	}
+
+	private long matchLevel(LimitOrder taker, long price, long shareAmount) {
+		long remaining = shareAmount;
+		for (OpenOrder resting : orderBook.findOpenAt(taker, price, shareAmount)) {
 			LimitOrder maker = resting.getOrder();
 			long traded = Math.min(remaining, resting.getRemaining());
 			long fee = quoter.quoteTradeFee(maker.getLimitPrice(), traded);
@@ -89,27 +102,9 @@ class P2pVenue {
 		return remaining;
 	}
 
-	// One share's orders are processed one at a time, as an exchange runs one
-	// matching engine
-	// per instrument: two orders can neither fill the same resting order nor both
-	// rest crossed.
-	// Shares whose keys collide only wait for each other.
 	private void lockBook(Id<IAsset> share) {
 		UUID id = share.value();
 		limitOrderRepository.lockBook(id.getMostSignificantBits() ^ id.getLeastSignificantBits());
-	}
-
-	// A buy meets the cheapest sells at or below its limit, a sell the dearest buys
-	// at or
-	// above it. Each resting order has at least one share left, so the order's size
-	// bounds
-	// how many are needed.
-	private List<OpenOrder> findCrossing(LimitOrder order) {
-		Limit limit = Limit.of(Math.toIntExact(order.getQuantity()));
-		if (order.getSide() == Side.BUY) {
-			return openOrderRepository.findSellsUpTo(order.getShareId().value(), order.getLimitPrice(), limit);
-		}
-		return openOrderRepository.findBuysFrom(order.getShareId().value(), order.getLimitPrice(), limit);
 	}
 
 	private void record(ATransaction<?> transaction) {
@@ -132,8 +127,6 @@ class P2pVenue {
 		}
 	}
 
-	// a zero remainder is zero whichever way the division rounds, so floorMod's
-	// rounding is irrelevant
 	private static boolean isMultipleOf(long value, long step) {
 		return Math.floorMod(value, step) == 0;
 	}

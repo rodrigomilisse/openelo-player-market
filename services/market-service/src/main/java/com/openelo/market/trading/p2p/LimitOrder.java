@@ -16,7 +16,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
-// What the user asked for. What happened to it is in its trades, escrow hold and cancellation.
 @Entity
 @Table(name = "limit_orders")
 class LimitOrder extends BaseEntity<LimitOrder> {

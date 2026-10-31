@@ -4,7 +4,6 @@ import java.math.BigInteger;
 
 import org.springframework.stereotype.Component;
 
-// Charged to the taker of a P2P trade only (ADR-0010).
 @Component
 final class TradeFee {
 

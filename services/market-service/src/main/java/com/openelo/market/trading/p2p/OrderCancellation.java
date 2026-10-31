@@ -13,7 +13,6 @@ import com.openelo.market.trading.WalletService;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-// releases what the order still has locked
 @Entity
 @Table(name = "order_cancellations")
 class OrderCancellation extends ATransaction<OrderCancellation> {

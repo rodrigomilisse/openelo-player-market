@@ -18,7 +18,6 @@ class Wallet extends BaseEntity<Wallet> {
 
 	private UUID accountId;
 
-	// holds what the user's open orders have locked
 	private UUID escrowAccountId;
 
 	protected Wallet() {

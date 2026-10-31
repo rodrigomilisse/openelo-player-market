@@ -2,5 +2,9 @@ package com.openelo.market.trading.p2p;
 
 public enum Side {
 	BUY,
-	SELL
+	SELL;
+
+	Side opposite() {
+		return this == BUY ? SELL : BUY;
+	}
 }
