@@ -83,9 +83,9 @@ elif cmd == "time":
 elif cmd == "user":
     post("/users", {"owner": a[0]})
 elif cmd == "share":
-    post("/market/shares")
+    post("/curve/shares")
 elif cmd in ("mint", "redeem"):
-    post(f"/market/{cmd}", {"userId": a[0], "playerShare": a[1], "shareAmount": int(a[2])})
+    post(f"/curve/{cmd}", {"userId": a[0], "playerShare": a[1], "shareAmount": int(a[2])})
 elif cmd == "balances":
     sql(BALANCES)
 elif cmd in TABLES:

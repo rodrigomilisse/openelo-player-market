@@ -18,12 +18,16 @@ class Wallet extends BaseEntity<Wallet> {
 
 	private UUID accountId;
 
+	// holds what the user's open orders have locked
+	private UUID escrowAccountId;
+
 	protected Wallet() {
 	}
 
-	Wallet(Id<IUser> user, Id<IAccount> account) {
+	Wallet(Id<IUser> user, Id<IAccount> account, Id<IAccount> escrowAccount) {
 		this.userId = user.value();
 		this.accountId = account.value();
+		this.escrowAccountId = escrowAccount.value();
 	}
 
 	Id<IUser> getUserId() {
@@ -32,5 +36,9 @@ class Wallet extends BaseEntity<Wallet> {
 
 	Id<IAccount> getAccountId() {
 		return new Id<>(accountId);
+	}
+
+	Id<IAccount> getEscrowAccountId() {
+		return new Id<>(escrowAccountId);
 	}
 }

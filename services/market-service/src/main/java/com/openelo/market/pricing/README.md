@@ -30,10 +30,10 @@ account is the ledger account whose id is the share's id (`ShareService`). Desig
 - [ ] One dividend pool for the whole market, split by Elo; platform cut 0%
 
 ### Market (leaning, not decided)
-- [ ] 24/7 continuous limit order book for P2P trading
+- [x] 24/7 continuous limit order book for P2P trading (resting GTC limit orders, matched on arrival at the resting price)
 - [ ] Curve and book as separate venues
-- [ ] Escrow postings for open orders
-- [ ] Taker-only P2P fee, lower than minting
+- [x] Escrow postings for open orders (one escrow account per trader, opened at sign-up)
+- [x] Taker-only P2P fee, lower than minting (5% placeholder; limit prices on a tick that keeps the fee whole)
 - [ ] Curve quotes shown as depth; anonymous book; platform never trades
 
 ## Notes (proposed, not built)

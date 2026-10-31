@@ -1,4 +1,4 @@
-package com.openelo.market.trading;
+package com.openelo.market.trading.banking;
 
 import org.springframework.stereotype.Service;
 
@@ -6,6 +6,9 @@ import com.openelo.market.common.Id;
 import com.openelo.market.ledger.IAccount;
 import com.openelo.market.ledger.IRecordedTransaction;
 import com.openelo.market.ledger.Ledger;
+import com.openelo.market.trading.MarketTransactionRepository;
+import com.openelo.market.trading.Platform;
+import com.openelo.market.trading.WalletService;
 import com.openelo.market.user.IUser;
 
 import jakarta.transaction.Transactional;
@@ -13,24 +16,27 @@ import jakarta.transaction.Transactional;
 @Service
 public class BankService {
 
-	WalletRepository walletRepository;
+	WalletService walletService;
+
+	Platform platform;
 
 	Ledger ledger;
 
 	MarketTransactionRepository marketTransactionRepository;
 
-	public BankService(WalletRepository walletRepository, Ledger ledger,
+	public BankService(WalletService walletService, Platform platform, Ledger ledger,
 			MarketTransactionRepository marketTransactionRepository) {
-		this.walletRepository = walletRepository;
+		this.walletService = walletService;
+		this.platform = platform;
 		this.ledger = ledger;
 		this.marketTransactionRepository = marketTransactionRepository;
 	}
 
 	@Transactional
 	public void deposit(Id<IUser> userId, long amount) {
-		Id<IAccount> accountId = getAccount(userId);
+		Id<IAccount> accountId = walletService.getAccount(userId);
 
-		Deposit deposit = new Deposit(accountId, amount);
+		Deposit deposit = new Deposit(platform, accountId, amount);
 
 		Id<IRecordedTransaction> transactionId = ledger.post(deposit);
 		deposit.setLedgerTransactionId(transactionId);
@@ -39,9 +45,9 @@ public class BankService {
 
 	@Transactional
 	public void withdraw(Id<IUser> userId, long amount) {
-		Id<IAccount> accountId = getAccount(userId);
+		Id<IAccount> accountId = walletService.getAccount(userId);
 
-		Withdrawal withdrawal = new Withdrawal(accountId, amount);
+		Withdrawal withdrawal = new Withdrawal(platform, accountId, amount);
 
 		Id<IRecordedTransaction> transactionId = ledger.post(withdrawal);
 		withdrawal.setLedgerTransactionId(transactionId);
@@ -49,11 +55,6 @@ public class BankService {
 	}
 
 	public long getBalance(Id<IUser> userId) {
-		return ledger.getBalance(getAccount(userId), Market.CREDITS);
-	}
-
-	// TODO method duplicated in market
-	private Id<IAccount> getAccount(Id<IUser> userId) {
-		return walletRepository.findByUserId(userId.value()).orElseThrow().getAccountId();
+		return ledger.getBalance(walletService.getAccount(userId), platform.getCreditsId());
 	}
 }

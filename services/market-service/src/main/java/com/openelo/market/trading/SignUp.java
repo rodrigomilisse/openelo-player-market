@@ -26,13 +26,14 @@ class SignUp {
 		this.ledger = ledger;
 	}
 
-	// user, ledger account and the wallet linking them commit together or not at
+	// user, ledger accounts and the wallet linking them commit together or not at
 	// all
 	@Transactional
 	public Id<IUser> signUp(String username) {
 		User user = users.save(new User(username));
 		Id<IAccount> account = ledger.openAccount();
-		wallets.save(new Wallet(user.getId(), account));
+		Id<IAccount> escrowAccount = ledger.openAccount();
+		wallets.save(new Wallet(user.getId(), account, escrowAccount));
 		return user.getId();
 	}
 }

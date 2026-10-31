@@ -15,9 +15,12 @@ public final class Quoter {
 
 	private final List<QuoteComponent> components;
 
-	Quoter(ShareService shareService, List<QuoteComponent> components) {
+	private final TradeFee tradeFee;
+
+	Quoter(ShareService shareService, List<QuoteComponent> components, TradeFee tradeFee) {
 		this.shareService = shareService;
 		this.components = components;
+		this.tradeFee = tradeFee;
 	}
 
 	public Quote quoteMint(Id<IAsset> share, long shareAmount) {
@@ -31,6 +34,14 @@ public final class Quoter {
 		requireNatural(shareAmount);
 		requireAvailable(share, shareAmount);
 		return total(QuoteRole.BACKING, component -> component.walkDown(share, shareAmount));
+	}
+
+	public long quoteTradeFee(long price, long shareAmount) {
+		return tradeFee.of(Math.multiplyExact(price, shareAmount));
+	}
+
+	public long getTick() {
+		return TradeFee.TICK;
 	}
 
 	private long total(QuoteRole role, ToLongFunction<QuoteComponent> price) {

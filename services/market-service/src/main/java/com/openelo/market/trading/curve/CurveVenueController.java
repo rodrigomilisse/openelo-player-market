@@ -1,8 +1,7 @@
-package com.openelo.market.trading;
+package com.openelo.market.trading.curve;
 
 import com.openelo.market.pricing.ShareService;
 import com.openelo.market.user.IUser;
-import com.openelo.market.user.UserRepository;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,19 +14,19 @@ import com.openelo.market.common.IAsset;
 import com.openelo.market.common.Id;
 
 @RestController
-@RequestMapping("market")
-public class MarketController {
+@RequestMapping("curve")
+public class CurveVenueController {
 
-	Market market;
+	CurveVenue curveVenue;
 
 	ShareService shareService;
 
-	MarketController(Market market, ShareService shareService, UserRepository userRepository, WalletRepository walletRepository) {
-		this.market = market;
+	CurveVenueController(CurveVenue curveVenue, ShareService shareService) {
+		this.curveVenue = curveVenue;
 		this.shareService = shareService;
 	}
 
-	record MarketRequest(Id<IUser> userId, long shareAmount, Id<IAsset> playerShare) {
+	record CurveRequest(Id<IUser> userId, long shareAmount, Id<IAsset> playerShare) {
 	}
 
 	record ShareResponse(Id<IAsset> shareId) {
@@ -41,15 +40,15 @@ public class MarketController {
 
 	@PostMapping("mint")
 	@ResponseStatus(HttpStatus.CREATED)
-	public void mint(@RequestBody MarketRequest request) {
+	public void mint(@RequestBody CurveRequest request) {
 		// TODO validate args
-		market.mint(request.userId, request.shareAmount, request.playerShare);
+		curveVenue.mint(request.userId, request.shareAmount, request.playerShare);
 	}
 
 	@PostMapping("redeem")
 	@ResponseStatus(HttpStatus.CREATED)
-	public void redeem(@RequestBody MarketRequest request) {
+	public void redeem(@RequestBody CurveRequest request) {
 		// TODO validate args
-		market.redeem(request.userId, request.shareAmount, request.playerShare);
+		curveVenue.redeem(request.userId, request.shareAmount, request.playerShare);
 	}
 }

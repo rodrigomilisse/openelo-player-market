@@ -1,4 +1,4 @@
-package com.openelo.market.trading;
+package com.openelo.market.trading.banking;
 
 import java.util.UUID;
 
