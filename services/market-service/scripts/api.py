@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-  ./api.py up                     start postgres (docker compose)
-  ./api.py down [-v]              stop postgres (-v also wipes the data)
+  ./api.py up                     start postgres and redis (docker compose)
+  ./api.py down [-v]              stop postgres and redis (-v also wipes the data)
   ./api.py start [manual]         start the server (mvnw spring-boot:run);
                                   manual = use the manual dev clock
   ./api.py time                   show the manual clock

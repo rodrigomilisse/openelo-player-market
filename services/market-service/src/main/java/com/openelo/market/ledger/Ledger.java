@@ -1,6 +1,8 @@
 package com.openelo.market.ledger;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -19,9 +21,13 @@ public class Ledger {
 
 	AccountRepository accountRepository;
 
-	public Ledger(TransactionRepository transactionRepository, AccountRepository accountRepository) {
+	AccountBalanceRepository accountBalanceRepository;
+
+	public Ledger(TransactionRepository transactionRepository, AccountRepository accountRepository,
+			AccountBalanceRepository accountBalanceRepository) {
 		this.transactionRepository = transactionRepository;
 		this.accountRepository = accountRepository;
+		this.accountBalanceRepository = accountBalanceRepository;
 	}
 
 	public Id<IRecordedTransaction> post(ITransaction transaction) {
@@ -46,9 +52,20 @@ public class Ledger {
 	}
 
 	@Transactional(readOnly = true)
-	public Long getBalance(Id<IAccount> accountId, Id<IAsset> assetId) {
+	public long getBalance(Id<IAccount> accountId, Id<IAsset> assetId) {
 		requireAccount(accountId);
-		return transactionRepository.getBalance(accountId.value(), assetId.value());
+		return accountBalanceRepository.findById(new AccountBalanceKey(accountId.value(), assetId.value()))
+				.map(balance -> balance.getBalance())
+				.orElse(0L);
+	}
+
+	@Transactional(readOnly = true)
+	public Balances getBalances(Id<IAccount> accountId) {
+		requireAccount(accountId);
+		Map<Id<IAsset>, Long> balances = new HashMap<>();
+		accountBalanceRepository.findByIdAccountId(accountId.value())
+				.forEach(balance -> balances.put(balance.getAssetId(), balance.getBalance()));
+		return new Balances(balances);
 	}
 
 	@Transactional(readOnly = true)

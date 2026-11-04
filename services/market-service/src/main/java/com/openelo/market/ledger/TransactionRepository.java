@@ -7,24 +7,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
-	@Query(value = """
-			SELECT COALESCE(SUM(p.amount), 0)
-			FROM postings p
-			JOIN ledger_transactions t ON t.id = p.transaction_id
-			WHERE p.from_account_id = :accountId
-			  AND p.asset_id = :assetId
-			  AND t.created_at > :since
-			""", nativeQuery = true)
-	long getOutflow(UUID accountId, UUID assetId, Instant since);
 
-	// Native so it reads postings directly. Postings are an @ElementCollection, not
-	// an entity, so JPQL can only reach them through their owning transaction,
-	// which joins ledger_transactions for nothing.
-	@Query(value = """
-			SELECT COALESCE(SUM(CASE WHEN to_account_id = :accountId THEN amount ELSE -amount END), 0)
-			FROM postings
-			WHERE asset_id = :assetId
-			  AND (to_account_id = :accountId OR from_account_id = :accountId)
-			""", nativeQuery = true)
-	long getBalance(UUID accountId, UUID assetId);
+	@Query("""
+			select coalesce(sum(p.amount), 0)
+			from Transaction t join t.postings p
+			where p.fromAccountId = :accountId
+			  and p.assetId = :assetId
+			  and t.createdAt > :since""")
+	long getOutflow(UUID accountId, UUID assetId, Instant since);
 }

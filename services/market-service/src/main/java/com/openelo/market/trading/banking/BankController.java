@@ -1,10 +1,6 @@
 package com.openelo.market.trading.banking;
 
-import java.util.UUID;
-
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,9 +23,6 @@ public class BankController {
 	record BankRequest(Id<IUser> userId, long amount) {
 	}
 
-	record BalanceResponse(long balance) {
-	}
-
 	@PostMapping("deposit")
 	@ResponseStatus(HttpStatus.CREATED)
 	public void deposit(@RequestBody BankRequest request) {
@@ -40,10 +33,5 @@ public class BankController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public void withdraw(@RequestBody BankRequest request) {
 		bankService.withdraw(request.userId, request.amount);
-	}
-
-	@GetMapping("balance/{userId}")
-	public BalanceResponse balance(@PathVariable UUID userId) {
-		return new BalanceResponse(bankService.getBalance(new Id<>(userId)));
 	}
 }

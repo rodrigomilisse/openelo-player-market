@@ -3,7 +3,11 @@ package com.openelo.market.trading.curve;
 import com.openelo.market.pricing.ShareService;
 import com.openelo.market.user.IUser;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,5 +54,10 @@ public class CurveVenueController {
 	public void redeem(@RequestBody CurveRequest request) {
 		// TODO validate args
 		curveVenue.redeem(request.userId, request.shareAmount, request.playerShare);
+	}
+
+	@GetMapping("shares/{shareId}/quote")
+	@ResponseStatus(HttpStatus.NOT_IMPLEMENTED)
+	public void quote(@PathVariable UUID shareId) {
 	}
 }

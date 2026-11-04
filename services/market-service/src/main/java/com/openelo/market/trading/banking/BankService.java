@@ -53,8 +53,4 @@ public class BankService {
 		withdrawal.setLedgerTransactionId(transactionId);
 		marketTransactionRepository.save(withdrawal);
 	}
-
-	public long getBalance(Id<IUser> userId) {
-		return ledger.getBalance(walletService.getAccount(userId), platform.getCreditsId());
-	}
 }
