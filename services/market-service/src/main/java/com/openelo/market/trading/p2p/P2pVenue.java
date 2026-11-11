@@ -1,7 +1,6 @@
 package com.openelo.market.trading.p2p;
 
 import java.util.Optional;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -54,7 +53,7 @@ class P2pVenue {
 	public Id<LimitOrder> place(Id<IUser> userId, Id<IAsset> share, Side side, long shareAmount, long limitPrice) {
 		requirePositive(shareAmount);
 		requireOnTick(limitPrice);
-		lockBook(share);
+		marketTransactionRepository.lockShare(share.value());
 
 		LimitOrder order = limitOrderRepository.save(new LimitOrder(userId, share, side, shareAmount, limitPrice));
 		long remaining = match(order);
@@ -68,7 +67,7 @@ class P2pVenue {
 	public void cancel(Id<IUser> userId, Id<LimitOrder> orderId) {
 		LimitOrder order = limitOrderRepository.findById(orderId.value()).orElseThrow();
 		requireOwner(order, userId);
-		lockBook(order.getShareId());
+		marketTransactionRepository.lockShare(order.getShareId().value());
 
 		OpenOrder open = openOrderRepository.findById(orderId.value()).orElseThrow();
 		record(new OrderCancellation(walletService, platform, order, open.getRemaining()));
@@ -100,11 +99,6 @@ class P2pVenue {
 			}
 		}
 		return remaining;
-	}
-
-	private void lockBook(Id<IAsset> share) {
-		UUID id = share.value();
-		limitOrderRepository.lockBook(id.getMostSignificantBits() ^ id.getLeastSignificantBits());
 	}
 
 	private void record(ATransaction<?> transaction) {
