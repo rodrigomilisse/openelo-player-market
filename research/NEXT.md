@@ -20,14 +20,15 @@ national-team term − absence`) and the team Elo. Each item is a light test
 3. **League share of European results** (tested, see below): keep at about 0.3;
    check pool drift (the shares are not zero-sum across leagues of different
    sizes) and a zero-sum version; refit K with it.
-4. **National teams, "the company you keep"**: replace the additive national
-   points with a lift towards the level of the national team-mates:
-   `rating = C + w × max(0, N − C)`, with C the club standing (team + bonus),
-   N the national standing (mean club standing of his national team-mates on the
-   pitch, himself excluded, + the same role bonus at national level), averaged over
-   call-ups with a decay instead of the 10-call-up / two-year window. Starters
-   full share, substitutes their minutes, unused squad members 0, keeper rule at
-   national level too. Prototype on the seven clubs first.
+4. **National teams (decided, `nt_matches` mode).** Points only ever added: over
+   the nation's last 20 covered matches, none older than two years, each match is
+   worth his minutes share (0 if not selected, at least 0.2 if in the squad) ×
+   strength, divided by the number of matches. Strength = the squad's average club
+   rating without him (sum once per match, subtract his own). Scale 100. Not being
+   selected is measured, never deducted: the others gain and he does not. The
+   two-year cap only matters while the data is tournaments only.
+   **Open:** a bigger bonus for a player at a weaker club, measured rather than
+   judged (see the relative-club term proposal).
 5. **Big-game trust** (separating regulars): weight each club match in the
    minutes share by the opponent's strength, so rotation in easy matches counts
    less. Check whether it reorders the top of squads (Bayern, City, Arsenal).
