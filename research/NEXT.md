@@ -110,6 +110,11 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   (the owner accepts the small penalty for cup rotation). Same rule for national
   call-ups. A slight skew towards midfielders and attackers would be welcome only
   if it comes naturally.
+- **Provisional, not locked:** goal term on, goals × 50 and assists × 40 per 90
+  (`output="weighted"`), over the 50 listed matches with 5 scoreless matches added.
+  Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
+  Kept because it is arguably measurement rather than judgement, though the owner
+  is not keen on it.
 - Team process noise 3 (from 6): +0.0006 team log loss for +0.013 held-out player agreement.
 - Position never enters the rating, except the keeper reference; positions are
   for analysis only. Counting any appearance as a full match (`appearance`) was

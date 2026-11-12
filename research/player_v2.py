@@ -74,6 +74,8 @@ class Variant:
     output: str = "none"
     output_scale: float = 100.0
     output_prior: float = 5.0
+    goal_scale: float = 50.0
+    assist_scale: float = 40.0
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -481,8 +483,14 @@ class Player:
         if self.v.output == "none" or not self.output_window:
             return 0.0
         minutes = sum(m for m, _, _ in self.output_window)
+        per_90 = minutes / 90 + self.v.output_prior
+        if self.v.output == "weighted":
+            # goals and assists with their own scales (provisional: goals 50, assists 40)
+            goals = sum(g for _, g, _ in self.output_window)
+            assists = sum(a for _, _, a in self.output_window)
+            return (self.v.goal_scale * goals + self.v.assist_scale * assists) / per_90
         involvements = sum(g + (a if self.v.output != "goals" else 0) for _, g, a in self.output_window)
-        rate = involvements / (minutes / 90 + self.v.output_prior)
+        rate = involvements / per_90
         if self.v.output == "ga_position":
             position_rate = context.ga_rate.get(context.position.get(getattr(self, "player_id", None)), 0.0)
             if getattr(self, "keeper", False) or position_rate <= 0:
