@@ -67,6 +67,7 @@ class Variant:
     nt_matches: int = 0
     nt_credit: float = 0.0
     nt_days: int = 0
+    nt_relative: float = 0.0
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -189,7 +190,7 @@ class Context:
                     rest = (total - level) / (count - 1) if level is not None and count > 1 else \
                         (total / count if count and level is None else 1500.0)
                     result.setdefault(int(player), []).append(
-                        (int(game.day), share, stacked, elo[(game.game_id, team)], rest, int(team)))
+                        (int(game.day), share, stacked, elo[(game.game_id, team)], rest, int(team), level))
         self.nation_days = {t: np.array(sorted(set(d))) for t, d in self.nation_days.items()}
         # national Elo restated on the spread of the club-rating average, so either can drive strength
         rows = [c for calls in result.values() for c in calls]
@@ -442,7 +443,8 @@ class Player:
         worth his minutes share (at least `nt_credit` if he was in the squad, 0 if he
         was not) times the team's strength, and the sum is divided by the number of
         matches. Strength: the squad's average club rating without him (`clubs`), the
-        national Elo on the same spread (`elo`), or 1 (`flat`)."""
+        national Elo on the same spread (`elo`), or 1 (`flat`); plus, with
+        `nt_relative`, how far his own club sits below that average (never negative)."""
         calls = [c for c in getattr(self, "call_ups", []) if c[0] < day]
         if not calls:
             return 0.0
@@ -462,8 +464,11 @@ class Player:
             if self.v.national == "flat":
                 strength = 1.0
             else:
-                level = c[4] if self.v.national == "clubs" else c[6]
+                level = c[4] if self.v.national == "clubs" else c[7]
                 strength = max(0.0, level - 1600.0) / 200.0
+            if self.v.nt_relative and c[6] is not None:
+                # how far his club sits below the clubs of the team-mates he is picked with
+                strength += self.v.nt_relative * max(0.0, c[4] - c[6]) / 200.0
             total += value * strength
         return self.v.national_scale * total / len(window)
 
