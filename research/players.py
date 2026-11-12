@@ -117,3 +117,97 @@ assert len(PLAYER_NAMES) == len(set(PLAYER_NAMES)), "duplicate player name in PL
 # name -> Transfermarkt player id (string), for names that resolve incorrectly
 # via plain-text search (e.g. very common names).
 MANUAL_TM_ID_OVERRIDES: dict[str, str] = {}
+
+
+# Second player set (FINDINGS.md §3.3): careers that lie inside the covered
+# window (2012/13 to 2025/26), so that convergence can be judged over whole
+# careers. Grouped by the diagnostic each one tests. Names are resolved against
+# transfermarkt-datasets' player table; SET_B_TM_IDS pins the resolved ids.
+SET_B_GROUPS: dict[str, list[str]] = {
+    # moved from a weaker league to a stronger one: tests the shared scale
+    "league mover": [
+        "Virgil van Dijk", "Luis Díaz", "Darwin Núñez", "Frenkie de Jong", "Matthijs de Ligt",
+        "Rúben Dias", "João Félix", "Cody Gakpo", "Mohamed Salah", "Bruno Fernandes",
+        "Victor Osimhen", "Khvicha Kvaratskhelia", "Hakim Ziyech", "Lisandro Martínez", "Antony",
+        "Erling Haaland", "Sadio Mané", "Andrew Robertson", "Jonathan David", "Joško Gvardiol",
+    ],
+    # few minutes at a big club, then a large fee
+    "low minutes, later large fee": [
+        "Julián Álvarez", "Gonçalo Ramos", "Cole Palmer", "Jadon Sancho", "Rodrygo",
+    ],
+    # almost never missed a game
+    "ever-present starter": [
+        "Jan Oblak", "Marc-André ter Stegen", "Alisson", "Ederson", "Jordan Pickford",
+        "Harry Kane", "Declan Rice", "César Azpilicueta", "Rodri", "Bernardo Silva",
+        "Kalidou Koulibaly", "Sergej Milinković-Savić", "Joshua Kimmich",
+    ],
+    "young star": [
+        "Kylian Mbappé", "Jude Bellingham", "Bukayo Saka", "Phil Foden", "Pedri",
+        "Vinicius Junior", "Federico Valverde", "Jamal Musiala", "Florian Wirtz", "Lautaro Martínez",
+        "Nicolò Barella", "Rafael Leão", "Achraf Hakimi", "Trent Alexander-Arnold", "William Saliba",
+        "Martin Ødegaard", "Dušan Vlahović", "Mason Mount", "Alphonso Davies",
+    ],
+}
+
+# name -> transfermarkt id (the most-capped player of that name in each case, checked by hand)
+SET_B_TM_IDS: dict[str, int] = {
+    "Virgil van Dijk": 139208,
+    "Luis Díaz": 480692,
+    "Darwin Núñez": 546543,
+    "Frenkie de Jong": 326330,
+    "Matthijs de Ligt": 326031,
+    "Rúben Dias": 258004,
+    "João Félix": 462250,
+    "Cody Gakpo": 434675,
+    "Mohamed Salah": 148455,
+    "Bruno Fernandes": 240306,
+    "Victor Osimhen": 401923,
+    "Khvicha Kvaratskhelia": 502670,
+    "Hakim Ziyech": 217111,
+    "Lisandro Martínez": 480762,
+    "Antony": 602105,
+    "Erling Haaland": 418560,
+    "Sadio Mané": 200512,
+    "Andrew Robertson": 234803,
+    "Jonathan David": 533738,
+    "Joško Gvardiol": 475959,
+    "Julián Álvarez": 576024,
+    "Gonçalo Ramos": 550550,
+    "Cole Palmer": 568177,
+    "Jadon Sancho": 401173,
+    "Rodrygo": 412363,
+    "Jan Oblak": 121483,
+    "Marc-André ter Stegen": 74857,
+    "Alisson": 105470,
+    "Ederson": 238223,
+    "Jordan Pickford": 130164,
+    "Harry Kane": 132098,
+    "Declan Rice": 357662,
+    "César Azpilicueta": 57500,
+    "Rodri": 357565,
+    "Bernardo Silva": 241641,
+    "Kalidou Koulibaly": 93128,
+    "Sergej Milinković-Savić": 266302,
+    "Joshua Kimmich": 161056,
+    "Kylian Mbappé": 342229,
+    "Jude Bellingham": 581678,
+    "Bukayo Saka": 433177,
+    "Phil Foden": 406635,
+    "Pedri": 683840,
+    "Vinicius Junior": 371998,
+    "Federico Valverde": 369081,
+    "Jamal Musiala": 580195,
+    "Florian Wirtz": 598577,
+    "Lautaro Martínez": 406625,
+    "Nicolò Barella": 255942,
+    "Rafael Leão": 357164,
+    "Achraf Hakimi": 398073,
+    "Trent Alexander-Arnold": 314353,
+    "William Saliba": 495666,
+    "Martin Ødegaard": 316264,
+    "Dušan Vlahović": 357498,
+    "Mason Mount": 346483,
+    "Alphonso Davies": 424204,
+}
+
+assert set(SET_B_TM_IDS) == {n for names in SET_B_GROUPS.values() for n in names}
