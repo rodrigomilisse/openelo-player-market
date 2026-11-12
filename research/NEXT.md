@@ -44,6 +44,25 @@ national-team term − absence`) and the team Elo. Each item is a light test
 
 ## Results so far
 
+**Minutes rule and keepers (item 1).** National rule as decided (20 matches, two
+years, credit 0.2, scale 100), club scale 400. Squad mean measured with the same
+rule as the player.
+
+| Variant | C7 A / B | Rank fit / held-out |
+|---|---|---|
+| A minutes | 0.697 / 0.882 | 0.476 / 0.409 |
+| B starts full, subs minutes, keeper reference 1.0 | 0.684 / 0.882 | 0.481 / 0.410 |
+| C starts full, subs 0.25, keeper reference 1.0 | 0.684 / 0.885 | 0.477 / 0.407 |
+| D starts full, subs minutes, no keeper rule | 0.681 / 0.885 | 0.481 / 0.407 |
+
+Mean minutes bonus of top-5-league regulars (keepers / defenders / midfielders /
+attackers): A 108 / 85 / 71 / 58; B −58 / 81 / 77 / 71; D 90 / 81 / 77 / 71. The
+start rule closes most of the defender-attacker gap (27 → 10). Open: with the
+keeper reference at 1.0 a regular first-choice keeper averages −58, because cup
+keepers and rotation keep his share near 0.85 (Raya 2208 → 2034, Verbruggen
+2120 → 1957).
+
+
 **League share of European results.** After a European match between clubs of
 different leagues, every other club active in each league in the past year gets
 a share of its club's swing (scratch test, `teamelo.py` unchanged). Within a

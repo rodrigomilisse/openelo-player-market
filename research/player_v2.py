@@ -68,6 +68,9 @@ class Variant:
     nt_credit: float = 0.0
     nt_days: int = 0
     nt_relative: float = 0.0
+    share_rule: str = "minutes"
+    sub_credit: float = 0.25
+    gk_reference: bool = False
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -114,17 +117,43 @@ class Context:
         played = played.dropna(subset=["day"])
         played["share"] = np.minimum(played.minutes, played.game_id.map(self.length)) / played.game_id.map(self.length)
         self.played_by_team = {t: g[["day", "player_id", "share"]].sort_values("day") for t, g in played.groupby("team_id")}
+        rows = appearances[["game_id", "player_id", "team_id", "minutes"]].merge(
+            lineups[["game_id", "player_id", "team_id", "starter"]], on=["game_id", "player_id", "team_id"], how="outer")
+        rows["day"] = rows.game_id.map(self.day)
+        rows = rows.dropna(subset=["day"])
+        rows["length"] = rows.game_id.map(self.length)
+        rows["minutes"] = rows.minutes.fillna(0.0)
+        rows["starter"] = rows.starter.fillna(-1)
+        self.club_rows = rows
+        self._played = {("minutes", 0.0): self.played_by_team}
+        players = store.players()
+        self.keepers = set(players[players.position == "Goalkeeper"].player_id)
         self.squad_mean = {}
         self.nation_days = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
 
-    def squad_means(self, team: int, top: int = 0):
+    def played_for(self, rule: str, credit: float) -> dict:
+        """Per team, (day, player, share) of every club match played, with the share
+        by `rule`: minutes; `starter` (a start is the full match, a substitute his
+        minutes); `starter_fixed` (a start is the full match, a substitute `credit`)."""
+        key = ("minutes", 0.0) if rule == "minutes" else (rule, credit)
+        if key not in self._played:
+            r = self.club_rows
+            minutes_share = np.minimum(r.minutes, r.length) / r.length
+            sub = minutes_share if rule == "starter" else np.where(r.minutes > 0, credit, 0.0)
+            share = np.where(r.starter == 1, 1.0, np.where(r.starter == -1, minutes_share, sub))
+            rows = r.assign(share=share)
+            rows = rows[rows.share > 0]
+            self._played[key] = {t: g[["day", "player_id", "share"]].sort_values("day") for t, g in rows.groupby("team_id")}
+        return self._played[key]
+
+    def squad_means(self, team: int, top: int = 0, rule: str = "minutes", credit: float = 0.0):
         """(days, mean share of the squad over the 365 days before each match day):
         the minutes shares summed over the window, ÷ (matches × players). With
         `top`, only the `top` players with the most minutes in the window count
         (16 = a starting eleven and five substitutes), so the mean no longer
         depends on how many fringe players the dataset lists."""
-        group = self.played_by_team.get(team)
+        group = self.played_for(rule, credit).get(team)
         if group is None:
             return np.array([]), np.array([])
         days = np.sort(group.day.unique())
@@ -190,7 +219,7 @@ class Context:
                     rest = (total - level) / (count - 1) if level is not None and count > 1 else \
                         (total / count if count and level is None else 1500.0)
                     result.setdefault(int(player), []).append(
-                        (int(game.day), share, stacked, elo[(game.game_id, team)], rest, int(team), level))
+                        (int(game.day), share, stacked, elo[(game.game_id, team)], rest, int(team), level, int(started == 1)))
         self.nation_days = {t: np.array(sorted(set(d))) for t, d in self.nation_days.items()}
         # national Elo restated on the spread of the club-rating average, so either can drive strength
         rows = [c for calls in result.values() for c in calls]
@@ -212,10 +241,11 @@ class Context:
         before = schedule[schedule.day < day]
         return float(before.rating.iloc[-1] + before.swing.iloc[-1]) if len(before) else None
 
-    def squad_mean_at(self, team: int, day: int, top: int = 0) -> float:
-        if (team, top) not in self.squad_mean:
-            self.squad_mean[(team, top)] = self.squad_means(team, top)
-        days, values = self.squad_mean[(team, top)]
+    def squad_mean_at(self, team: int, day: int, top: int = 0, rule: str = "minutes", credit: float = 0.0) -> float:
+        key = (team, top, rule, credit if rule == "starter_fixed" else 0.0)
+        if key not in self.squad_mean:
+            self.squad_mean[key] = self.squad_means(team, top, rule, key[3])
+        days, values = self.squad_mean[key]
         i = np.searchsorted(days, day, side="right") - 1
         return float(values[i]) if i >= 0 and not np.isnan(values[i]) else 0.4
 
@@ -233,7 +263,7 @@ class Context:
         if not fill:
             rows = rows.dropna(subset=["minutes"])
         rows["minutes"] = rows.minutes.fillna(0)
-        rows["starter"] = rows.starter.fillna((rows.minutes > 0).astype(int))
+        rows["starter"] = rows.starter.fillna(-1)  # no line-up: unknown, minutes decide
         return rows.sort_values(["day", "game_id"])
 
 
@@ -333,8 +363,17 @@ class Player:
     def rating(self) -> float:
         return self.level + self.offset
 
-    def match(self, row, listed: bool, minutes: float) -> None:
-        share = min(minutes, row.length) / row.length
+    def share_of(self, minutes_share: float, started, played: bool) -> float:
+        """The share a match counts for, by the variant's rule (see Context.played_for);
+        `started` None means the line-up is unknown and minutes decide."""
+        if self.v.share_rule == "minutes" or started is None:
+            return minutes_share
+        if started:
+            return 1.0
+        return minutes_share if self.v.share_rule == "starter" else (self.v.sub_credit if played else 0.0)
+
+    def match(self, row, listed: bool, minutes: float, started=None) -> None:
+        share = self.share_of(min(minutes, row.length) / row.length, started, minutes > 0)
         if self.level is None:
             self.level = row.rating - DEBUTANT_OFFSET
         if self.team is not None and self.team != row.team_id:
@@ -460,11 +499,11 @@ class Player:
             c = mine.get(int(d))
             if c is None:
                 continue
-            value = max(c[1], self.v.nt_credit)
+            value = max(self.share_of(c[1], c[7] == 1, c[1] > 0), self.v.nt_credit)
             if self.v.national == "flat":
                 strength = 1.0
             else:
-                level = c[4] if self.v.national == "clubs" else c[7]
+                level = c[4] if self.v.national == "clubs" else c[8]
                 strength = max(0.0, level - 1600.0) / 200.0
             if self.v.nt_relative and c[6] is not None:
                 # how far his club sits below the clubs of the team-mates he is picked with
@@ -475,7 +514,9 @@ class Player:
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
             return 0.0
-        squad = context.squad_mean_at(self.team, day, self.v.squad_top)
+        squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)
+        if self.v.gk_reference and getattr(self, "keeper", False):
+            squad = 1.0  # a keeper is measured against playing every match: the first choice gets 0
         if self.v.selection:
             share = np.mean(self.window) if self.window else squad
         else:
@@ -491,7 +532,7 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
     listings = context.listings(player_id, variant.fill)
     if listings.empty:
         return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])
-    listed = {(int(r.game_id), int(r.team_id)): float(r.minutes) for r in listings.itertuples()}
+    listed = {(int(r.game_id), int(r.team_id)): (float(r.minutes), r.starter) for r in listings.itertuples()}
     timeline = []
     for team, first, last in stints(listings):
         schedule = context.by_team.get(team)
@@ -504,6 +545,7 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
     timeline = pd.concat(timeline).sort_values(["day", "game_id"]).drop_duplicates("game_id")
     state = Player(variant)
     state.call_ups = context.national_call_ups.get(int(player_id), [])
+    state.keeper = int(player_id) in context.keepers
     own_shares = deque()
     rows = []
     position = 0
@@ -514,8 +556,8 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
             position += 1
             key = (int(row.game_id), int(row.team_id))
             is_listed = key in listed
-            minutes = listed.get(key, 0.0)
-            state.match(row, is_listed, minutes)
+            minutes, started = listed.get(key, (0.0, 0))
+            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started))
             own_shares.append((row.day, min(minutes, row.length) / row.length, row.team_id))
         if state.level is None:
             continue
