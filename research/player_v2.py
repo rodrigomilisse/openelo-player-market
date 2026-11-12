@@ -174,8 +174,9 @@ class Context:
                 club_levels = [self.club_rating(club_of, p, game.day) for p in members.player_id]
                 club_levels = [c for c in club_levels if c is not None]
                 stacked = float(np.mean(club_levels)) if club_levels else 1500.0
-                for player in members.player_id:
-                    played = float(minutes.get((game.game_id, player), 0.0))
+                for player, started in zip(members.player_id, members.starter):
+                    # as for clubs: a starter the dataset lists without minutes played the match
+                    played = float(minutes.get((game.game_id, player), length if started == 1 else 0.0))
                     share = min(played, length) / length
                     result.setdefault(int(player), []).append((int(game.day), share, stacked, elo[(game.game_id, team)]))
         return result
