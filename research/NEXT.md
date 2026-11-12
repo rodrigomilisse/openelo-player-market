@@ -63,7 +63,22 @@ keepers and rotation keep his share near 0.85 (Raya 2208 → 2034, Verbruggen
 2120 → 1957).
 
 
-**League share of European results.** After a European match between clubs of
+**Lower team K (item 2).** The team model's step size is set by its process
+noise (fitted 6 per day). Decided player rules (B, national rule, keeper
+reference).
+
+| Process noise | Mean swing | Team test log loss vs fitted | Held-out rank corr. at club 200 / 400 / 800 | C7 A / B at 400 |
+|---|---|---|---|---|
+| 6 (fitted) | 17.7 | 0 | 0.350 / 0.410 / 0.454 | 0.684 / 0.882 |
+| 3 | 15.8 | +0.0006 (+0.0002 to +0.0010) | 0.363 / 0.423 / 0.458 | 0.717 / 0.885 |
+| 1.5 | 14.5 | +0.0020 (+0.0012 to +0.0027) | 0.374 / 0.431 / 0.457 | 0.717 / 0.891 |
+| 0.75 | 13.7 | +0.0038 (+0.0028 to +0.0049) | 0.383 / 0.431 / 0.453 | 0.723 / 0.891 |
+
+A smoother team rating helps player agreement at every club scale, most at
+200-400, but 800 still scores best at every noise level: the scale question is
+only partly team-rating noise. The 400-800 gap on held-out halves (0.044 →
+0.022).
+ After a European match between clubs of
 different leagues, every other club active in each league in the past year gets
 a share of its club's swing (scratch test, `teamelo.py` unchanged). Within a
 league every club moves by the same amount, so domestic predictions and gaps
