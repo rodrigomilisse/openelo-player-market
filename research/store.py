@@ -60,7 +60,13 @@ def national_games() -> pd.DataFrame:
 
 
 def appearances() -> pd.DataFrame:
-    return query("SELECT game_id, player_id, team_id, minutes, goals, yellow, red FROM appearance")
+    columns = {r[1] for r in _connect_columns("appearance")}
+    assists = "assists" if "assists" in columns else "0 AS assists"
+    return query(f"SELECT game_id, player_id, team_id, minutes, goals, {assists}, yellow, red FROM appearance")
+
+
+def _connect_columns(table: str) -> list:
+    return query(f"PRAGMA table_info({table})").values.tolist()
 
 
 def lineups() -> pd.DataFrame:

@@ -83,6 +83,7 @@ CREATE TABLE game (
 CREATE TABLE appearance (
     game_id INTEGER NOT NULL, player_id INTEGER NOT NULL, team_id INTEGER NOT NULL,
     minutes INTEGER NOT NULL, goals INTEGER NOT NULL, yellow INTEGER NOT NULL, red INTEGER NOT NULL,
+    assists INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (game_id, player_id)
 );
 CREATE TABLE lineup (
@@ -331,11 +332,12 @@ def duplicate_team_days(games: pd.DataFrame) -> set:
 
 def load_appearances(games: pd.DataFrame) -> pd.DataFrame:
     raw = pd.read_csv(TMD_DIR / "appearances.csv.gz", usecols=[
-        "game_id", "player_id", "player_club_id", "minutes_played", "goals", "yellow_cards", "red_cards"])
+        "game_id", "player_id", "player_club_id", "minutes_played", "goals", "assists", "yellow_cards", "red_cards"])
     raw = raw[raw.game_id.isin(games.game_id)].drop_duplicates(["game_id", "player_id"])
     return pd.DataFrame({
         "game_id": raw.game_id, "player_id": raw.player_id, "team_id": raw.player_club_id,
         "minutes": raw.minutes_played, "goals": raw.goals, "yellow": raw.yellow_cards, "red": raw.red_cards,
+        "assists": raw.assists,
     })
 
 

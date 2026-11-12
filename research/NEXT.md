@@ -63,6 +63,16 @@ keepers and rotation keep his share near 0.85 (Raya 2208 → 2034, Verbruggen
 2120 → 1957).
 
 
+**Goal term (tested, open).** Goal involvement over the same 50 listed matches,
+per 90 with 5 scoreless matches added, × 100. Process noise 3, rule B.
+
+| Variant | Rank fit / held-out | C7 A / B | Mean bonus + goal term, keepers / defenders / midfielders / attackers |
+|---|---|---|---|
+| B | 0.489 / 0.423 | 0.717 / 0.885 | −58 / 81 / 77 / 71 |
+| + goals | 0.505 / 0.436 | 0.710 / 0.891 | −58 / 85 / 87 / 99 |
+| + goals and assists | 0.511 / 0.433 | 0.710 / 0.891 | −58 / 90 / 97 / 113 |
+| + goals and assists scaled by position (analysis only) | 0.505 / 0.434 | 0.717 / 0.895 | −58 / 102 / 96 / 91 |
+
 **Lower team K (item 2).** The team model's step size is set by its process
 noise (fitted 6 per day). Decided player rules (B, national rule, keeper
 reference).
@@ -100,6 +110,7 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   (the owner accepts the small penalty for cup rotation). Same rule for national
   call-ups. A slight skew towards midfielders and attackers would be welcome only
   if it comes naturally.
+- Team process noise 3 (from 6): +0.0006 team log loss for +0.013 held-out player agreement.
 - Position never enters the rating, except the keeper reference; positions are
   for analysis only. Counting any appearance as a full match (`appearance`) was
   tested and rejected: it over-values substitutes (held-out rank correlation

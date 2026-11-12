@@ -71,6 +71,9 @@ class Variant:
     share_rule: str = "minutes"
     sub_credit: float = 0.25
     gk_reference: bool = False
+    output: str = "none"
+    output_scale: float = 100.0
+    output_prior: float = 5.0
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -128,6 +131,12 @@ class Context:
         self._played = {("minutes", 0.0): self.played_by_team}
         players = store.players()
         self.keepers = set(players[players.position == "Goalkeeper"].player_id)
+        self.position = dict(zip(players.player_id, players.position))
+        # goal involvements per 90 by position (all club matches), for the position-scaled output test
+        apps = appearances[appearances.game_id.isin(self.day.keys())]
+        per_pos = apps.assign(position=apps.player_id.map(self.position)).groupby("position")[["goals", "assists", "minutes"]].sum()
+        self.ga_rate = ((per_pos.goals + per_pos.assists) / (per_pos.minutes / 90)).to_dict()
+        self.ga_rate_all = float((apps.goals.sum() + apps.assists.sum()) / (apps.minutes.sum() / 90))
         self.squad_mean = {}
         self.nation_days = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
@@ -255,7 +264,7 @@ class Context:
     def listings(self, player: int, fill: bool) -> pd.DataFrame:
         """Every club match the player was listed for: minutes (filled for starters
         without minutes when `fill`), and whether he started or sat on the bench."""
-        apps = self.appearances[self.appearances.player_id == player][["game_id", "team_id", "minutes"]]
+        apps = self.appearances[self.appearances.player_id == player][["game_id", "team_id", "minutes", "goals", "assists"]]
         lins = self.lineups[self.lineups.player_id == player][["game_id", "team_id", "starter"]]
         rows = apps.merge(lins, on=["game_id", "team_id"], how="outer")
         rows["day"] = rows.game_id.map(self.day)
@@ -266,6 +275,8 @@ class Context:
         if not fill:
             rows = rows.dropna(subset=["minutes"])
         rows["minutes"] = rows.minutes.fillna(0)
+        rows["goals"] = rows.goals.fillna(0)
+        rows["assists"] = rows.assists.fillna(0)
         rows["starter"] = rows.starter.fillna(-1)  # no line-up: unknown, minutes decide
         return rows.sort_values(["day", "game_id"])
 
@@ -358,6 +369,7 @@ class Player:
         self.offset_variance = OFFSET_PRIOR_VARIANCE
         self.discount = 0.0
         self.window = deque(maxlen=variant.window)
+        self.output_window = deque(maxlen=variant.window)
         self.team = None
         self.last_played = None
         self.last_listed = None
@@ -377,7 +389,9 @@ class Player:
             return 1.0
         return minutes_share if self.v.share_rule == "starter" else (self.v.sub_credit if played else 0.0)
 
-    def match(self, row, listed: bool, minutes: float, started=None) -> None:
+    def match(self, row, listed: bool, minutes: float, started=None, goals: float = 0.0, assists: float = 0.0) -> None:
+        if listed and self.v.output != "none":
+            self.output_window.append((minutes, goals, assists))
         share = self.share_of(min(minutes, row.length) / row.length, started, minutes > 0)
         if self.level is None:
             self.level = row.rating - DEBUTANT_OFFSET
@@ -457,7 +471,24 @@ class Player:
                 idle = day - self.last_played - GRACE_DAYS
                 if idle > 0:
                     rating = REPLACEMENT + (rating - REPLACEMENT) * max(0, DECAY_DAYS - idle) / DECAY_DAYS
-        return rating + self.bonus(day, context) + self.national_points(day, context)
+        return rating + self.bonus(day, context) + self.national_points(day, context) + self.output_points(context)
+
+    def output_points(self, context: "Context") -> float:
+        """Goal involvement over the same window of listed matches: goals (or goals +
+        assists) per 90, with `output_prior` scoreless matches added so a few minutes
+        cannot carry a high rate, × `output_scale`. `ga_position` divides by his
+        position's average rate (analysis only: position is not meant for the rating)."""
+        if self.v.output == "none" or not self.output_window:
+            return 0.0
+        minutes = sum(m for m, _, _ in self.output_window)
+        involvements = sum(g + (a if self.v.output != "goals" else 0) for _, g, a in self.output_window)
+        rate = involvements / (minutes / 90 + self.v.output_prior)
+        if self.v.output == "ga_position":
+            position_rate = context.ga_rate.get(context.position.get(getattr(self, "player_id", None)), 0.0)
+            if getattr(self, "keeper", False) or position_rate <= 0:
+                return 0.0
+            rate = rate / position_rate * context.ga_rate_all
+        return self.v.output_scale * rate
 
     def national_points(self, day: int, context: "Context") -> float:
         """Points for being a regular in a national team, never for its results:
@@ -537,7 +568,8 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
     listings = context.listings(player_id, variant.fill)
     if listings.empty:
         return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])
-    listed = {(int(r.game_id), int(r.team_id)): (float(r.minutes), r.starter) for r in listings.itertuples()}
+    listed = {(int(r.game_id), int(r.team_id)): (float(r.minutes), r.starter, float(r.goals), float(r.assists))
+              for r in listings.itertuples()}
     timeline = []
     for team, first, last in stints(listings):
         schedule = context.by_team.get(team)
@@ -551,6 +583,7 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
     state = Player(variant)
     state.call_ups = context.national_call_ups.get(int(player_id), [])
     state.keeper = int(player_id) in context.keepers
+    state.player_id = int(player_id)
     own_shares = deque()
     rows = []
     position = 0
@@ -561,8 +594,8 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
             position += 1
             key = (int(row.game_id), int(row.team_id))
             is_listed = key in listed
-            minutes, started = listed.get(key, (0.0, 0))
-            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started))
+            minutes, started, goals, assists = listed.get(key, (0.0, 0, 0.0, 0.0))
+            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started), goals, assists)
             own_shares.append((row.day, min(minutes, row.length) / row.length, row.team_id))
         if state.level is None:
             continue
