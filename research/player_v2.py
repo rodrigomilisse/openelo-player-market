@@ -58,6 +58,7 @@ class Variant:
     fill: bool = True
     window: int = WINDOW_MATCHES
     squad_window: bool = False
+    squad_top: int = 0
     national: str = "none"
     national_scale: float = 50.0
 
@@ -65,6 +66,8 @@ class Variant:
         parts = [p for p in ("split", "weighted", "absence", "selection") if getattr(self, p)]
         if self.selection:
             parts.append(f"window {self.window} {'squad' if self.squad_window else 'team'} matches")
+        if self.squad_top:
+            parts.append(f"mean of top {self.squad_top}")
         if self.national != "none":
             parts.append(f"national {self.national}")
         return " + ".join(parts) or ("baseline" if self.fill else "baseline, no fill")
@@ -104,29 +107,36 @@ class Context:
         self.squad_mean = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
 
-    def squad_means(self, team: int):
+    def squad_means(self, team: int, top: int = 0):
         """(days, mean share of the squad over the 365 days before each match day):
-        the minutes shares summed over the window, ÷ (matches × distinct players)."""
+        the minutes shares summed over the window, ÷ (matches × players). With
+        `top`, only the `top` players with the most minutes in the window count
+        (16 = a starting eleven and five substitutes), so the mean no longer
+        depends on how many fringe players the dataset lists."""
         group = self.played_by_team.get(team)
         if group is None:
             return np.array([]), np.array([])
         days = np.sort(group.day.unique())
-        per_day = {d: (g.share.sum(), list(g.player_id)) for d, g in group.groupby("day")}
-        counts, total, start, result = {}, 0.0, 0, []
+        per_day = {d: list(zip(g.player_id, g.share)) for d, g in group.groupby("day")}
+        sums, counts, start, result = {}, {}, 0, []
         for i, d in enumerate(days):
             while days[start] < d - 365:
-                share_sum, members = per_day[days[start]]
-                total -= share_sum
-                for p in members:
+                for p, share in per_day[days[start]]:
+                    sums[p] -= share
                     counts[p] -= 1
                     if counts[p] == 0:
-                        del counts[p]
+                        del sums[p], counts[p]
                 start += 1
             matches = i - start
-            result.append(total / (matches * len(counts)) if matches and counts else np.nan)
-            share_sum, members = per_day[d]
-            total += share_sum
-            for p in members:
+            if matches and sums:
+                values = sorted(sums.values(), reverse=True)
+                if top:
+                    values = values[:top]
+                result.append(sum(values) / (matches * len(values)))
+            else:
+                result.append(np.nan)
+            for p, share in per_day[d]:
+                sums[p] = sums.get(p, 0.0) + share
                 counts[p] = counts.get(p, 0) + 1
         return days, np.array(result)
 
@@ -177,10 +187,10 @@ class Context:
         before = schedule[schedule.day < day]
         return float(before.rating.iloc[-1] + before.swing.iloc[-1]) if len(before) else None
 
-    def squad_mean_at(self, team: int, day: int) -> float:
-        if team not in self.squad_mean:
-            self.squad_mean[team] = self.squad_means(team)
-        days, values = self.squad_mean[team]
+    def squad_mean_at(self, team: int, day: int, top: int = 0) -> float:
+        if (team, top) not in self.squad_mean:
+            self.squad_mean[(team, top)] = self.squad_means(team, top)
+        days, values = self.squad_mean[(team, top)]
         i = np.searchsorted(days, day, side="right") - 1
         return float(values[i]) if i >= 0 and not np.isnan(values[i]) else 0.4
 
@@ -401,7 +411,7 @@ class Player:
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
             return 0.0
-        squad = context.squad_mean_at(self.team, day)
+        squad = context.squad_mean_at(self.team, day, self.v.squad_top)
         if self.v.selection:
             share = np.mean(self.window) if self.window else squad
         else:
