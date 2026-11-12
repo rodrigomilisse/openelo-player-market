@@ -64,6 +64,7 @@ class Variant:
     direct: bool = False
     national: str = "none"
     national_scale: float = 50.0
+    bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
         parts = [p for p in ("split", "weighted", "absence", "selection") if getattr(self, p)]
@@ -424,7 +425,7 @@ class Player:
             share = np.mean(self.window) if self.window else squad
         else:
             share = self.team_window_share(day, context)
-        return BONUS_SCALE * (share - squad)
+        return self.v.bonus_scale * (share - squad)
 
     def team_window_share(self, day: int, context: Context) -> float:
         return self._team_share.get(day, 0.0) if hasattr(self, "_team_share") else 0.0
