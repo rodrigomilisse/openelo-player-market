@@ -135,13 +135,16 @@ class Context:
     def played_for(self, rule: str, credit: float) -> dict:
         """Per team, (day, player, share) of every club match played, with the share
         by `rule`: minutes; `starter` (a start is the full match, a substitute his
-        minutes); `starter_fixed` (a start is the full match, a substitute `credit`)."""
+        minutes); `starter_fixed` (a start is the full match, a substitute `credit`);
+        `appearance` (any start or substitute appearance is the full match)."""
         key = ("minutes", 0.0) if rule == "minutes" else (rule, credit)
         if key not in self._played:
             r = self.club_rows
             minutes_share = np.minimum(r.minutes, r.length) / r.length
             sub = minutes_share if rule == "starter" else np.where(r.minutes > 0, credit, 0.0)
             share = np.where(r.starter == 1, 1.0, np.where(r.starter == -1, minutes_share, sub))
+            if rule == "appearance":
+                share = np.where((r.starter == 1) | (r.minutes > 0), 1.0, 0.0)
             rows = r.assign(share=share)
             rows = rows[rows.share > 0]
             self._played[key] = {t: g[["day", "player_id", "share"]].sort_values("day") for t, g in rows.groupby("team_id")}
@@ -366,6 +369,8 @@ class Player:
     def share_of(self, minutes_share: float, started, played: bool) -> float:
         """The share a match counts for, by the variant's rule (see Context.played_for);
         `started` None means the line-up is unknown and minutes decide."""
+        if self.v.share_rule == "appearance":
+            return 1.0 if (started or played) else 0.0
         if self.v.share_rule == "minutes" or started is None:
             return minutes_share
         if started:
