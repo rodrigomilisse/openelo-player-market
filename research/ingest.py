@@ -128,7 +128,9 @@ def download(url: str, target: Path) -> None:
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_suffix(target.suffix + ".part")
-    with urllib.request.urlopen(url, timeout=600) as response, open(partial, "wb") as out:
+    # The dataset host (Cloudflare) refuses urllib's default User-Agent.
+    request = urllib.request.Request(url, headers={"User-Agent": "openelo-research/1.0"})
+    with urllib.request.urlopen(request, timeout=600) as response, open(partial, "wb") as out:
         while chunk := response.read(1 << 20):
             out.write(chunk)
     partial.rename(target)

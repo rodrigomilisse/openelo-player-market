@@ -88,3 +88,36 @@ def clubelo() -> pd.DataFrame:
 def output_path(directory: Path, name: str) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     return directory / name
+
+
+def national_extra() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """National-team games, line-ups and minutes added by national.py (empty when it
+    has not been run). Games the store already holds keep their game id."""
+    try:
+        games = query("SELECT * FROM nt_game ORDER BY date, game_id")
+    except Exception:
+        empty = pd.DataFrame(columns=["game_id", "player_id", "team_id"])
+        return pd.DataFrame(columns=["game_id", "date", "day", "home_team_id", "away_team_id", "length",
+                                     "in_store"]), empty.assign(starter=[]), empty.assign(minutes=[])
+    games["day"] = (pd.to_datetime(games.date) - EPOCH).dt.days
+    games["goal_difference"] = games.home_goals - games.away_goals
+    return games, query("SELECT * FROM nt_lineup"), query("SELECT * FROM nt_appearance")
+
+
+def international_results() -> pd.DataFrame:
+    """Every international result (martj42), team names as the store spells them."""
+    try:
+        results = query("SELECT * FROM international_result ORDER BY date")
+    except Exception:
+        return pd.DataFrame()
+    results["day"] = (pd.to_datetime(results.date) - EPOCH).dt.days
+    return results
+
+
+def national_team_names() -> dict:
+    names = dict(query("SELECT team_id, name FROM team WHERE kind = 'national'").values)
+    try:
+        names.update(dict(query("SELECT team_id, name FROM nt_team").values))
+    except Exception:
+        pass
+    return names

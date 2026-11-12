@@ -134,20 +134,27 @@ class Context:
         """Per player: (day, minutes share, mean club rating of the line-up, the
         national team's Elo) for every national-team match he was listed for."""
         games = store.national_games()
+        extra_games, extra_lineups, extra_minutes = store.national_extra()
+        games = pd.concat([games, extra_games[extra_games.in_store == 0]], ignore_index=True)
         elo = national_elo(games)
         club_rows = appearances[appearances.game_id.isin(self.day.keys()) & (appearances.minutes > 0)].copy()
         club_rows["day"] = club_rows.game_id.map(self.day)
         club_rows = club_rows.sort_values("day")
         club_of = {p: (g.day.to_numpy(), g.team_id.to_numpy()) for p, g in club_rows.groupby("player_id")}
-        listed = lineups[lineups.game_id.isin(games.game_id)]
-        minutes = appearances[appearances.game_id.isin(games.game_id)].set_index(["game_id", "player_id"]).minutes
-        lengths = appearances[appearances.game_id.isin(games.game_id)].groupby("game_id").minutes.max()
+        listed = pd.concat([lineups[lineups.game_id.isin(games.game_id)], extra_lineups]) \
+            .drop_duplicates(["game_id", "player_id"])
+        played = pd.concat([appearances[appearances.game_id.isin(games.game_id)], extra_minutes]) \
+            .drop_duplicates(["game_id", "player_id"])
+        minutes = played.set_index(["game_id", "player_id"]).minutes
+        lengths = played.groupby("game_id").minutes.max()
+        known_lengths = dict(zip(extra_games.game_id, extra_games.length))
+        listed_by_game = {g: s for g, s in listed.groupby("game_id")}
         result = {}
         for game in games.itertuples():
-            squad = listed[listed.game_id == game.game_id]
-            if squad.empty:
+            squad = listed_by_game.get(game.game_id)
+            if squad is None:
                 continue
-            length = 120 if lengths.get(game.game_id, 90) > 100 else 90
+            length = known_lengths.get(game.game_id) or (120 if lengths.get(game.game_id, 90) > 100 else 90)
             for team, members in squad.groupby("team_id"):
                 club_levels = [self.club_rating(club_of, p, game.day) for p in members.player_id]
                 club_levels = [c for c in club_levels if c is not None]
@@ -195,10 +202,60 @@ class Context:
         return rows.sort_values(["day", "game_id"])
 
 
+# K by kind of international (World Football Elo style), set by hand.
+INTERNATIONAL_K = {"FIFA World Cup": 60.0, "UEFA Euro": 50.0, "Copa América": 50.0,
+                   "African Cup of Nations": 50.0, "AFC Asian Cup": 50.0, "Gold Cup": 50.0,
+                   "Friendly": 20.0}
+
+
+def international_k(tournament: str) -> float:
+    if tournament in INTERNATIONAL_K:
+        return INTERNATIONAL_K[tournament]
+    if "qualification" in tournament or "Nations League" in tournament:
+        return 40.0
+    return 30.0
+
+
 def national_elo(games: pd.DataFrame) -> dict:
-    """A plain Elo for national teams from their tournament results (K 40, the
-    margin multiplier, host advantage 100): only a strength measure for the
-    national-team points, never fed into player ratings."""
+    """National-team strength before each listed match: (game id, team id) -> Elo.
+    From every international since 1872 when national.py has been run (K by
+    tournament, the margin multiplier, home advantage 100); otherwise a plain
+    Elo from the store's tournament results only (K 40), which is compressed.
+    Only a strength measure for the national-team points, never fed into
+    player ratings."""
+    results = store.international_results()
+    if results.empty:
+        return tournament_elo(games)
+    ratings, history = {}, {}
+    for r in results.itertuples():
+        home, away = ratings.get(r.home, 1500.0), ratings.get(r.away, 1500.0)
+        advantage = 0.0 if r.neutral else 100.0
+        difference = r.home_goals - r.away_goals
+        expected = te.expected_score(home + advantage - away)
+        step = international_k(r.tournament) * te.goal_difference_multiplier(difference) * \
+            (te.score_of(difference) - expected)
+        ratings[r.home], ratings[r.away] = home + step, away - step
+        for team, value in ((r.home, home + step), (r.away, away - step)):
+            days, values = history.setdefault(team, ([], []))
+            days.append(r.day)
+            values.append(value)
+    names = store.national_team_names()
+
+    def before(team_id: int, day: int) -> float:
+        days, values = history.get(names.get(team_id), ([], []))
+        i = np.searchsorted(days, day, side="left") - 1
+        return float(values[i]) if i >= 0 else 1500.0
+
+    result = {}
+    for game in games.itertuples():
+        for team in (game.home_team_id, game.away_team_id):
+            result[(game.game_id, team)] = before(team, game.day)
+    return result
+
+
+def tournament_elo(games: pd.DataFrame) -> dict:
+    """The earlier national-team Elo, from tournament results only (K 40, the
+    margin multiplier, host advantage 100)."""
     ratings, before = {}, {}
     for game in games.sort_values(["day", "game_id"]).itertuples():
         home = ratings.get(game.home_team_id, 1500.0)
