@@ -72,4 +72,4 @@ in milli-Elo, so these need `evaluate.py exact` first. Charts go to
 | `players.py` | Set A (the original 100) and set B (diagnostic cases) |
 | `openelo.py`, `analysis.py`, `openelo_market.py`, `db.py`, `tm_client.py` | The original Transfermarkt comparison tool |
 
-`OPENELO_TM_AGE_ADJUST=1` runs the Transfermarkt comparisons against age-adjusted values (RESULTS-communication.md §8).
+`OPENELO_TM_AGE_ADJUST=linear:2` (or `linear:R`, `exp:R`) runs the Transfermarkt comparisons against age-adjusted values (RESULTS-communication.md §8).

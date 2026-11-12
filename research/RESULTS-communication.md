@@ -160,26 +160,29 @@ with Transfermarkt directionally, not that it matches its size. Olise: rating
 ## 8. Age-adjusted Transfermarkt values (evaluation only)
 
 Transfermarkt values include age (remaining career); the rating has none (age
-is to be added separately later). So the comparison can be run against values
-restated at the age-25 level: `OPENELO_TM_AGE_ADJUST=1` makes `store.valuations()`
-divide every value by the typical drift of value with age (mean 12-month log
-change by age over all valued players, summed outwards from 25; relative value
-0.89 at 24, 1.06 at 26, 0.77 at 30, 0.42 at 32). Ratings never see it.
+is to be added separately later). So the comparison can also be run against
+values divided by an age factor: `OPENELO_TM_AGE_ADJUST=<spec> ` makes
+`store.valuations()` do it. Ratings never see it. Specs: `linear:R` (a straight
+line, R times as much at 20 as at 30; R = 2 is 1.47 at 18, 1.0 at 25, 0.67 at 30,
+0.33 at 35, zero at 40) and `exp:R` (the same share lost every year). Owner's
+choice: linear, 20 worth double 30.
 
-| Measure | Current, raw | Current, adjusted | Direct, raw | Direct, adjusted | Direct, no NT, adjusted |
-|---|---|---|---|---|---|
-| Rank correlation | 0.508 | 0.406 | 0.432 | 0.353 | 0.343 |
-| C7 set A / set B | 0.724 / 0.880 | 0.687 / 0.797 | 0.683 / 0.853 | 0.668 / 0.783 | 0.629 / 0.776 |
+| Age factor | Current: rank corr. / C7 A / C7 B | Direct: rank corr. / C7 A / C7 B |
+|---|---|---|
+| none (raw) | 0.508 / 0.724 / 0.880 | 0.432 / 0.683 / 0.853 |
+| linear:1.5 | 0.504 / 0.704 / 0.882 | 0.428 / 0.659 / 0.857 |
+| **linear:2** | 0.493 / 0.713 / 0.885 | 0.420 / 0.655 / 0.859 |
+| linear:3 | 0.490 / 0.678 / 0.882 | 0.409 / 0.657 / 0.863 |
+| exp:2 | 0.506 / 0.712 / 0.883 | 0.428 / 0.658 / 0.861 |
+| fitted curve (dropped) | 0.406 / 0.687 / 0.797 | 0.353 / 0.668 / 0.783 |
 
-- Bruno's divergence is age: his raw value falls €90M → €40M (2021–26) while his
-  rating is flat; adjusted, his value is flat at about €75–85M.
-- All agreement falls on the adjusted values, so part of the earlier agreement was
-  both rising for young players and falling for old. The gap between direct and
-  current narrows (rank correlation −0.076 raw, −0.053 adjusted).
-- Caveat: the average curve also removes the average real change in ability with
-  age (growth at 20, decline at 32), which results-based ratings should
-  partly capture; and players who stop being valued drop out of the curve, so
-  the decline at old ages is understated.
+- Simple age factors barely move the agreement (rank correlation −0.015 at R = 2).
+  A curve fitted to the average drift of value with age (value at 20 about a third
+  of the value at 25) cut it by 0.1, because it also removed the real growth of
+  young players that the rating picks up; it was dropped.
+- Direct stays 0.07 to 0.08 below current on rank correlation under every factor.
+- Bruno's divergence is age: raw value €90M → €40M (2021–26) with a flat rating;
+  adjusted by the fitted curve his value was flat at about €75–85M.
 
 ## Current candidate
 
