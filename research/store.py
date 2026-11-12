@@ -4,10 +4,12 @@ The store lives under data/raw/, which is gitignored: it is derived from scraped
 data and the repository is public.
 """
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 RAW_DIR = Path(__file__).parent / "data" / "raw"
@@ -73,8 +75,59 @@ def players() -> pd.DataFrame:
     return query("SELECT player_id, name, position, sub_position, date_of_birth, citizenship FROM player")
 
 
-def valuations() -> pd.DataFrame:
-    return query("SELECT player_id, date, value_eur, team_id FROM valuation")
+def valuations(age_adjusted: bool | None = None) -> pd.DataFrame:
+    """Transfermarkt values. With `age_adjusted` (default: environment variable
+    OPENELO_TM_AGE_ADJUST=1) every value is restated at the age-25 level (see
+    `age_curve`), so a rating is scored against value changes that are not just a
+    player getting older or younger. Evaluation only; ratings never see this."""
+    values = query("SELECT player_id, date, value_eur, team_id FROM valuation")
+    if age_adjusted is None:
+        age_adjusted = os.environ.get("OPENELO_TM_AGE_ADJUST") == "1"
+    if not age_adjusted:
+        return values
+    born = query("SELECT player_id, date_of_birth FROM player").dropna()
+    values = values.merge(born, on="player_id")
+    age = (pd.to_datetime(values.date) - pd.to_datetime(values.date_of_birth)).dt.days / 365.25
+    ages, cumulative = age_curve()
+    values["value_eur"] = (values.value_eur * np.exp(-np.interp(age, ages, cumulative))).round().astype("int64")
+    return values.drop(columns="date_of_birth")
+
+
+REFERENCE_AGE = 25
+_age_curve = None
+
+
+def age_curve():
+    """(ages, cumulative log value change from the reference age): the typical way a
+    Transfermarkt value drifts with age, from the 12-month log change of every
+    valued player (value at least €500k) averaged by age in whole years, then
+    summed outwards from age 25. Players who stop being valued drop out, so the
+    old-age decline is understated."""
+    global _age_curve
+    if _age_curve is not None:
+        return _age_curve
+    values = query("SELECT v.player_id, v.date, v.value_eur, p.date_of_birth FROM valuation v "
+                   "JOIN player p USING (player_id) WHERE p.date_of_birth IS NOT NULL AND v.value_eur >= 500000")
+    values["t"] = pd.to_datetime(values.date)
+    values = values.sort_values("t")
+    later = values[["player_id", "t", "value_eur"]].rename(columns={"t": "t_later", "value_eur": "later"})
+    ahead = values.assign(t_later=values.t + pd.Timedelta(days=365))
+    pairs = pd.merge_asof(ahead.sort_values("t_later"), later.sort_values("t_later"), on="t_later",
+                          by="player_id", direction="backward", tolerance=pd.Timedelta(days=120))
+    pairs = pairs[pairs.t_later <= values.t.max()].dropna(subset=["later"])
+    pairs = pairs[pairs.later > 0]
+    pairs["age"] = ((pairs.t - pd.to_datetime(pairs.date_of_birth)).dt.days / 365.25).astype(int).clip(16, 38)
+    pairs["change"] = np.log(pairs.later / pairs.value_eur)
+    drift = pairs.groupby("age").change.mean()
+    ages = np.arange(16, 40)
+    step = drift.reindex(range(16, 39)).interpolate().to_numpy()      # drift over age a → a+1
+    centre = {a: 0.0 for a in ages}
+    for a in range(REFERENCE_AGE + 1, 40):
+        centre[a] = centre[a - 1] + step[a - 1 - 16]
+    for a in range(REFERENCE_AGE - 1, 15, -1):
+        centre[a] = centre[a + 1] - step[a - 16]
+    _age_curve = (ages.astype(float), np.array([centre[a] for a in ages]))
+    return _age_curve
 
 
 def transfers() -> pd.DataFrame:

@@ -95,3 +95,96 @@ national line-ups for earlier years (for example StatsBomb's open data for the
 - Fitting the new constants (absence cap, window length, selection scale)
   instead of setting them by hand.
 - National-team data for earlier years.
+
+## 5. National-team data for 2014–26 (`national.py`)
+
+Line-ups added from open sources into separate `nt_*` tables, matched to
+Transfermarkt ids: World Cups 2014/2018/2022 (jfjelstul/worldcup, minutes from
+substitutions; 83% / 90% / 96% of listed players matched), Euro 2020/2024 and
+AFCON 2023 (StatsBomb, exact minutes; 89% / 93% / 54%). The national-team Elo
+now runs over every international since 1872 (martj42), K by tournament, so top
+teams reach about 2,200 (Brazil 2,214, Argentina 2,210 before Qatar 2022) rather
+than the 1,720 of the tournament-only version. Still missing: qualifiers and
+friendlies line-ups, Euro 2016, Copa América before 2024.
+
+On squad 100 / squad 50 (C+D):
+
+| Measure | Squad 100 | + NT flat | + NT clubs | + NT Elo | Squad 50 | 50 + NT clubs | 50 + NT Elo |
+|---|---|---|---|---|---|---|---|
+| C7 set A / set B | 0.689 / 0.874 | 0.706 / 0.868 | 0.703 / 0.868 | 0.700 / 0.874 | 0.706 / 0.868 | **0.727 / 0.877** | 0.724 / 0.874 |
+| Rank correlation | 0.480 | 0.490 | 0.488 | 0.469 | 0.504 | **0.509** | 0.489 |
+
+A small gain from the club-strength scheme. The Elo scheme overshoots (Rodri
++289): its strength formula `(level − 1600) ÷ 200` was set for the compressed Elo
+and needs a new scale.
+
+## 6. Squad mean over the most used players
+
+The squad average in the minutes bonus (`share − squad mean`) is now the mean
+share of the N players with the most minutes in the window (`squad_top`), so it
+no longer depends on how many fringe players the dataset lists. 50-match window,
+club-strength national points:
+
+| Measure | all | top 14 | top 16 | top 18 | top 20 | top 22 |
+|---|---|---|---|---|---|---|
+| Rank correlation | 0.509 | 0.507 | 0.508 | 0.509 | 0.509 | 0.510 |
+| C7 set A / set B | 0.727 / 0.877 | 0.720 / 0.874 | 0.724 / 0.880 | 0.724 / 0.877 | 0.724 / 0.880 | 0.724 / 0.877 |
+| Rodri gap Jul 25 | +227 | +172 | +179 | +186 | +193 | +199 |
+| Kane mean gap 2016–23 | +130 | +76 | +84 | +91 | +99 | +106 |
+| Wirtz worst gap in injury | +37 | −20 | −14 | −6 | +2 | +11 |
+
+Agreement is unchanged, gaps shrink with N. Top 16 (starting eleven plus five
+substitutes) is the choice. Smaller N raises the mean, so the 200 scale will
+want to rise.
+
+## 7. Team rating as a direct component (`direct`)
+
+`rating = team rating after its last match + minutes bonus + national points`:
+no personal level, no pull, no debutant offset. A transfer moves the rating by
+the difference between the clubs.
+
+| Measure | Current (level) | Direct |
+|---|---|---|
+| Rank correlation | 0.508 | 0.432 |
+| C7 set A / set B | 0.724 / 0.880 | 0.683 / 0.853 |
+| Isak / Wirtz change on moving | +19 / +34 | +168 / +95 |
+| Rodri gap Jul 25 | +179 | +65 |
+
+Direct fixes squad players that were far too low (Bayern: Bischof −205 → −51,
+Urbig −183 → −49) at the cost of agreement. Decision (owner): keep direct, the
+jump at a transfer is accepted; the target is that the rating leads or catches up
+with Transfermarkt directionally, not that it matches its size. Olise: rating
++121 by July 2024 and +226 at the move to Bayern while his value was still
+€55M, then Transfermarkt climbs to €140M as the rating keeps rising.
+
+## 8. Age-adjusted Transfermarkt values (evaluation only)
+
+Transfermarkt values include age (remaining career); the rating has none (age
+is to be added separately later). So the comparison can be run against values
+restated at the age-25 level: `OPENELO_TM_AGE_ADJUST=1` makes `store.valuations()`
+divide every value by the typical drift of value with age (mean 12-month log
+change by age over all valued players, summed outwards from 25; relative value
+0.89 at 24, 1.06 at 26, 0.77 at 30, 0.42 at 32). Ratings never see it.
+
+| Measure | Current, raw | Current, adjusted | Direct, raw | Direct, adjusted | Direct, no NT, adjusted |
+|---|---|---|---|---|---|
+| Rank correlation | 0.508 | 0.406 | 0.432 | 0.353 | 0.343 |
+| C7 set A / set B | 0.724 / 0.880 | 0.687 / 0.797 | 0.683 / 0.853 | 0.668 / 0.783 | 0.629 / 0.776 |
+
+- Bruno's divergence is age: his raw value falls €90M → €40M (2021–26) while his
+  rating is flat; adjusted, his value is flat at about €75–85M.
+- All agreement falls on the adjusted values, so part of the earlier agreement was
+  both rising for young players and falling for old. The gap between direct and
+  current narrows (rank correlation −0.076 raw, −0.053 adjusted).
+- Caveat: the average curve also removes the average real change in ability with
+  age (growth at 20, decline at 32), which results-based ratings should
+  partly capture; and players who stop being valued drop out of the curve, so
+  the decline at old ages is understated.
+
+## Current candidate
+
+Team Elo with uncertainty (forward only); player rating = team rating + 200 ×
+(share in own 50-match squad window − mean share of the squad's 16 most used
+players) + club-strength national-team points (scale 50); bounded absence
+discount; minutes filled for starters without them. Constants hand-set, not
+fitted.

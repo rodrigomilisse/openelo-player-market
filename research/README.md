@@ -65,8 +65,11 @@ in milli-Elo, so these need `evaluate.py exact` first. Charts go to
 | `teamelo.py` | Team Elo, float: fixed-K baseline and Elo with uncertainty |
 | `hindsight.py` | Hindsight correction of opponent strength, float |
 | `playerelo.py` | Player ratings from team swings, float |
+| `national.py` | National-team line-ups 2014–26 and all internationals into `nt_*` tables (`--fetch` to download) |
 | `exact.py` | Exact integer reference of the final candidate |
 | `team_checks.py`, `player_checks.py`, `exact_checks.py` | The evaluations behind each criterion |
 | `evaluate.py` | Command line for all of the above |
 | `players.py` | Set A (the original 100) and set B (diagnostic cases) |
 | `openelo.py`, `analysis.py`, `openelo_market.py`, `db.py`, `tm_client.py` | The original Transfermarkt comparison tool |
+
+`OPENELO_TM_AGE_ADJUST=1` runs the Transfermarkt comparisons against age-adjusted values (RESULTS-communication.md §8).
