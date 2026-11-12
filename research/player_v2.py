@@ -64,6 +64,9 @@ class Variant:
     direct: bool = False
     national: str = "none"
     national_scale: float = 50.0
+    nt_matches: int = 0
+    nt_credit: float = 0.0
+    nt_days: int = 0
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -111,6 +114,7 @@ class Context:
         played["share"] = np.minimum(played.minutes, played.game_id.map(self.length)) / played.game_id.map(self.length)
         self.played_by_team = {t: g[["day", "player_id", "share"]].sort_values("day") for t, g in played.groupby("team_id")}
         self.squad_mean = {}
+        self.nation_days = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
 
     def squad_means(self, team: int, top: int = 0):
@@ -172,14 +176,27 @@ class Context:
                 continue
             length = known_lengths.get(game.game_id) or (120 if lengths.get(game.game_id, 90) > 100 else 90)
             for team, members in squad.groupby("team_id"):
-                club_levels = [self.club_rating(club_of, p, game.day) for p in members.player_id]
-                club_levels = [c for c in club_levels if c is not None]
-                stacked = float(np.mean(club_levels)) if club_levels else 1500.0
-                for player, started in zip(members.player_id, members.starter):
+                own = [self.club_rating(club_of, p, game.day) for p in members.player_id]
+                known = [c for c in own if c is not None]
+                stacked = float(np.mean(known)) if known else 1500.0
+                total, count = sum(known), len(known)
+                self.nation_days.setdefault(int(team), []).append(int(game.day))
+                for player, started, level in zip(members.player_id, members.starter, own):
                     # as for clubs: a starter the dataset lists without minutes played the match
                     played = float(minutes.get((game.game_id, player), length if started == 1 else 0.0))
                     share = min(played, length) / length
-                    result.setdefault(int(player), []).append((int(game.day), share, stacked, elo[(game.game_id, team)]))
+                    # the squad's average without him: sum once per match, take his own level out
+                    rest = (total - level) / (count - 1) if level is not None and count > 1 else \
+                        (total / count if count and level is None else 1500.0)
+                    result.setdefault(int(player), []).append(
+                        (int(game.day), share, stacked, elo[(game.game_id, team)], rest, int(team)))
+        self.nation_days = {t: np.array(sorted(set(d))) for t, d in self.nation_days.items()}
+        # national Elo restated on the spread of the club-rating average, so either can drive strength
+        rows = [c for calls in result.values() for c in calls]
+        club_mean, club_sd = np.mean([c[4] for c in rows]), np.std([c[4] for c in rows])
+        elo_mean, elo_sd = np.mean([c[3] for c in rows]), np.std([c[3] for c in rows])
+        for player, calls in result.items():
+            result[player] = [c + (club_mean + (c[3] - elo_mean) / elo_sd * club_sd,) for c in calls]
         return result
 
     def club_rating(self, club_of: dict, player: int, day: int):
@@ -405,6 +422,8 @@ class Player:
         how stacked the squad is), or elo (the national team's own Elo)."""
         if self.v.national == "none":
             return 0.0
+        if self.v.nt_matches:
+            return self.national_share_points(day, context)
         recent = [c for c in getattr(self, "call_ups", []) if day - 730 <= c[0] < day][-10:]
         if not recent:
             return 0.0
@@ -416,6 +435,37 @@ class Player:
             level = float(np.mean([c[column] for c in recent]))
             strength = max(0.0, level - 1600.0) / 200.0
         return self.v.national_scale * share * strength
+
+    def national_share_points(self, day: int, context: "Context") -> float:
+        """Points only ever added, so a player who is not selected falls behind those
+        who are: over his nation's last `nt_matches` covered matches, each match is
+        worth his minutes share (at least `nt_credit` if he was in the squad, 0 if he
+        was not) times the team's strength, and the sum is divided by the number of
+        matches. Strength: the squad's average club rating without him (`clubs`), the
+        national Elo on the same spread (`elo`), or 1 (`flat`)."""
+        calls = [c for c in getattr(self, "call_ups", []) if c[0] < day]
+        if not calls:
+            return 0.0
+        nation = calls[-1][5]
+        days = context.nation_days.get(nation, np.array([]))
+        earliest = day - self.v.nt_days if self.v.nt_days else -10 ** 9
+        window = days[(days < day) & (days >= earliest)][-self.v.nt_matches:]
+        if len(window) == 0:
+            return 0.0
+        mine = {c[0]: c for c in calls if c[5] == nation and c[0] >= window[0]}
+        total = 0.0
+        for d in window:
+            c = mine.get(int(d))
+            if c is None:
+                continue
+            value = max(c[1], self.v.nt_credit)
+            if self.v.national == "flat":
+                strength = 1.0
+            else:
+                level = c[4] if self.v.national == "clubs" else c[6]
+                strength = max(0.0, level - 1600.0) / 200.0
+            total += value * strength
+        return self.v.national_scale * total / len(window)
 
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
