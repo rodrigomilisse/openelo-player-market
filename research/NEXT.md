@@ -63,6 +63,21 @@ keepers and rotation keep his share near 0.85 (Raya 2208 → 2034, Verbruggen
 2120 → 1957).
 
 
+**Items 3, 5, 7 (process noise 3, decided player rules, goal term 100 / 100).**
+
+- League share (item 3), team log loss vs noise 3 without it: zero-sum 0.3
+  −0.0018 (−0.0023 to −0.0013), European matches −0.0156, pool drift +2 to +6
+  (not zero-sum: −0.0020, drift +12 to +16). With the share on, noise 6 −0.0023,
+  noise 3 −0.0018, noise 1.5 −0.0005. Player rank correlation held-out 0.433 →
+  0.446, C7 B 0.891 → 0.914.
+- Big-game trust (item 5): minutes share weighted by 2 × (1 − expected score).
+  Held-out 0.433 → 0.444, C7 B 0.891 → 0.904, C7 A 0.710 → 0.704. Top of squads
+  barely reordered (moves of −6 to +33).
+- Rotated line-ups (item 7), regularity = share of the usual eleven (most starts
+  in the last 30 matches) fielded. Weighting the update by it: worse (+0.0024 at
+  power 0.5, +0.0098 at 2). Shifting the expected result by 100 × the difference
+  in regularity: −0.0015 (−0.0020 to −0.0009); 50: −0.0011; 200: none.
+
 **Goal term (tested, open).** Goal involvement over the same 50 listed matches,
 per 90 with 5 scoreless matches added, × 100. Process noise 3, rule B.
 
@@ -110,7 +125,8 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   (the owner accepts the small penalty for cup rotation). Same rule for national
   call-ups. A slight skew towards midfielders and attackers would be welcome only
   if it comes naturally.
-- **Provisional, not locked:** goal term on, goals × 50 and assists × 40 per 90
+- **Provisional, not locked:** goal term on, goals × 100 and assists × 100 per 90
+  (changed from 50 / 40 by the owner); first tried at
   (`output="weighted"`), over the 50 listed matches with 5 scoreless matches added.
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner

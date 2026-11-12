@@ -53,6 +53,10 @@ class TeamConstants:
     corner_scale: float = 0.5
     card_weight: float = 0.0
     card_scale: float = -0.2
+    league_share: float = 0.0       # share of a European swing given to the other clubs of each league
+    league_zero_sum: bool = True    # what one league gains the other loses, whatever their sizes
+    lineup_power: float = 0.0       # update weight × (share of usual starters fielded) ^ power
+    lineup_shift: float = 0.0       # Elo points a team is weaker per unit of usual starters missing
 
     def with_(self, **changes) -> "TeamConstants":
         return replace(self, **changes)
@@ -201,9 +205,43 @@ class Seeder:
         return sum(everyone) / len(everyone) - self.constants.unknown_seed_offset
 
 
+EUROPEAN = {"CL", "EL", "UCOL", "CLQ", "ELQ", "ECLQ", "USC"}
+LEAGUE_REFERENCE_CLUBS = 17
+LINEUP_REGULARITY: dict[tuple[int, int], float] = {}   # (game, team) -> share of usual starters fielded
+
+
+def share_with_leagues(prediction: "Prediction", league_of: dict, seeder: "Seeder", states: dict,
+                       constants: TeamConstants) -> None:
+    """After a European match between clubs of different leagues, the other clubs
+    active in each league in the past year move with it: the level of the league is
+    learnt, gaps inside it are untouched."""
+    m = prediction.match
+    home_league, away_league = league_of.get(m.home), league_of.get(m.away)
+    if not home_league or not away_league or home_league == away_league:
+        return
+    def others(league, team):
+        return [t for t, last in seeder.league_members.get(league, {}).items()
+                if t != team and t in states and m.day - last <= 365]
+    home_others, away_others = others(home_league, m.home), others(away_league, m.away)
+    if not home_others or not away_others:
+        return
+    if constants.league_zero_sum:
+        moved = constants.league_share * LEAGUE_REFERENCE_CLUBS * (prediction.home_swing - prediction.away_swing) / 2
+        for t in home_others:
+            states[t].rating += moved / len(home_others)
+        for t in away_others:
+            states[t].rating -= moved / len(away_others)
+    else:
+        for t in home_others:
+            states[t].rating += constants.league_share * prediction.home_swing
+        for t in away_others:
+            states[t].rating += constants.league_share * prediction.away_swing
+
+
 def run(matches: list[Match], constants: TeamConstants, burn_in_seed: bool = True) -> tuple[list[Prediction], dict[int, TeamState]]:
     """Forward filter over every match, in processing order."""
     states: dict[int, TeamState] = {}
+    league_of: dict[int, str] = {}
     seeder = Seeder(constants)
     predictions = []
     for day in days_of(matches):
@@ -225,6 +263,10 @@ def run(matches: list[Match], constants: TeamConstants, burn_in_seed: bool = Tru
         for prediction, home_variance, away_variance in pending:
             apply(prediction, home_variance, away_variance, states)
             seeder.note(prediction.match)
+            if prediction.match.stage == "league":
+                league_of[prediction.match.home] = league_of[prediction.match.away] = prediction.match.competition_id
+            elif constants.league_share and prediction.match.competition_id in EUROPEAN:
+                share_with_leagues(prediction, league_of, seeder, states, constants)
     return predictions, states
 
 
@@ -234,6 +276,9 @@ def predict(match: Match, states: dict[int, TeamState], constants: TeamConstants
     away_variance = aged_variance(away, match.day, constants)
     home_advantage = 0.0 if match.neutral else constants.home_advantage
     rating_difference = home.rating + home_advantage - away.rating
+    if constants.lineup_shift:
+        rating_difference -= constants.lineup_shift * (LINEUP_REGULARITY.get((match.game_id, match.home), 1.0)
+                                                      - LINEUP_REGULARITY.get((match.game_id, match.away), 1.0)) * -1
     return Prediction(match, rating_difference, home.rating, away.rating, home_variance, away_variance,
                       home.matches, away.matches)
 
@@ -269,6 +314,10 @@ def observations_of(match: Match, rating_difference: float, constants: TeamConst
     or 0. A tier-2 signal is another share (corners won, or the opponent's share of
     the cards) whose expected value is the expected score at a scaled difference."""
     weight = match_weight(match, rating_difference, constants)
+    if constants.lineup_power:
+        regularity = min(LINEUP_REGULARITY.get((match.game_id, match.home), 1.0),
+                         LINEUP_REGULARITY.get((match.game_id, match.away), 1.0))
+        weight *= regularity ** constants.lineup_power
     observations = [(score_of(match.goal_difference), 1.0, weight)]
     if constants.corner_weight > 0 and match.corner_share is not None:
         observations.append((match.corner_share, constants.corner_scale, constants.corner_weight))

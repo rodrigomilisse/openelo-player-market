@@ -74,8 +74,9 @@ class Variant:
     output: str = "none"
     output_scale: float = 100.0
     output_prior: float = 5.0
-    goal_scale: float = 50.0
-    assist_scale: float = 40.0
+    goal_scale: float = 100.0
+    assist_scale: float = 100.0
+    big_game: bool = False
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -107,10 +108,11 @@ class Context:
             expected = te.expected_score(p.rating_difference)
             surprise = te.score_of(m.goal_difference) - expected
             spread = expected * (1 - expected)
-            for team, rating, swing, sign in ((m.home, p.home_rating, p.home_swing, 1), (m.away, p.away_rating, p.away_swing, -1)):
-                rows.append((m.game_id, team, m.day, rating, swing, sign * surprise, spread, lengths.get(m.game_id, 90)))
+            for team, rating, swing, sign, own in ((m.home, p.home_rating, p.home_swing, 1, expected),
+                                                   (m.away, p.away_rating, p.away_swing, -1, 1 - expected)):
+                rows.append((m.game_id, team, m.day, rating, swing, sign * surprise, spread, lengths.get(m.game_id, 90), own))
         self.team_matches = pd.DataFrame(rows, columns=["game_id", "team_id", "day", "rating", "swing", "surprise",
-                                                        "spread", "length"]).sort_values(["day", "game_id"])
+                                                        "spread", "length", "expected"]).sort_values(["day", "game_id"])
         self.by_team = {t: g.reset_index(drop=True) for t, g in self.team_matches.groupby("team_id")}
         self.length = dict(zip(self.team_matches.game_id, self.team_matches.length))
         self.day = dict(zip(self.team_matches.game_id, self.team_matches.day))
@@ -372,6 +374,7 @@ class Player:
         self.discount = 0.0
         self.window = deque(maxlen=variant.window)
         self.output_window = deque(maxlen=variant.window)
+        self.weights = deque(maxlen=variant.window)
         self.team = None
         self.last_played = None
         self.last_listed = None
@@ -417,6 +420,8 @@ class Player:
             self.absence_step(row, listed, share)
         if listed or not self.v.squad_window:
             self.window.append(share)
+            # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
+            self.weights.append(2.0 * (1.0 - row.expected) if self.v.big_game else 1.0)
         if share > 0:
             self.last_played = row.day
         if listed:
@@ -485,7 +490,7 @@ class Player:
         minutes = sum(m for m, _, _ in self.output_window)
         per_90 = minutes / 90 + self.v.output_prior
         if self.v.output == "weighted":
-            # goals and assists with their own scales (provisional: goals 50, assists 40)
+            # goals and assists with their own scales (provisional: 100 each)
             goals = sum(g for _, g, _ in self.output_window)
             assists = sum(a for _, _, a in self.output_window)
             return (self.v.goal_scale * goals + self.v.assist_scale * assists) / per_90
@@ -561,7 +566,9 @@ class Player:
         squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)
         if self.v.gk_reference and getattr(self, "keeper", False):
             squad = 1.0  # a keeper is measured against playing every match: the first choice gets 0
-        if self.v.selection:
+        if self.v.selection and self.v.big_game and self.window:
+            share = float(np.dot(self.window, self.weights) / sum(self.weights))
+        elif self.v.selection:
             share = np.mean(self.window) if self.window else squad
         else:
             share = self.team_window_share(day, context)
