@@ -32,7 +32,12 @@ national-team term − absence`) and the team Elo. Each item is a light test
    minutes share by the opponent's strength, so rotation in easy matches counts
    less. Check whether it reorders the top of squads (Bayern, City, Arsenal).
 6. **Bookmaker benchmark** for the team Elo (Bet365 odds on 50,441 matches): log
-   loss gap overall, by league and by month of the season.
+   loss gap overall, by league and by month of the season. Deferred by the owner
+   as too much for this stage. Note: the overall comparison is already coded
+   (`evaluate.py benchmarks`, with clubelo too); only the breakdowns are new. An
+   ordering benchmark against Opta's power rankings was suggested instead; Opta is
+   not reachable from here and is proprietary, while clubelo (open, in the store
+   until June 2025) is the ordering reference already used.
 7. **Rotated line-ups in the team Elo**: weight each match's update by how many
    regulars started (also covers dead rubbers without simulating tables).
 
