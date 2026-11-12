@@ -13,6 +13,8 @@ Ideas, tested one at a time and in combinations (`Variant`):
 - absence:   no-show while still at the club is a bounded, recoverable discount
              (injury, suspension); unused on the bench is no absence; only a player
              listed by no covered club for 300 days decays to the replacement level.
+- direct:    no personal level at all: the rating is the team's rating after its
+             last match plus the minutes bonus (and national points).
 - selection: the minutes bonus measured over the player's own last 38 team
              matches (any club), so a new club's evidence replaces the old one
              gradually and nothing before he arrived counts against him.
@@ -59,6 +61,7 @@ class Variant:
     window: int = WINDOW_MATCHES
     squad_window: bool = False
     squad_top: int = 0
+    direct: bool = False
     national: str = "none"
     national_scale: float = 50.0
 
@@ -68,6 +71,8 @@ class Variant:
             parts.append(f"window {self.window} {'squad' if self.squad_window else 'team'} matches")
         if self.squad_top:
             parts.append(f"mean of top {self.squad_top}")
+        if self.direct:
+            parts.append("team rating direct")
         if self.national != "none":
             parts.append(f"national {self.national}")
         return " + ".join(parts) or ("baseline" if self.fill else "baseline, no fill")
@@ -318,7 +323,9 @@ class Player:
         if not self.v.absence:
             self.apply_decay(row.day)
         usual = np.mean(self.window) if self.window else share
-        if self.v.split:
+        if self.v.direct:
+            self.level = row.rating + row.swing
+        elif self.v.split:
             self.level += row.swing + LEVEL_RATE * share * (row.rating - self.level)
             if self.v.weighted:
                 self.weighted_evidence(row, share - usual)
