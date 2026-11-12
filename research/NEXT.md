@@ -131,6 +131,10 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner
   is not keen on it.
+- League share, big-game trust and the rotation shift (items 3, 5, 7) are **not
+  adopted**: each is a small gain (the yardstick itself, the team model's gain over
+  plain Elo, is small) and each costs interpretability. The options stay in the code,
+  off by default.
 - Team process noise 3 (from 6): +0.0006 team log loss for +0.013 held-out player agreement.
 - Position never enters the rating, except the keeper reference; positions are
   for analysis only. Counting any appearance as a full match (`appearance`) was
