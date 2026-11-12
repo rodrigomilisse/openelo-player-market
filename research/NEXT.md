@@ -80,6 +80,12 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
 
 ## Decided
 
+- Minutes rule B: a start counts as the full match, a substitute his minutes, the
+  squad mean measured the same way; keepers against a reference share of 1.0
+  (the owner accepts the small penalty for cup rotation). Same rule for national
+  call-ups. A slight skew towards midfielders and attackers would be welcome only
+  if it comes naturally.
+
 - No plus-minus; the direct model is the candidate.
 - Keepers: full credit only as first choice, a lot less otherwise.
 - Age is handled separately later; evaluation uses Transfermarkt values divided by
