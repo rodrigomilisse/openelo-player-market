@@ -85,6 +85,10 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   (the owner accepts the small penalty for cup rotation). Same rule for national
   call-ups. A slight skew towards midfielders and attackers would be welcome only
   if it comes naturally.
+- Position never enters the rating, except the keeper reference; positions are
+  for analysis only. Counting any appearance as a full match (`appearance`) was
+  tested and rejected: it over-values substitutes (held-out rank correlation
+  0.410 → 0.319).
 
 - No plus-minus; the direct model is the candidate.
 - Keepers: full credit only as first choice, a lot less otherwise.
