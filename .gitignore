@@ -12,3 +12,6 @@ build/
 puppeteer-config.json
 docs/schema/
 
+
+# research: downloaded/scraped raw data and everything derived from it (public repo; see research/README.md)
+research/data/raw/

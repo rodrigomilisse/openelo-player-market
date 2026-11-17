@@ -31,9 +31,11 @@ import matplotlib.pyplot as plt
 import analysis
 import db
 import tm_client
-from players import MANUAL_TM_ID_OVERRIDES, PLAYER_NAMES
+from players import MANUAL_TM_ID_OVERRIDES, PLAYER_NAMES, SET_B_TM_IDS
 
-OUTPUTS_DIR = Path(__file__).parent / "outputs"
+# Charts now carry ratings derived from scraped data, so they go under the
+# gitignored data/raw/ (see README.md); outputs/ keeps the two tracked charts.
+OUTPUTS_DIR = Path(__file__).parent / "data" / "raw" / "charts"
 
 SCRAPE_DELAY_SECONDS = 1.5  # be polite to the (rate-limited) API
 
@@ -113,14 +115,33 @@ def cmd_list(args: argparse.Namespace) -> None:
             print(f"[scraped]     {name} -> tm_id={r['tm_id']} ({r['tm_name']})")
 
 
-def cmd_compare(args: argparse.Namespace) -> None:
+def frame_for(name: str):
+    """Set B players are named in players.SET_B_GROUPS; set A players in PLAYER_NAMES."""
+    if name in SET_B_TM_IDS:
+        return analysis.set_b_frame(SET_B_TM_IDS[name])
     db.init_db()
     with db.connect() as conn:
-        player = db.get_player_by_name(conn, args.player)
+        player = db.get_player_by_name(conn, name)
         if not player or not player["scraped_at"]:
-            print(f"'{args.player}' has not been scraped yet. Run `scrape --player \"{args.player}\"` first.", file=sys.stderr)
+            print(f"'{name}' has not been scraped yet. Run `scrape --player \"{name}\"` first.", file=sys.stderr)
             sys.exit(1)
-        frame = analysis.player_frame(conn, player)
+        return analysis.player_frame(conn, player)
+
+
+def set_frame(set_name: str):
+    if set_name == "b":
+        return analysis.average_frame(None, list(SET_B_TM_IDS.values())), len(SET_B_TM_IDS)
+    db.init_db()
+    with db.connect() as conn:
+        players = db.get_scraped_players(conn)
+        if not players:
+            print("No players scraped yet. Run `scrape` first.", file=sys.stderr)
+            sys.exit(1)
+        return analysis.average_frame(conn, players), len(players)
+
+
+def cmd_compare(args: argparse.Namespace) -> None:
+    frame = frame_for(args.player)
 
     if frame.empty:
         print(f"No market value data for {args.player}", file=sys.stderr)
@@ -143,13 +164,7 @@ def cmd_compare(args: argparse.Namespace) -> None:
 
 
 def cmd_average(args: argparse.Namespace) -> None:
-    db.init_db()
-    with db.connect() as conn:
-        players = db.get_scraped_players(conn)
-        if not players:
-            print("No players scraped yet. Run `scrape` first.", file=sys.stderr)
-            sys.exit(1)
-        frame = analysis.average_frame(conn, players)
+    frame, count = set_frame(args.set)
 
     if frame.empty:
         print("No market value data available across scraped players.", file=sys.stderr)
@@ -166,28 +181,19 @@ def cmd_average(args: argparse.Namespace) -> None:
     ax2.set_ylabel("Avg OpenELO", color="tab:red")
     ax2.tick_params(axis="y", labelcolor="tab:red")
 
-    plt.title(f"Average OpenELO vs Average Transfermarkt value ({len(players)} players)")
+    plt.title(f"Average OpenELO vs Average Transfermarkt value (set {args.set.upper()}, {count} players)")
     fig.tight_layout()
-    _save_or_show(fig, args.out, default_name="average.png")
+    _save_or_show(fig, args.out, default_name=f"average_set_{args.set}.png")
 
 
 def cmd_correlation(args: argparse.Namespace) -> None:
-    db.init_db()
-    with db.connect() as conn:
-        if args.player:
-            player = db.get_player_by_name(conn, args.player)
-            if not player or not player["scraped_at"]:
-                print(f"'{args.player}' has not been scraped yet.", file=sys.stderr)
-                sys.exit(1)
-            frame = analysis.player_frame(conn, player)
-            label = args.player
-        else:
-            players = db.get_scraped_players(conn)
-            if not players:
-                print("No players scraped yet. Run `scrape` first.", file=sys.stderr)
-                sys.exit(1)
-            frame = analysis.average_frame(conn, players)
-            label = f"average across {len(players)} players"
+    if args.player:
+        frame = frame_for(args.player)
+        label = args.player
+    else:
+        frame, count = set_frame(args.set)
+        label = f"average across {count} players of set {args.set.upper()}"
+    frame = frame.dropna()
 
     if frame.empty:
         print("No data to correlate.", file=sys.stderr)
@@ -245,17 +251,19 @@ def main() -> None:
     p_list.set_defaults(func=cmd_list)
 
     p_compare = sub.add_parser("compare", help="Plot OpenELO vs Transfermarkt value for one player")
-    p_compare.add_argument("player", help="Player name, must match players.PLAYER_NAMES")
-    p_compare.add_argument("--out", help="Output PNG path (default outputs/<player>.png)")
+    p_compare.add_argument("player", help="Player name from players.PLAYER_NAMES or players.SET_B_GROUPS")
+    p_compare.add_argument("--out", help="Output PNG path (default data/raw/charts/<player>.png)")
     p_compare.set_defaults(func=cmd_compare)
 
     p_avg = sub.add_parser("average", help="Plot average OpenELO vs average Transfermarkt value across all scraped players")
-    p_avg.add_argument("--out", help="Output PNG path (default outputs/average.png)")
+    p_avg.add_argument("--out", help="Output PNG path (default data/raw/charts/average_set_<set>.png)")
+    p_avg.add_argument("--set", choices=["a", "b"], default="a", help="player set (default a, the original 100)")
     p_avg.set_defaults(func=cmd_average)
 
     p_corr = sub.add_parser("correlation", help="Lagged cross-correlation to check if a phase shift is needed")
     p_corr.add_argument("--player", help="Restrict to one player (default: average across all scraped players)")
     p_corr.add_argument("--max-lag", type=int, default=12, help="Max lag in months to test in each direction (default 12)")
+    p_corr.add_argument("--set", choices=["a", "b"], default="a", help="player set when --player is omitted")
     p_corr.set_defaults(func=cmd_correlation)
 
     args = parser.parse_args()

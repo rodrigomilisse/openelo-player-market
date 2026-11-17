@@ -44,6 +44,7 @@ class CurveVenue {
 
 	@Transactional
 	public void mint(Id<IUser> userId, long shareAmount, Id<IAsset> player_share) {
+		marketTransactionRepository.lockShare(player_share.value());
 
 		Id<IAccount> userAccount = walletService.getAccount(userId);
 		Quote quote = quoter.quoteMint(player_share, shareAmount);
@@ -56,6 +57,7 @@ class CurveVenue {
 
 	@Transactional
 	public void redeem(Id<IUser> userId, long shareAmount, Id<IAsset> player_share) {
+		marketTransactionRepository.lockShare(player_share.value());
 
 		Id<IAccount> userAccount = walletService.getAccount(userId);
 		long proceeds = quoter.quoteRedeem(player_share, shareAmount);
