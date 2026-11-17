@@ -186,8 +186,27 @@ choice: linear, 20 worth double 30.
 
 ## Current candidate
 
-Team Elo with uncertainty (forward only); player rating = team rating + 200 ×
-(share in own 50-match squad window − mean share of the squad's 16 most used
-players) + club-strength national-team points (scale 50); bounded absence
-discount; minutes filled for starters without them. Constants hand-set, not
-fitted.
+Superseded; the current candidate (decisions and rejected ideas in `NEXT.md`):
+
+```
+playerRating = teamRating + minutesBonus + nationalTeamBonus + goalBonus − absenceDiscount
+```
+
+- **teamRating**: team Elo with uncertainty, forward only, process noise 3.
+- **minutesBonus** = 400 × (playerShare − clubReferenceShare). playerShare is the
+  mean matchShare over his last 50 matchday squads (any club): 1 if he started,
+  minutesPlayed ÷ matchLength if he came on, 0 if unused. clubReferenceShare is
+  the same mean for the club's 16 most-used players over 365 days; 1 for
+  keepers.
+- **nationalTeamBonus** = 100 × mean over his nation's last 20 covered matches
+  within two years of (nationalMatchShare × nationalTeamStrength).
+  nationalMatchShare: 1 started, minutes ÷ length if he came on, 0.2 unused in
+  the squad, 0 not selected. nationalTeamStrength = max(0, teammatesAverageClubRating
+  − 1600) ÷ 200, team-mates excluding himself. Only ever adds.
+- **goalBonus** (provisional) = 100 × (goals + assists) ÷ (minutesPlayed ÷ 90 + 5)
+  over the same 50 matchday squads.
+- **absenceDiscount**: each club match out of the squad closes 1 − e^(−7/120) of
+  the gap to 120; each match played multiplies it by 0.5^matchShare. Out of every
+  squad for 300 days: the rating slides linearly to 1,250 over a year.
+
+Constants hand-set, not fitted.
