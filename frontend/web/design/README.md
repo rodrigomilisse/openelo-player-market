@@ -20,6 +20,8 @@ python3 -m http.server 8000   # then open http://localhost:8000/matchnight.html
 | `trade.html` | trading | One-screen terminal with panels. The week's price and rating, with trend lines, meet the order book as a 3D depth wall; pointing at a book row lights its bar. |
 | `trade-hud.html` | trading | Same scene, no panels: type floats over the 3D, watchlist as round coins, the book as a column of light, the order as one editable sentence. |
 | `trade-rail.html` | trading | Same scene, a tall price rail with the book's depth on it: drag to your price, read whether it fills now or waits, press and hold to confirm. |
+| `scope.html` | trading | A different world: a two-channel oscilloscope. Price and OpenElo as phosphor traces drawn by a sweeping beam, trend lines on a switch, an LED depth meter, and the order set with rotary knobs (time base, limit, shares), a lever and a lit push button. No 3D, Canvas 2D only. |
+| `survey.html` | both | A different world: a light survey map. The whole market as a 3D ridgeline terrain (one ridge per player, contours between), map labels to pick a player, and a cross-section card with price, OpenElo, trend lines and an order form. |
 | `stats.html` | football | Rating anatomy. Camera flies along the rating through a goal frame per match; match log and "rating leads, price follows" computed from the series. |
 | `portfolio.html` | both | Holdings as lanes of return over a "what you paid" floor, with the next matchdays glowing ahead. |
 
@@ -52,9 +54,11 @@ page of the design canvas, linked below).
   `textSprite`, `scrollTracker`, `pointerTracker`.
 - `trade-scene.js`: the trading view's scene (week ribbons, least-squares trend lines dashed
   past now, depth wall, new-share ceiling), shared by the three trading layouts.
+- `analysis.js`: least-squares trend fit shared by every page that draws trend lines.
 - `design.css`: tokens and components (glass, legend swatches, chips, segmented buttons,
   order-book rows, order form, tables).
-- `ticket.js`: order form behaviour and order-book rendering.
+- `ticket.js`: order form behaviour, order-book rendering, and `bookOutcome` (does a limit
+  order fill now, wait, or would minting be no dearer).
 - `sample-data.js`: the fictional players, series, matches and fixtures.
 
 ## How this level is made

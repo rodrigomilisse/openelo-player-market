@@ -101,25 +101,22 @@ html, body { height: 100% }
 
 <script type="module">
 import { week, book, MINT_PRICE } from './sample-data.js';
-import { quote, formatCredits } from './ticket.js';
-import { buildTradeScene, fitTrend, STEPS_PER_DAY } from './trade-scene.js';
+import { quote, formatCredits, bookOutcome } from './ticket.js';
+import { buildTradeScene, STEPS_PER_DAY } from './trade-scene.js';
+import { fitTrend } from './analysis.js';
 
 const field = (id) => document.getElementById(id);
 const LOW = 325;
 const HIGH = 365;
 const MINT = Math.round(MINT_PRICE * 100);
-const levels = {
-  asks: book.asks.map(([p, s]) => [Math.round(Number(p) * 100), s]),
-  bids: book.bids.map(([p, s]) => [Math.round(Number(p) * 100), s])
-};
-const bestAsk = Math.min(...levels.asks.map(([p]) => p));
-const bestBid = Math.max(...levels.bids.map(([p]) => p));
 const topOf = (hundredths) => `${(HIGH - hundredths) / (HIGH - LOW) * 100}%`;
 const show = (hundredths) => (hundredths / 100).toFixed(2);
+const depthTick = ([price, shares], color) =>
+  `<div class="tick" style="top: ${topOf(Math.round(Number(price) * 100))}; width: ${shares / 2.2}px; background: ${color}; box-shadow: 0 0 12px ${color}"></div>`;
 
 field('ticks').innerHTML =
-  levels.asks.map(([p, s]) => `<div class="tick" style="top: ${topOf(p)}; width: ${s / 2.2}px; background: var(--ask); box-shadow: 0 0 12px var(--ask)"></div>`).join('') +
-  levels.bids.map(([p, s]) => `<div class="tick" style="top: ${topOf(p)}; width: ${s / 2.2}px; background: var(--price); box-shadow: 0 0 12px var(--price)"></div>`).join('') +
+  book.asks.map((level) => depthTick(level, 'var(--ask)')).join('') +
+  book.bids.map((level) => depthTick(level, 'var(--price)')).join('') +
   `<div class="mint-line" style="top: ${topOf(MINT)}"></div><div class="mark" style="top: ${topOf(MINT)}; color: var(--ask)">new 3.61</div>` +
   `<div class="mark" style="top: ${topOf(342)}">last 3.42</div>`;
 
@@ -127,22 +124,14 @@ let side = 'buy';
 let shares = 40;
 
 function describe(price) {
-  const sum = (list) => list.reduce((total, [, s]) => total + s, 0);
+  const outcome = bookOutcome(side, price);
+  if (outcome.kind === 'mint') return `At ${show(price)} or more, <b>new shares at 3.61</b> cost the same or less. Mint instead.`;
   if (side === 'buy') {
-    if (price >= MINT) return `At ${show(price)} or more, <b>new shares at 3.61</b> cost the same or less. Mint instead.`;
-    if (price >= bestAsk) {
-      const available = sum(levels.asks.filter(([p]) => p <= price));
-      return `<b style="color: var(--price)">Fills now.</b> ${available} shares are for sale at ${show(price)} or less.`;
-    }
-    const ahead = sum(levels.bids.filter(([p]) => p >= price));
-    return `<b>Waits in the book.</b> ${ahead ? `${ahead} shares are wanted at your price or higher, ahead of you.` : 'You would be the best bid.'} Sellers start at ${show(bestAsk)}.`;
+    if (outcome.kind === 'fills') return `<b style="color: var(--price)">Fills now.</b> ${outcome.shares} shares are for sale at ${show(price)} or less.`;
+    return `<b>Waits in the book.</b> ${outcome.shares ? `${outcome.shares} shares are wanted at your price or higher, ahead of you.` : 'You would be the best bid.'} Sellers start at ${show(outcome.best)}.`;
   }
-  if (price <= bestBid) {
-    const wanted = sum(levels.bids.filter(([p]) => p >= price));
-    return `<b style="color: var(--ask)">Fills now.</b> Buyers want ${wanted} shares at ${show(price)} or more.`;
-  }
-  const ahead = sum(levels.asks.filter(([p]) => p <= price));
-  return `<b>Waits in the book.</b> ${ahead ? `${ahead} shares are for sale at your price or lower, ahead of you.` : 'You would be the cheapest seller.'} Buyers stop at ${show(bestBid)}.`;
+  if (outcome.kind === 'fills') return `<b style="color: var(--ask)">Fills now.</b> Buyers want ${outcome.shares} shares at ${show(price)} or more.`;
+  return `<b>Waits in the book.</b> ${outcome.shares ? `${outcome.shares} shares are for sale at your price or lower, ahead of you.` : 'You would be the cheapest seller.'} Buyers stop at ${show(outcome.best)}.`;
 }
 
 function update() {

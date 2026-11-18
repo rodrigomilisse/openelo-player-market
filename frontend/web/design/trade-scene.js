@@ -1,6 +1,7 @@
 // The trading view's 3D scene: the week's price and rating with trend lines, meeting the order book as a depth wall.
 import { THREE, COLOR, createStage, addStadium, addRibbon, addPillar, addDashedLine, textSprite, pointerTracker, reducedMotion } from './stadium.js';
 import { week, book, MINT_PRICE } from './sample-data.js';
+import { fitTrend } from './analysis.js';
 
 const STEP = 2;
 const last = week.price.length - 1;
@@ -9,19 +10,6 @@ const priceY = (price) => (price - 3.0) * 12;
 const eloY = (rating) => (rating - 1812) / 32 * 6.5;
 
 export const STEPS_PER_DAY = last / 7;
-
-// Least-squares line through a series: value at step i is mean + slope * (i - middle).
-export function fitTrend(values) {
-  const middle = (values.length - 1) / 2;
-  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
-  let covariance = 0;
-  let variance = 0;
-  values.forEach((v, i) => {
-    covariance += (i - middle) * (v - mean);
-    variance += (i - middle) * (i - middle);
-  });
-  return { mean, middle, slope: covariance / variance };
-}
 
 // Solid over the data, dashed a few steps beyond now.
 function addTrend(scene, values, toY, x, color) {

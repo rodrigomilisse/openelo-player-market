@@ -1,6 +1,26 @@
 // Order form behaviour for the mockups. Money is handled in whole hundredths of a credit, never floats.
+import { book, MINT_PRICE } from './sample-data.js';
 
 const FEE_PERCENT = 5;
+const MINT_HUNDREDTHS = Math.round(MINT_PRICE * 100);
+const levels = (rows) => rows.map(([price, shares]) => [Math.round(Number(price) * 100), shares]);
+const ASKS = levels(book.asks);
+const BIDS = levels(book.bids);
+export const BEST_ASK = Math.min(...ASKS.map(([p]) => p));
+export const BEST_BID = Math.max(...BIDS.map(([p]) => p));
+const total = (rows) => rows.reduce((sum, [, shares]) => sum + shares, 0);
+
+// What a limit order at this price would do against the sample book.
+// kind: 'mint' (new shares are no dearer), 'fills' (shares that match now) or 'waits' (shares queued ahead).
+export function bookOutcome(side, priceHundredths) {
+  if (side === 'buy') {
+    if (priceHundredths >= MINT_HUNDREDTHS) return { kind: 'mint' };
+    if (priceHundredths >= BEST_ASK) return { kind: 'fills', shares: total(ASKS.filter(([p]) => p <= priceHundredths)) };
+    return { kind: 'waits', shares: total(BIDS.filter(([p]) => p >= priceHundredths)), best: BEST_ASK };
+  }
+  if (priceHundredths <= BEST_BID) return { kind: 'fills', shares: total(BIDS.filter(([p]) => p >= priceHundredths)) };
+  return { kind: 'waits', shares: total(ASKS.filter(([p]) => p <= priceHundredths)), best: BEST_BID };
+}
 
 export function quote(shares, priceHundredths) {
   const cost = shares * priceHundredths;
