@@ -2,7 +2,12 @@
 
 const FEE_PERCENT = 5;
 
-function toHundredths(text) {
+export function quote(shares, priceHundredths) {
+  const cost = shares * priceHundredths;
+  return { cost, fee: Math.floor((cost * FEE_PERCENT + 50) / 100) };
+}
+
+export function toHundredths(text) {
   const match = /^\s*(\d+)(?:\.(\d{1,2}))?\s*$/.exec(text);
   if (!match) return null;
   return parseInt(match[1], 10) * 100 + parseInt(((match[2] || '') + '00').slice(0, 2), 10);
@@ -34,8 +39,7 @@ export function mountTicket(form, { mintHundredths }) {
       ['cost', 'fee', 'sum'].forEach((id) => { field(id).textContent = '–'; });
       return;
     }
-    const cost = shares * price;
-    const fee = Math.floor((cost * FEE_PERCENT + 50) / 100);
+    const { cost, fee } = quote(shares, price);
     field('cost').textContent = formatCredits(cost);
     field('fee').textContent = formatCredits(fee);
     field('sum').textContent = formatCredits(side === 'buy' ? cost + fee : cost - fee);

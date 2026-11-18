@@ -17,7 +17,9 @@ python3 -m http.server 8000   # then open http://localhost:8000/matchnight.html
 |---|---|---|
 | `matchnight.html` | football | One player's page. Photo fixed on the left; scrolling flies the camera along his price and rating through the season; ends at the order book and order form. |
 | `market.html` | trading | Every player's season racing in parallel lanes. Switch between price, OpenElo or both; picking a player flies the camera to his lane. |
-| `trade.html` | trading | One-screen terminal. The week's price meets the order book as a 3D depth wall; pointing at a book row lights its bar. |
+| `trade.html` | trading | One-screen terminal with panels. The week's price and rating, with trend lines, meet the order book as a 3D depth wall; pointing at a book row lights its bar. |
+| `trade-hud.html` | trading | Same scene, no panels: type floats over the 3D, watchlist as round coins, the book as a column of light, the order as one editable sentence. |
+| `trade-rail.html` | trading | Same scene, a tall price rail with the book's depth on it: drag to your price, read whether it fills now or waits, press and hold to confirm. |
 | `stats.html` | football | Rating anatomy. Camera flies along the rating through a goal frame per match; match log and "rating leads, price follows" computed from the series. |
 | `portfolio.html` | both | Holdings as lanes of return over a "what you paid" floor, with the next matchdays glowing ahead. |
 
@@ -48,6 +50,8 @@ page of the design canvas, linked below).
   reduced-motion fallback, an optional shift to clear a side panel), `addStadium`, `addRibbon`
   (glowing tube plus a faint curtain to the ground, fadeable), `addPillar`, `addDashedLine`,
   `textSprite`, `scrollTracker`, `pointerTracker`.
+- `trade-scene.js`: the trading view's scene (week ribbons, least-squares trend lines dashed
+  past now, depth wall, new-share ceiling), shared by the three trading layouts.
 - `design.css`: tokens and components (glass, legend swatches, chips, segmented buttons,
   order-book rows, order form, tables).
 - `ticket.js`: order form behaviour and order-book rendering.

@@ -1,0 +1,155 @@
+<title>OpenElo Trading HUD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="design.css">
+<style>
+/* Layout: no panels. Type floats over the 3D week; watchlist as coins top right, the book as a column of light on the right, the order as one sentence at the bottom */
+html, body { height: 100% }
+.hud { position: relative; z-index: 2; min-height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto; gap: 16px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); padding-block: 20px 28px; text-shadow: 0 2px 18px rgba(6,11,20,0.9) }
+.title .club { color: var(--muted); font-size: 17px }
+.title h1 { font-size: clamp(56px, 7vw, 104px) }
+.title .now { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 28px; margin-top: 8px }
+.title .now .price { font-family: var(--display); font-weight: 900; font-size: 64px; line-height: 0.9 }
+.title .now span { font-size: 18px; font-weight: 600 }
+
+.coins { display: flex; gap: 14px; align-items: flex-start }
+.coin { display: grid; justify-items: center; gap: 6px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0 }
+.coin .ring { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; padding: 3px }
+.coin .face { width: 100%; height: 100%; border-radius: 50%; background: rgba(6,11,20,0.85); display: grid; place-items: center; font-family: var(--display); font-weight: 900; font-size: 24px }
+.coin .tag { font-size: 13px; color: var(--muted) }
+.coin[aria-current] .face { background: var(--ink); color: var(--night) }
+
+.book { grid-column: 2; grid-row: 2; align-self: center; display: grid; gap: 2px; text-align: right; font-family: var(--display); font-weight: 700 }
+.book .level { display: grid; grid-template-columns: auto 64px; gap: 14px; align-items: baseline; justify-content: end; font-size: 22px; padding: 2px 0; cursor: default }
+.book .level small { font-family: var(--ui); font-weight: 500; font-size: 14px; color: var(--muted) }
+.book .level:hover { filter: brightness(1.4) }
+.book .mint { color: var(--ask); font-size: 16px; letter-spacing: 0.04em; margin-bottom: 6px }
+.book .last { font-size: 44px; font-weight: 900; color: var(--ink); padding: 6px 0 }
+
+.tape { grid-column: 1; grid-row: 2; align-self: end; display: grid; gap: 4px; font-size: 15px; color: var(--muted) }
+.tape div:nth-child(n+4) { opacity: 0.5 }
+.tape b { color: var(--ink) }
+
+.sentence { grid-column: 1 / -1; justify-self: center; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 14px 14px 28px; border-radius: 999px;
+  background: rgba(10,19,33,0.72); border: 1px solid var(--glass-edge); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); font-size: 22px; text-shadow: none; max-width: 100% }
+.sentence .side { background: none; border: 0; font: inherit; font-weight: 800; cursor: pointer; padding: 0 2px; border-bottom: 2px dotted currentColor; color: var(--price) }
+.sentence .side.sell { color: var(--ask) }
+.sentence input { width: 3.2em; background: none; border: 0; border-bottom: 2px solid var(--glass-edge); color: var(--ink); font: inherit; font-weight: 700; text-align: center; padding: 0 }
+.sentence input:focus { border-bottom-color: var(--ink); outline: none }
+.sentence select { background: none; border: 0; border-bottom: 2px dotted var(--muted); color: var(--ink); font: inherit; padding: 0 }
+.sentence .total { color: var(--muted); font-size: 17px }
+.sentence .total b { color: var(--ink) }
+.go { width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--price); color: var(--night); display: grid; place-items: center; cursor: pointer }
+.go.sell { background: var(--ask) }
+.notice { grid-column: 1 / -1; justify-self: center; margin: -8px 0 0; text-align: center }
+@media (max-width: 860px) {
+  .hud { grid-template-columns: minmax(0, 1fr) }
+  .book, .tape { grid-column: 1; grid-row: auto; text-align: left }
+  .book .level { justify-content: start }
+  .sentence { border-radius: 24px }
+}
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="hud">
+  <div class="title">
+    <div class="club">Vale do Sado FC, central midfield</div>
+    <h1>Mendonça</h1>
+    <div class="now">
+      <span class="price">3.42</span>
+      <span style="color: var(--price)">+4.3% today</span>
+      <span style="color: var(--elo)">OpenElo 1,842, +23</span>
+      <span style="color: var(--ask)">New shares 3.61</span>
+    </div>
+  </div>
+
+  <nav class="coins" aria-label="Watchlist" id="coins"></nav>
+
+  <div class="book" aria-label="Order book" id="book"></div>
+
+  <div class="tape" aria-label="Recent trades" id="tape"></div>
+
+  <form class="sentence" id="order" novalidate aria-label="Order">
+    <button type="button" class="side" id="side" aria-label="Side: buy. Press to switch to sell">Buy</button>
+    <input id="shares" inputmode="numeric" value="40" aria-label="Shares">
+    <span>shares at</span>
+    <input id="limit" inputmode="decimal" value="3.45" aria-label="Limit price in credits">
+    <select id="venue" aria-label="Where from">
+      <option value="holders">from holders</option>
+      <option value="mint">as new shares</option>
+    </select>
+    <span class="total"><span id="total-label">holds</span> <b id="total"></b> <span>with fee</span></span>
+    <button type="submit" class="go" id="go" aria-label="Place order">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+    </button>
+  </form>
+  <p class="notice" id="notice" role="status"></p>
+</div>
+
+<script type="module">
+import { market, book, MINT_PRICE } from './sample-data.js';
+import { quote, toHundredths, formatCredits } from './ticket.js';
+import { buildTradeScene } from './trade-scene.js';
+
+document.getElementById('coins').innerHTML = market.slice(0, 5).map((p, i) => {
+  const color = p.change >= 0 ? 'var(--price)' : 'var(--ask)';
+  const sweep = Math.min(100, Math.abs(p.change) * 15);
+  return `<button type="button" class="coin"${i === 0 ? ' aria-current="page"' : ''} aria-label="${p.name}, ${p.price[p.price.length - 1].toFixed(2)}">
+    <span class="ring" style="background: conic-gradient(${color} ${sweep}%, rgba(150,190,235,0.18) 0)"><span class="face">${p.number}</span></span>
+    <span class="tag">${p.short}</span></button>`;
+}).join('');
+
+const level = ([price, shares], color) =>
+  `<div class="level" data-price="${price}" style="color: ${color}; text-shadow: 0 0 18px ${color}">${price}<small>${shares}</small></div>`;
+document.getElementById('book').innerHTML =
+  `<div class="mint">NEW SHARES ${MINT_PRICE.toFixed(2)}, ANY AMOUNT</div>` +
+  [...book.asks].map((l) => level(l, 'var(--ask)')).join('') +
+  `<div class="last">3.42</div>` +
+  book.bids.map((l) => level(l, 'var(--price)')).join('');
+
+document.getElementById('tape').innerHTML = [['14:32', '3.42', 25], ['14:29', '3.40', 60], ['14:21', '3.61', 12], ['14:08', '3.41', 8], ['13:55', '3.38', 140]]
+  .map(([time, price, shares]) => `<div>${time} <b>${shares}</b> at <b>${price}</b></div>`).join('');
+
+const form = document.getElementById('order');
+const field = (id) => document.getElementById(id);
+let side = 'buy';
+function update() {
+  const sell = side === 'sell';
+  const mint = !sell && field('venue').value === 'mint';
+  field('limit').disabled = mint;
+  if (mint) field('limit').value = MINT_PRICE.toFixed(2);
+  const shares = parseInt(field('shares').value, 10);
+  const price = toHundredths(field('limit').value);
+  if (!(shares > 0) || price === null) { field('total').textContent = '–'; return; }
+  const { cost, fee } = quote(shares, price);
+  field('total').textContent = formatCredits(sell ? cost - fee : cost + fee);
+  field('total-label').textContent = sell ? 'receives' : mint ? 'costs' : 'holds';
+}
+field('side').addEventListener('click', () => {
+  side = side === 'buy' ? 'sell' : 'buy';
+  const sell = side === 'sell';
+  field('side').textContent = sell ? 'Sell' : 'Buy';
+  field('side').setAttribute('aria-label', `Side: ${side}. Press to switch to ${sell ? 'buy' : 'sell'}`);
+  field('side').classList.toggle('sell', sell);
+  field('go').classList.toggle('sell', sell);
+  field('venue').innerHTML = sell ? '<option value="holders">to holders</option>' : '<option value="holders">from holders</option><option value="mint">as new shares</option>';
+  update();
+});
+['shares', 'limit', 'venue'].forEach((id) => field(id).addEventListener('input', update));
+form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  field('notice').textContent = 'Demo only: no order was sent.';
+});
+update();
+
+const scene = await buildTradeScene(document.getElementById('scene'), { distance: 30 });
+document.getElementById('book').addEventListener('pointerover', (event) => {
+  const row = event.target.closest('.level');
+  scene.highlight(row ? row.dataset.price : null);
+});
+document.getElementById('book').addEventListener('pointerleave', () => scene.highlight(null));
+</script>
