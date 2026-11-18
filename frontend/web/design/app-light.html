@@ -1,0 +1,560 @@
+<title>OpenElo App Light</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&display=swap">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<style>
+/* Layout: a clean app page. A glossy 3D share card held in a sticky stage on the left; the player's page scrolls on the right in rounded cards */
+:root {
+  color-scheme: light;
+  --bg: #F3F4F6;
+  --surface: #FFFFFF;
+  --ink: #0C0E13;
+  --muted: #5E6573;
+  --line: #E4E7EC;
+  --price: #2B63F6;
+  --elo: #E4A21A;
+  --elo-text: #9A6A00;
+  --down: #D9661C;
+  --sans: 'Geist', 'Inter', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased }
+.page { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 600px) minmax(24px, 0.35fr); gap: 0 32px }
+.stage { position: sticky; top: 0; height: 100vh; display: grid; place-items: center }
+.stage canvas { width: 100%; height: 100%; display: block }
+.stage .hint { position: absolute; bottom: 28px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 14px }
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 120px; display: grid; gap: 16px; align-content: start; min-width: 0 }
+
+.topbar { display: flex; align-items: center; gap: 8px; padding-block: 4px 8px }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--surface); display: grid; place-items: center; color: var(--ink); cursor: pointer; box-shadow: 0 1px 2px rgba(12,14,19,0.06) }
+.icon-btn[aria-pressed="true"] svg { fill: var(--elo); stroke: var(--elo) }
+.topbar .title { font-weight: 600; margin-right: auto; margin-left: 8px }
+.card { background: var(--surface); border-radius: 24px; padding: 22px; box-shadow: 0 1px 2px rgba(12,14,19,0.04) }
+
+.hero { padding-block: 18px 8px; display: grid; gap: 8px }
+.hero .who { display: flex; align-items: center; gap: 10px; color: var(--muted); font-weight: 500 }
+.hero .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: #FFFFFF; display: grid; place-items: center; font-weight: 700; font-size: 14px }
+.hero .amount { font-size: clamp(56px, 9vw, 76px); font-weight: 700; letter-spacing: -0.035em; line-height: 1 }
+.hero .amount small { font-size: 0.42em; letter-spacing: -0.01em; margin-left: 4px; color: var(--muted); font-weight: 600 }
+.hero .change { font-weight: 600; color: var(--price) }
+.hero .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--surface); font-weight: 600; font-size: 14px }
+.chip i { width: 8px; height: 8px; border-radius: 50% }
+.actions { display: flex; gap: 10px; margin-top: 10px }
+.pill { border: 0; border-radius: 999px; min-height: 52px; padding: 0 28px; font: inherit; font-weight: 600; font-size: 17px; cursor: pointer }
+.pill.primary { background: var(--ink); color: #FFFFFF }
+.pill.secondary { background: var(--surface); color: var(--ink) }
+.pill:focus-visible, .icon-btn:focus-visible, .seg button:focus-visible, .quick button:focus-visible { outline: 2px solid var(--price); outline-offset: 2px }
+
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap }
+.toggles { display: flex; gap: 8px }
+.toggle { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: none; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 36px }
+.toggle i { width: 10px; height: 3px; border-radius: 2px }
+.toggle[aria-pressed="false"] { opacity: 0.45 }
+.seg { display: inline-flex; background: var(--bg); border-radius: 999px; padding: 4px }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; min-height: 32px }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(12,14,19,0.12) }
+.chart { position: relative; margin-top: 14px; touch-action: pan-y }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible }
+.scrub { position: absolute; top: 0; pointer-events: none; transform: translateX(-50%); background: var(--ink); color: #FFFFFF; border-radius: 10px; padding: 6px 10px; font-size: 13px; white-space: nowrap; display: grid; gap: 1px }
+.scrub[hidden] { display: none }
+
+h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em }
+.list { display: grid; margin-top: 8px }
+.row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line) }
+.row:first-child { border-top: 0 }
+.row .badge { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px }
+.row .main { min-width: 0 }
+.row .main b { display: block; font-weight: 600 }
+.row .main span { color: var(--muted); font-size: 14px }
+.row .side { text-align: right; font-weight: 600; font-size: 15px; display: grid; gap: 2px }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.tile { background: var(--surface); border-radius: 20px; padding: 18px; display: grid; gap: 4px }
+.tile .label { color: var(--muted); font-size: 14px }
+.tile .big { font-size: 26px; font-weight: 700; letter-spacing: -0.02em }
+.tile .sub { font-size: 14px; color: var(--muted) }
+.depth-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin: 14px 0 10px; gap: 3px }
+.depth-labels { display: flex; justify-content: space-between; font-size: 14px }
+
+.amount-input { display: flex; align-items: baseline; gap: 8px; border-bottom: 2px solid var(--line); padding-bottom: 6px; margin-top: 12px }
+.amount-input:focus-within { border-bottom-color: var(--ink) }
+.amount-input input { border: 0; outline: none; font: inherit; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; width: 100%; min-width: 0; background: none; color: var(--ink) }
+.amount-input span { font-size: 20px; color: var(--muted); font-weight: 600 }
+.quick { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap }
+.quick button { border: 0; background: var(--bg); border-radius: 999px; padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer; min-height: 40px }
+.route { margin-top: 16px; display: grid; gap: 8px; font-size: 15px }
+.route div { display: flex; justify-content: space-between; gap: 12px }
+.route div span:first-child { color: var(--muted) }
+.route .total { font-weight: 700; padding-top: 8px; border-top: 1px solid var(--line) }
+.review { margin-top: 16px; background: var(--bg); border-radius: 18px; padding: 16px; display: grid; gap: 12px }
+.notice { margin: 0; font-weight: 600; color: var(--price); min-height: 1.4em }
+.dock { display: none }
+.toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 10; background: var(--ink); color: #FFFFFF; border-radius: 999px; padding: 12px 20px; font-weight: 600 }
+@media (max-width: 900px) {
+  .page { grid-template-columns: minmax(0, 1fr) }
+  .stage { position: relative; height: 62vh }
+  .dock { display: flex; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: rgba(243,244,246,0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px) }
+  .dock .pill { flex: 1 }
+}
+</style>
+
+<div class="page">
+  <div class="stage" id="stage" aria-hidden="true">
+    <canvas id="card3d"></canvas>
+    <div class="hint">Scroll to turn the card</div>
+  </div>
+
+  <main>
+    <div class="topbar">
+      <button class="icon-btn" type="button" aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <span class="title">Players</span>
+      <button class="icon-btn" type="button" aria-label="Add to watchlist" aria-pressed="false" id="watch">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path></svg>
+      </button>
+      <button class="icon-btn" type="button" aria-label="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0"></path></svg>
+      </button>
+    </div>
+
+    <section class="hero" aria-label="Price">
+      <div class="who"><span class="avatar">8</span>Tiago Mendonça, Vale do Sado FC</div>
+      <div class="amount">3.42<small>cr</small></div>
+      <div class="change">+0.14 (4.3%) today</div>
+      <div class="chips">
+        <span class="chip"><i style="background: var(--elo)"></i>OpenElo 1,842</span>
+        <span class="chip"><i style="background: var(--price)"></i>You hold 40</span>
+        <span class="chip">Central midfield, 24</span>
+      </div>
+      <div class="actions">
+        <a class="pill primary" href="#buy" style="display: inline-grid; place-items: center; text-decoration: none">Buy</a>
+        <button class="pill secondary" type="button" data-sell>Sell</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="chart-title">
+      <div class="chart-head">
+        <h2 id="chart-title">Price and rating</h2>
+        <div class="seg" role="group" aria-label="Range">
+          <button type="button" data-range="week" aria-pressed="true">1W</button>
+          <button type="button" data-range="season" aria-pressed="false">Season</button>
+        </div>
+      </div>
+      <div class="toggles" style="margin-top: 12px">
+        <button type="button" class="toggle" data-line="price" aria-pressed="true"><i style="background: var(--price)"></i>Price</button>
+        <button type="button" class="toggle" data-line="elo" aria-pressed="true"><i style="background: var(--elo)"></i>OpenElo</button>
+        <button type="button" class="toggle" data-line="trend" aria-pressed="true"><i style="background: repeating-linear-gradient(90deg, var(--muted) 0 3px, transparent 3px 5px)"></i>Trend</button>
+      </div>
+      <div class="chart" id="chart">
+        <div class="scrub" id="scrub" hidden></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="moves-title">
+      <h2 id="moves-title">What moved it</h2>
+      <div class="list" id="moves"></div>
+    </section>
+
+    <section class="tiles" aria-label="Key numbers">
+      <div class="tile"><span class="label">Your position</span><span class="big">136.80 cr</span><span class="sub" style="color: var(--price)">+52.80 since you bought</span></div>
+      <div class="tile"><span class="label">New shares</span><span class="big">3.61 cr</span><span class="sub">Includes 12.8% demand, cooling</span></div>
+      <div class="tile"><span class="label">In circulation</span><span class="big">18,450</span><span class="sub">shares</span></div>
+      <div class="tile"><span class="label">Rating since August</span><span class="big" style="color: var(--elo-text)" id="since"></span><span class="sub">OpenElo points</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="depth-title">
+      <h2 id="depth-title">Market depth</h2>
+      <div class="depth-bar" id="depth-bar" role="img"></div>
+      <div class="depth-labels"><span style="color: var(--price)" id="bids-label"></span><span style="color: var(--down)" id="asks-label"></span></div>
+    </section>
+
+    <section class="card" id="buy" aria-labelledby="buy-title">
+      <h2 id="buy-title">Buy Mendonça</h2>
+      <label class="amount-input" for="amount"><input id="amount" inputmode="decimal" value="50" aria-label="Amount to spend in credits"><span>cr</span></label>
+      <div class="quick" role="group" aria-label="Quick amounts">
+        <button type="button" data-amount="10">10 cr</button>
+        <button type="button" data-amount="50">50 cr</button>
+        <button type="button" data-amount="100">100 cr</button>
+        <button type="button" data-amount="250">250 cr</button>
+      </div>
+      <div class="route" id="route" aria-live="polite"></div>
+      <div class="actions"><button class="pill primary" type="button" id="review-btn" style="flex: 1">Review order</button></div>
+      <div class="review" id="review" hidden>
+        <div id="review-text"></div>
+        <div class="actions" style="margin: 0"><button class="pill primary" type="button" id="confirm" style="flex: 1">Confirm</button><button class="pill secondary" type="button" id="cancel">Edit</button></div>
+        <p class="notice" id="notice" role="status"></p>
+      </div>
+    </section>
+
+    <p style="color: var(--muted); font-size: 13px; margin: 8px 4px">Photo: Alex Rizzardi, Unsplash. Stand-in image. Sample data.</p>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="dock"><a class="pill primary" href="#buy" style="display: grid; place-items: center; text-decoration: none">Buy</a><button class="pill secondary" type="button" data-sell>Sell</button></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/environments/RoomEnvironment.js';
+import { mendonca, week, matches, book } from './sample-data.js';
+import { quote, formatCredits, toHundredths } from './ticket.js';
+import { fitTrend } from './analysis.js';
+
+const field = (id) => document.getElementById(id);
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const signed = (n, digits = 0) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(digits);
+
+/* Chart */
+const RANGES = { week: { ...week, labels: ['Mon', 'Sun'] }, season: { price: mendonca.price, elo: mendonca.elo, labels: ['Aug', 'Nov'] } };
+const shown = { price: true, elo: true, trend: true };
+let range = 'week';
+const W = 560;
+const H = 240;
+const PAD = 10;
+function drawChart() {
+  const { price, elo, labels } = RANGES[range];
+  const n = price.length;
+  const span = (values) => { const lo = Math.min(...values); const hi = Math.max(...values); const m = (hi - lo) * 0.1; return [lo - m, hi + m]; };
+  const pr = span(price);
+  const er = span(elo);
+  const x = (i) => PAD + i / (n - 1) * (W - 2 * PAD);
+  const y = (v, [lo, hi]) => H - PAD - (v - lo) / (hi - lo) * (H - 2 * PAD);
+  const line = (values, r) => values.map((v, i) => `${x(i).toFixed(1)},${y(v, r).toFixed(1)}`).join(' ');
+  const trend = (values, r, color) => {
+    const { mean, middle, slope } = fitTrend(values);
+    return `<line x1="${x(0)}" y1="${y(mean - slope * middle, r)}" x2="${x(n - 1)}" y2="${y(mean + slope * (n - 1 - middle), r)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="3 5" opacity="0.8"></line>`;
+  };
+  const area = `${PAD},${H - PAD} ${line(price, pr)} ${W - PAD},${H - PAD}`;
+  field('chart').querySelector('svg')?.remove();
+  field('chart').insertAdjacentHTML('afterbegin', `
+    <svg viewBox="0 0 ${W} ${H + 24}" role="img" aria-label="Price from ${price[0].toFixed(2)} to ${price[n - 1].toFixed(2)} and OpenElo from ${elo[0]} to ${elo[n - 1]}">
+      <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B63F6" stop-opacity="0.16"></stop><stop offset="1" stop-color="#2B63F6" stop-opacity="0"></stop></linearGradient></defs>
+      ${shown.price ? `<polygon points="${area}" fill="url(#fill)"></polygon>` : ''}
+      ${shown.trend && shown.price ? trend(price, pr, '#2B63F6') : ''}
+      ${shown.trend && shown.elo ? trend(elo, er, '#E4A21A') : ''}
+      ${shown.elo ? `<polyline points="${line(elo, er)}" fill="none" stroke="#E4A21A" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>` : ''}
+      ${shown.price ? `<polyline points="${line(price, pr)}" fill="none" stroke="#2B63F6" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></polyline>` : ''}
+      ${shown.price ? `<circle cx="${x(n - 1)}" cy="${y(price[n - 1], pr)}" r="5" fill="#2B63F6" stroke="#FFFFFF" stroke-width="2"></circle>` : ''}
+      <line id="scrub-line" x1="0" x2="0" y1="${PAD}" y2="${H - PAD}" stroke="#0C0E13" stroke-width="1" opacity="0"></line>
+      <text x="${PAD}" y="${H + 18}" font-size="13" fill="#5E6573" font-family="Geist, sans-serif">${labels[0]}</text>
+      <text x="${W - PAD}" y="${H + 18}" font-size="13" fill="#5E6573" text-anchor="end" font-family="Geist, sans-serif">${labels[1]}</text>
+    </svg>`);
+}
+function scrubTo(clientX) {
+  const svg = field('chart').querySelector('svg');
+  const rect = svg.getBoundingClientRect();
+  const { price, elo } = RANGES[range];
+  const n = price.length;
+  const fraction = Math.min(1, Math.max(0, ((clientX - rect.left) / rect.width * W - PAD) / (W - 2 * PAD)));
+  const i = Math.round(fraction * (n - 1));
+  const px = (PAD + i / (n - 1) * (W - 2 * PAD)) / W * rect.width;
+  const scrubLine = svg.querySelector('#scrub-line');
+  scrubLine.setAttribute('x1', PAD + i / (n - 1) * (W - 2 * PAD));
+  scrubLine.setAttribute('x2', PAD + i / (n - 1) * (W - 2 * PAD));
+  scrubLine.setAttribute('opacity', '0.25');
+  field('scrub').hidden = false;
+  field('scrub').style.left = `${Math.min(Math.max(px, 60), rect.width - 60)}px`;
+  field('scrub').innerHTML = `<b>${price[i].toFixed(2)} cr</b><span>OpenElo ${elo[i].toLocaleString('en')}</span>`;
+}
+field('chart').addEventListener('pointermove', (event) => scrubTo(event.clientX));
+field('chart').addEventListener('pointerleave', () => {
+  field('scrub').hidden = true;
+  field('chart').querySelector('#scrub-line')?.setAttribute('opacity', '0');
+});
+document.querySelectorAll('[data-range]').forEach((button) => button.addEventListener('click', () => {
+  range = button.dataset.range;
+  document.querySelectorAll('[data-range]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+  drawChart();
+}));
+document.querySelectorAll('[data-line]').forEach((button) => button.addEventListener('click', () => {
+  shown[button.dataset.line] = !shown[button.dataset.line];
+  button.setAttribute('aria-pressed', String(shown[button.dataset.line]));
+  drawChart();
+}));
+field('watch').addEventListener('click', (event) => {
+  const button = event.currentTarget;
+  button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
+});
+drawChart();
+
+/* What moved it */
+const { price, elo } = mendonca;
+field('moves').innerHTML = [...matches].reverse().map((m) => {
+  const goals = m.score.split('–').map(Number);
+  const result = goals[0] > goals[1] ? ['W', '#E8F0FF', 'var(--price)'] : goals[0] < goals[1] ? ['L', '#FCEBDD', 'var(--down)'] : ['D', 'var(--bg)', 'var(--muted)'];
+  const move = Math.round((price[Math.min(m.index + 3, price.length - 1)] - price[m.index - 1]) / price[m.index - 1] * 100);
+  return `<div class="row"><span class="badge" style="background: ${result[1]}; color: ${result[2]}">${result[0]}</span>
+    <span class="main"><b>${m.score} ${m.venue === 'home' ? 'vs' : 'at'} ${m.opponent}</b><span>${m.note}</span></span>
+    <span class="side"><span style="color: ${m.change >= 0 ? 'var(--elo-text)' : 'var(--down)'}">${signed(m.change)} rating</span><span style="color: ${move >= 0 ? 'var(--price)' : 'var(--down)'}; font-weight: 500; font-size: 14px">${signed(move)}% price</span></span></div>`;
+}).join('');
+field('since').textContent = signed(elo[elo.length - 1] - elo[0]);
+
+/* Depth */
+const bidShares = book.bids.reduce((s, [, n]) => s + n, 0);
+const askShares = book.asks.reduce((s, [, n]) => s + n, 0);
+field('depth-bar').innerHTML = `<span style="flex: ${bidShares}; background: var(--price)"></span><span style="flex: ${askShares}; background: var(--down)"></span>`;
+field('depth-bar').setAttribute('aria-label', `${bidShares} shares wanted, ${askShares} for sale`);
+field('bids-label').textContent = `${bidShares} wanted, best ${book.bids[0][0]}`;
+field('asks-label').textContent = `${askShares} for sale, best ${book.asks[book.asks.length - 1][0]}`;
+
+/* Buy by amount: cheapest holders first, then new shares. All in hundredths of a credit. */
+const MINT_HUNDREDTHS = 361;
+const asks = book.asks.map(([p, s]) => [Math.round(Number(p) * 100), s]).sort((a, b) => a[0] - b[0]);
+function route(budget) {
+  let left = budget;
+  const fills = [];
+  for (const [priceH, available] of [...asks.filter(([p]) => p < MINT_HUNDREDTHS), [MINT_HUNDREDTHS, Infinity]]) {
+    let shares = Math.min(available, Math.floor(left / priceH));
+    while (shares > 0) {
+      const { cost, fee } = quote(shares, priceH);
+      if (cost + fee <= left) break;
+      shares -= 1;
+    }
+    if (shares > 0) {
+      const { cost, fee } = quote(shares, priceH);
+      fills.push({ priceH, shares, cost, fee, mint: priceH === MINT_HUNDREDTHS });
+      left -= cost + fee;
+    }
+    if (shares < available) break;
+  }
+  return { fills, spent: budget - left };
+}
+function updateRoute() {
+  field('review').hidden = true;
+  const budget = toHundredths(field('amount').value);
+  if (!budget) { field('route').innerHTML = '<div><span>Enter an amount, like 50</span></div>'; return null; }
+  const { fills, spent } = route(budget);
+  const shares = fills.reduce((s, f) => s + f.shares, 0);
+  const fee = fills.reduce((s, f) => s + f.fee, 0);
+  field('route').innerHTML = (shares === 0 ? '<div><span>Not enough for one share with the fee</span></div>' :
+    fills.map((f) => `<div><span>${f.shares} ${f.mint ? 'new shares' : 'from holders'} at ${(f.priceH / 100).toFixed(2)}</span><span>${formatCredits(f.cost)}</span></div>`).join('') +
+    `<div><span>Fee, 5%</span><span>${formatCredits(fee)}</span></div>
+     <div class="total"><span style="color: var(--ink)">You get ${shares} shares</span><span>${formatCredits(spent)}</span></div>`);
+  return { shares, spent };
+}
+field('amount').addEventListener('input', updateRoute);
+document.querySelectorAll('[data-amount]').forEach((button) => button.addEventListener('click', () => {
+  field('amount').value = button.dataset.amount;
+  updateRoute();
+}));
+field('review-btn').addEventListener('click', () => {
+  const order = updateRoute();
+  if (!order || !order.shares) return;
+  field('review').hidden = false;
+  field('notice').textContent = '';
+  field('review-text').innerHTML = `<b>Buy ${order.shares} Mendonça shares for ${formatCredits(order.spent)}</b><div style="color: var(--muted); margin-top: 4px">Your balance after: ${formatCredits(125000 - order.spent)}</div>`;
+});
+document.querySelectorAll('[data-sell]').forEach((button) => button.addEventListener('click', () => {
+  field('toast').textContent = 'Selling is not part of this prototype.';
+  field('toast').hidden = false;
+  setTimeout(() => { field('toast').hidden = true; }, 2600);
+}));
+field('confirm').addEventListener('click', () => { field('notice').textContent = 'Demo only: nothing was bought.'; });
+field('cancel').addEventListener('click', () => { field('review').hidden = true; field('amount').focus(); });
+updateRoute();
+
+/* The 3D share card */
+const stage = field('stage');
+const canvas = field('card3d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+camera.position.set(0, 0, 8.6);
+
+const CARD_W = 2.2;
+const CARD_H = 3.3;
+const RADIUS = 0.18;
+function roundedShape() {
+  const s = new THREE.Shape();
+  const x = -CARD_W / 2;
+  const y = -CARD_H / 2;
+  s.moveTo(x + RADIUS, y);
+  s.lineTo(x + CARD_W - RADIUS, y);
+  s.quadraticCurveTo(x + CARD_W, y, x + CARD_W, y + RADIUS);
+  s.lineTo(x + CARD_W, y + CARD_H - RADIUS);
+  s.quadraticCurveTo(x + CARD_W, y + CARD_H, x + CARD_W - RADIUS, y + CARD_H);
+  s.lineTo(x + RADIUS, y + CARD_H);
+  s.quadraticCurveTo(x, y + CARD_H, x, y + CARD_H - RADIUS);
+  s.lineTo(x, y + RADIUS);
+  s.quadraticCurveTo(x, y, x + RADIUS, y);
+  return s;
+}
+function faceGeometry() {
+  const geometry = new THREE.ShapeGeometry(roundedShape(), 12);
+  const position = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < position.count; i++) uv.setXY(i, (position.getX(i) + CARD_W / 2) / CARD_W, (position.getY(i) + CARD_H / 2) / CARD_H);
+  return geometry;
+}
+
+async function frontTexture() {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 1536;
+  const g = c.getContext('2d');
+  const photo = new Image();
+  photo.src = 'player.jpg';
+  await photo.decode();
+  const scale = Math.max(c.width / photo.width, c.height / photo.height);
+  const w = photo.width * scale;
+  const h = photo.height * scale;
+  g.drawImage(photo, (c.width - w) * 0.62, (c.height - h) * 0.5, w, h);
+  const shade = g.createLinearGradient(0, c.height * 0.35, 0, c.height);
+  shade.addColorStop(0, 'rgba(12,14,19,0)');
+  shade.addColorStop(1, 'rgba(12,14,19,0.92)');
+  g.fillStyle = shade;
+  g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#FFFFFF';
+  g.font = '700 46px Geist';
+  g.fillText('OpenElo', 64, 104);
+  g.font = '700 56px Geist';
+  g.textAlign = 'right';
+  g.fillText('8', c.width - 64, 108);
+  g.textAlign = 'left';
+  g.font = '800 104px Geist';
+  g.fillText('Mendonça', 64, c.height - 250);
+  g.font = '500 44px Geist';
+  g.fillStyle = 'rgba(255,255,255,0.75)';
+  g.fillText('Vale do Sado FC', 64, c.height - 180);
+  g.font = '700 54px Geist';
+  g.fillStyle = '#FFFFFF';
+  g.fillText('3.42 cr', 64, c.height - 84);
+  g.fillStyle = '#F6C453';
+  g.textAlign = 'right';
+  g.fillText('1,842', c.width - 64, c.height - 84);
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+function backTexture() {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 1536;
+  const g = c.getContext('2d');
+  const bg = g.createLinearGradient(0, 0, c.width, c.height);
+  bg.addColorStop(0, '#0E1638');
+  bg.addColorStop(1, '#2443B8');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#FFFFFF';
+  g.font = '700 46px Geist';
+  g.fillText('Season so far', 64, 110);
+  g.font = '500 38px Geist';
+  g.fillStyle = 'rgba(255,255,255,0.7)';
+  g.fillText('Price and OpenElo since August', 64, 166);
+  const plot = (values, color, widthPx) => {
+    const lo = Math.min(...values);
+    const hi = Math.max(...values);
+    g.strokeStyle = color;
+    g.lineWidth = widthPx;
+    g.lineJoin = 'round';
+    g.beginPath();
+    values.forEach((v, i) => {
+      const px = 64 + i / (values.length - 1) * (c.width - 128);
+      const py = 1180 - (v - lo) / (hi - lo) * 800;
+      if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
+    });
+    g.stroke();
+  };
+  plot(mendonca.elo, '#F6C453', 8);
+  plot(mendonca.price, '#FFFFFF', 12);
+  g.font = '700 64px Geist';
+  g.fillStyle = '#FFFFFF';
+  g.fillText('+242%', 64, 1380);
+  g.fillStyle = '#F6C453';
+  g.textAlign = 'right';
+  g.fillText('+142', c.width - 64, 1380);
+  g.font = '500 36px Geist';
+  g.fillStyle = 'rgba(255,255,255,0.7)';
+  g.textAlign = 'left';
+  g.fillText('price', 64, 1440);
+  g.textAlign = 'right';
+  g.fillText('rating', c.width - 64, 1440);
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+await document.fonts.ready;
+const card = new THREE.Group();
+const faceMaterial = (map) => new THREE.MeshPhysicalMaterial({ map, roughness: 0.38, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.12 });
+const front = new THREE.Mesh(faceGeometry(), faceMaterial(await frontTexture()));
+front.position.z = 0.026;
+const back = new THREE.Mesh(faceGeometry(), faceMaterial(backTexture()));
+back.rotation.y = Math.PI;
+back.position.z = -0.026;
+const edge = new THREE.Mesh(new THREE.ExtrudeGeometry(roundedShape(), { depth: 0.05, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 12 }),
+  new THREE.MeshPhysicalMaterial({ color: 0x1B1F2A, metalness: 0.85, roughness: 0.28 }));
+edge.position.z = -0.025;
+card.add(edge, front, back);
+scene.add(card);
+
+const shadowCanvas = document.createElement('canvas');
+shadowCanvas.width = shadowCanvas.height = 128;
+const sg = shadowCanvas.getContext('2d');
+const radial = sg.createRadialGradient(64, 64, 0, 64, 64, 64);
+radial.addColorStop(0, 'rgba(12,14,19,0.35)');
+radial.addColorStop(1, 'rgba(12,14,19,0)');
+sg.fillStyle = radial;
+sg.fillRect(0, 0, 128, 128);
+const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.9), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false }));
+shadow.position.set(0, -2.25, -0.4);
+scene.add(shadow);
+
+const smoothstep = (a, b, x) => { const t = Math.min(Math.max((x - a) / (b - a), 0), 1); return t * t * (3 - 2 * t); };
+let target = 0;
+let progress = 0;
+const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
+const readScroll = () => {
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  target = max > 0 ? window.scrollY / max : 0;
+};
+window.addEventListener('scroll', readScroll, { passive: true });
+window.addEventListener('pointermove', (event) => {
+  pointer.x = event.clientX / window.innerWidth - 0.5;
+  pointer.y = event.clientY / window.innerHeight - 0.5;
+});
+function resize() {
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.position.z = w / h < 0.7 ? 11 : 8.6;
+  camera.updateProjectionMatrix();
+  draw(0);
+}
+// Front, tilted, at the top; flipped to the season chart while the chart is in view; front again, lying back, by the buy section.
+function draw(time) {
+  progress += (target - progress) * (reducedMotion ? 1 : 0.08);
+  pointer.sx += (pointer.x - pointer.sx) * 0.06;
+  pointer.sy += (pointer.y - pointer.sy) * 0.06;
+  const flip = smoothstep(0.08, 0.3, progress) - smoothstep(0.42, 0.62, progress);
+  const settle = smoothstep(0.65, 0.95, progress);
+  const float = reducedMotion ? 0 : Math.sin(time * 0.9) * 0.05;
+  card.rotation.y = -0.32 + flip * Math.PI + settle * 0.5 + pointer.sx * 0.35;
+  card.rotation.x = -0.06 - pointer.sy * 0.25 - settle * 0.35;
+  card.rotation.z = 0.04 - settle * 0.06;
+  card.position.y = 0.1 + float - settle * 0.25;
+  shadow.material.opacity = 1 - settle * 0.3;
+  renderer.render(scene, camera);
+}
+window.addEventListener('resize', resize);
+readScroll();
+resize();
+if (reducedMotion) {
+  window.addEventListener('scroll', () => draw(0), { passive: true });
+} else {
+  const clock = new THREE.Clock();
+  const loop = () => { draw(clock.getElapsedTime()); requestAnimationFrame(loop); };
+  loop();
+}
+</script>
