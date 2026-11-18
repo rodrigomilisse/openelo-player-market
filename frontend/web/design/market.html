@@ -1,0 +1,210 @@
+<title>OpenElo Market Night</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="design.css">
+<style>
+/* Layout: one screen. Player rail on the left, market panels on the right, every player's season racing in lanes behind */
+html, body { height: 100% }
+.app { position: relative; z-index: 2; min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.board { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(260px, 320px); gap: 20px; align-items: start; padding-bottom: 16px }
+.rail { display: grid; gap: 4px; padding: 10px }
+.rail h2 { font-size: 30px; padding: 6px 8px 10px }
+.player-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px; border-radius: 8px; border: 1px solid transparent;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 44px }
+.player-row:hover { background: rgba(150,190,235,0.08) }
+.player-row[aria-pressed="true"] { border-color: var(--glass-edge); background: rgba(90,169,255,0.12) }
+.player-row .who { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.player-row .price { text-align: right; font-weight: 700; font-size: 17px }
+.player-row .meta { color: var(--muted); font-size: 14px }
+.player-row .move { text-align: right; font-size: 14px; font-weight: 600 }
+.centre { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; min-width: 0 }
+.centre .controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center }
+.focus-card { align-self: flex-start; max-width: 420px }
+.focus-card .big { font-family: var(--display); font-weight: 900; font-size: 64px; line-height: 0.9 }
+.side { display: grid; gap: 16px }
+.side ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px }
+.side li { display: flex; justify-content: space-between; gap: 12px }
+.heat-bar { height: 6px; border-radius: 3px; background: rgba(150,190,235,0.15); overflow: hidden; margin-top: 4px }
+.heat-bar div { height: 100%; background: var(--ask) }
+.ticker { position: relative; overflow: hidden; border-top: 1px solid var(--glass-edge); background: var(--glass-strong); margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px))) }
+.ticker .track { display: inline-flex; gap: 40px; padding: 10px 0; white-space: nowrap; animation: run 40s linear infinite }
+.ticker span b { margin-left: 6px }
+@keyframes run { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+@media (prefers-reduced-motion: reduce) { .ticker .track { animation: none } }
+@media (max-width: 1100px) { .board { grid-template-columns: minmax(0, 1fr) } .site-header { position: static } }
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="app">
+  <header class="site-header">
+    <div class="logo">OPENELO</div>
+    <nav aria-label="Main">
+      <a href="#top" aria-current="page">Market</a>
+      <a href="#top">Portfolio</a>
+      <a href="#top">Wallet</a>
+    </nav>
+    <div class="wallet">Available <strong>1,250.00 cr</strong></div>
+  </header>
+
+  <div class="board" id="top">
+    <nav class="glass rail" aria-label="Players">
+      <h2>Tonight's market</h2>
+      <div id="players"></div>
+    </nav>
+
+    <div class="centre">
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Lines to show">
+          <button type="button" data-mode="price" aria-pressed="true">Price</button>
+          <button type="button" data-mode="elo" aria-pressed="false">OpenElo</button>
+          <button type="button" data-mode="both" aria-pressed="false">Both</button>
+        </div>
+        <div class="legend"><span><i class="swatch price"></i>Rising price</span><span><i class="swatch" style="background: var(--ask)"></i>Falling price</span><span><i class="swatch elo"></i>OpenElo rating</span></div>
+      </div>
+      <div class="glass focus-card" id="focus" aria-live="polite"></div>
+    </div>
+
+    <aside class="side">
+      <div class="glass">
+        <h3>Market today</h3>
+        <div class="stats" style="margin-top: 10px; gap: 14px 28px">
+          <div class="stat"><div class="label">Credits traded</div><div class="value" style="font-size: 30px">48,210</div></div>
+          <div class="stat"><div class="label">Shares minted</div><div class="value" style="font-size: 30px">3,140</div></div>
+          <div class="stat"><div class="label">Players rising</div><div class="value" style="font-size: 30px">4 of 6</div></div>
+        </div>
+      </div>
+      <div class="glass">
+        <h3>New-share demand</h3>
+        <p class="muted" style="margin: 4px 0 0; font-size: 14px">Heat adds to the price of new shares and cools when buying stops.</p>
+        <ol id="heat"></ol>
+      </div>
+      <div class="glass">
+        <h3>Biggest rating moves this week</h3>
+        <ol id="movers"></ol>
+      </div>
+    </aside>
+  </div>
+
+  <div class="ticker" aria-label="Live prices"><div class="track" id="ticker"></div></div>
+</div>
+
+<script type="module">
+import { THREE, COLOR, createStage, addStadium, addRibbon, textSprite, pointerTracker, reducedMotion } from './stadium.js';
+import { market } from './sample-data.js';
+
+const STEP = 2;
+const LANE = 4.4;
+const priceY = (price) => price * 1.25;
+const eloY = (rating) => (rating - 1640) / 220 * 6.5;
+const last = market[0].price.length - 1;
+const centerZ = -last * STEP / 2;
+const laneX = (i) => (i - (market.length - 1) / 2) * LANE;
+
+const stage = createStage(document.getElementById('scene'), { shiftRight: 0.04 });
+addStadium(stage, { centerZ, length: last * STEP + 8 });
+
+const lanes = market.map((player, i) => {
+  const rising = player.change >= 0;
+  const price = addRibbon(stage.scene, player.price, { toY: priceY, step: STEP, x: laneX(i), wiggle: 0.35,
+    color: rising ? COLOR.price : COLOR.ask, core: rising ? COLOR.priceCore : 0xFFD2B0, curtain: true });
+  const elo = addRibbon(stage.scene, player.elo, { toY: eloY, step: STEP, x: laneX(i) + 1.2, wiggle: 0.35, color: COLOR.elo, core: COLOR.eloCore, curtain: false });
+  return { player, price, elo, mix: { price: 1, elo: 0 } };
+});
+
+await document.fonts.ready;
+lanes.forEach(({ player, price }) => {
+  const label = textSprite(player.short.toUpperCase(), { height: 1.1 });
+  label.position.copy(price.points[0]).add(new THREE.Vector3(0, -0.2, 3));
+  stage.scene.add(label);
+});
+
+let mode = 'price';
+let selected = -1;
+const format = (n) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(1) + '%';
+const ratingChange = (p) => p.elo[p.elo.length - 1] - p.elo[p.elo.length - 8];
+
+const list = document.getElementById('players');
+list.innerHTML = market.map((p, i) => `
+  <button type="button" class="player-row" data-index="${i}" aria-pressed="false">
+    <span class="who">${p.name}</span><span class="price">${p.price[last].toFixed(2)}</span>
+    <span class="meta">${p.club}, rated ${p.elo[last].toLocaleString('en')}</span>
+    <span class="move" style="color: ${p.change >= 0 ? 'var(--price)' : 'var(--ask)'}">${format(p.change)}</span>
+  </button>`).join('');
+
+function showFocus() {
+  const card = document.getElementById('focus');
+  if (selected < 0) {
+    card.innerHTML = `<h3>Six players, one season</h3><p class="muted" style="margin: 6px 0 0">Each lane is a player since August. Pick one to fly over to it, or switch to OpenElo to see whose rating led the way.</p>`;
+    return;
+  }
+  const p = market[selected];
+  const move = ratingChange(p);
+  card.innerHTML = `<div class="muted">${p.position}, ${p.club}</div>
+    <div class="big">${p.price[last].toFixed(2)} <span style="font-size: 22px; color: ${p.change >= 0 ? 'var(--price)' : 'var(--ask)'}">${format(p.change)}</span></div>
+    <div style="margin-top: 6px">OpenElo <b style="color: var(--elo)">${p.elo[last].toLocaleString('en')}</b>, ${move >= 0 ? 'up' : 'down'} ${Math.abs(move)} this week</div>
+    <div class="muted" style="margin-top: 6px">${p.held ? `You hold ${p.held} shares.` : 'You hold none.'}</div>`;
+}
+
+list.addEventListener('click', (event) => {
+  const row = event.target.closest('.player-row');
+  if (!row) return;
+  const index = Number(row.dataset.index);
+  selected = selected === index ? -1 : index;
+  list.querySelectorAll('.player-row').forEach((r) => r.setAttribute('aria-pressed', String(Number(r.dataset.index) === selected)));
+  showFocus();
+  stage.refresh();
+});
+document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => {
+  mode = button.dataset.mode;
+  document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+  stage.refresh();
+}));
+showFocus();
+
+document.getElementById('heat').innerHTML = [...market].sort((a, b) => b.heat - a.heat).slice(0, 4).map((p) =>
+  `<li style="display: block"><div style="display: flex; justify-content: space-between"><span>${p.short}</span><span style="color: var(--ask)">+${p.heat.toFixed(1)}%</span></div>
+   <div class="heat-bar"><div style="width: ${Math.min(100, p.heat * 7)}%"></div></div></li>`).join('');
+document.getElementById('movers').innerHTML = [...market].sort((a, b) => Math.abs(ratingChange(b)) - Math.abs(ratingChange(a))).slice(0, 4).map((p) => {
+  const move = ratingChange(p);
+  return `<li><span>${p.short}</span><span class="chip ${move >= 0 ? 'elo' : 'down'}">${move >= 0 ? '+' : '−'}${Math.abs(move)}</span></li>`;
+}).join('');
+const tickerItems = market.map((p) => `<span>${p.short.toUpperCase()} ${p.price[last].toFixed(2)}<b style="color: ${p.change >= 0 ? 'var(--price)' : 'var(--ask)'}">${format(p.change)}</b><b style="color: var(--elo)">${p.elo[last]}</b></span>`).join('');
+document.getElementById('ticker').innerHTML = tickerItems + tickerItems;
+
+const pointer = pointerTracker();
+const camPosition = new THREE.Vector3(24, 15, 16);
+const camTarget = new THREE.Vector3(0, 3, centerZ);
+const wantPosition = new THREE.Vector3();
+const wantTarget = new THREE.Vector3();
+
+stage.start((time) => {
+  const mouse = pointer.step();
+  lanes.forEach((lane, i) => {
+    const showPrice = mode !== 'elo' ? 1 : 0;
+    const showElo = mode !== 'price' ? 1 : 0;
+    const dim = selected >= 0 && selected !== i ? 0.35 : 1;
+    lane.mix.price += (showPrice * dim - lane.mix.price) * (reducedMotion ? 1 : 0.08);
+    lane.mix.elo += (showElo * dim - lane.mix.elo) * (reducedMotion ? 1 : 0.08);
+    lane.price.setOpacity(lane.mix.price);
+    lane.elo.setOpacity(lane.mix.elo);
+  });
+  if (selected < 0) {
+    const sway = Math.sin(time * 0.08) * 6;
+    wantPosition.set(22 + sway, 15, 16);
+    wantTarget.set(0, 3, centerZ);
+  } else {
+    const end = lanes[selected].price.points[last];
+    wantPosition.set(laneX(selected) + 8, end.y + 6, end.z + 14);
+    wantTarget.set(laneX(selected), end.y * 0.6, end.z + 2);
+  }
+  const ease = reducedMotion ? 1 : 0.04;
+  camPosition.lerp(wantPosition, ease);
+  camTarget.lerp(wantTarget, ease);
+  stage.camera.position.set(camPosition.x + mouse.x * 3, camPosition.y - mouse.y * 2, camPosition.z);
+  stage.camera.lookAt(camTarget);
+});
+</script>

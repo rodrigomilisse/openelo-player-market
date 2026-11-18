@@ -1,0 +1,187 @@
+<title>OpenElo Your Squad</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="design.css">
+<style>
+/* Layout: one screen. Your total and holdings on the left; each holding's return as a lane over a "what you paid" floor, next matchdays glowing ahead */
+html, body { height: 100% }
+.app { position: relative; z-index: 2; min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: 16px }
+.desk { display: grid; grid-template-columns: minmax(320px, 420px) minmax(0, 1fr) minmax(240px, 300px); gap: 20px; align-items: start }
+.col { display: grid; gap: 16px; min-width: 0 }
+.worth { font-family: var(--display); font-weight: 900; font-size: clamp(72px, 8vw, 120px); line-height: 0.85 }
+.worth small { font-size: 0.3em; font-weight: 700 }
+.holding { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; width: 100% }
+.holding:hover, .holding:focus-visible { background: rgba(150,190,235,0.08); border-color: var(--glass-edge) }
+.holding .who { font-weight: 700; font-size: 17px }
+.holding .right { text-align: right }
+.holding .meta { color: var(--muted); font-size: 14px }
+.matchday { padding: 10px 0; border-top: 1px solid var(--glass-edge); display: grid; gap: 2px }
+@media (max-width: 1100px) { .desk { grid-template-columns: minmax(0, 1fr) } .site-header { position: static } }
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="app">
+  <header class="site-header">
+    <div class="logo">OPENELO</div>
+    <nav aria-label="Main">
+      <a href="#top">Market</a>
+      <a href="#top">Trade</a>
+      <a href="#top" aria-current="page">Portfolio</a>
+    </nav>
+    <div class="wallet">Available <strong>1,250.00 cr</strong></div>
+  </header>
+
+  <div class="desk" id="top">
+    <div class="col">
+      <div>
+        <div class="muted">Your squad is worth</div>
+        <div class="worth" id="worth"></div>
+        <div class="stats" style="margin-top: 14px; gap: 12px 32px">
+          <div class="stat"><div class="label">Gain on what you paid</div><div class="value" style="font-size: 30px" id="gain"></div></div>
+          <div class="stat"><div class="label">Dividends this season</div><div class="value" style="font-size: 30px; color: var(--elo)">14.20 cr</div></div>
+        </div>
+      </div>
+      <div class="glass" style="padding: 10px">
+        <h3 style="padding: 6px 10px">Holdings</h3>
+        <div id="holdings"></div>
+        <p class="muted" style="margin: 6px 10px; font-size: 14px">Point at a player to light up his lane.</p>
+      </div>
+    </div>
+
+    <div class="col" style="align-self: end">
+      <div class="legend"><span><i class="swatch price"></i>In profit</span><span><i class="swatch" style="background: var(--ask)"></i>Below what you paid</span><span><i class="swatch elo"></i>OpenElo rating</span><span>Glowing gates ahead: next matchdays</span></div>
+    </div>
+
+    <aside class="col">
+      <div class="glass">
+        <h3>Coming up</h3>
+        <p class="muted" style="margin: 4px 0 6px; font-size: 14px">Each matchday can move every rating you hold.</p>
+        <div id="matchdays"></div>
+      </div>
+      <div class="glass">
+        <h3>Open orders</h3>
+        <p style="margin: 8px 0 0"><b style="color: var(--ask)">Sell</b> 10 Mendonça at 3.58</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+import { THREE, COLOR, createStage, addStadium, addRibbon, textSprite, pointerTracker, reducedMotion } from './stadium.js';
+import { market, fixtures } from './sample-data.js';
+import { formatCredits } from './ticket.js';
+
+const held = market.filter((p) => p.held > 0);
+const cents = (credits) => Math.round(credits * 100);
+const lastOf = (series) => series[series.length - 1];
+const worth = held.reduce((sum, p) => sum + p.held * cents(lastOf(p.price)), 0);
+const paid = held.reduce((sum, p) => sum + p.held * cents(p.costBasis), 0);
+const gain = worth - paid;
+document.getElementById('worth').innerHTML = `${(Math.floor(worth / 100)).toLocaleString('en')}<small>.${String(worth % 100).padStart(2, '0')} cr</small>`;
+const gainEl = document.getElementById('gain');
+gainEl.textContent = (gain >= 0 ? '+' : '−') + formatCredits(Math.abs(gain));
+gainEl.style.color = gain >= 0 ? 'var(--price)' : 'var(--ask)';
+
+document.getElementById('holdings').innerHTML = held.map((p, i) => {
+  const value = p.held * cents(lastOf(p.price));
+  const back = value - p.held * cents(p.costBasis);
+  return `<button type="button" class="holding" data-index="${i}">
+    <span class="who">${p.name}</span><span class="right" style="font-weight: 700">${formatCredits(value)}</span>
+    <span class="meta">${p.held} shares, paid ${p.costBasis.toFixed(2)}, rated ${lastOf(p.elo)}</span>
+    <span class="right meta" style="color: ${back >= 0 ? 'var(--price)' : 'var(--ask)'}">${back >= 0 ? '+' : '−'}${formatCredits(Math.abs(back))}</span>
+  </button>`;
+}).join('');
+
+const matchdays = fixtures.map((f, i) => ({ label: `MATCHDAY ${15 + i}`, when: f.when }));
+document.getElementById('matchdays').innerHTML = matchdays.map((m, i) =>
+  `<div class="matchday"><b>Matchday ${15 + i}, ${m.when}</b><span class="muted">${held.length} of your players in action</span></div>`).join('');
+
+const STEP = 2;
+const LANE = 4.6;
+const last = market[0].price.length - 1;
+const returnY = (player) => (price) => (price / player.costBasis - 1) * 5;
+const eloY = (rating) => (rating - 1640) / 220 * 4 - 0.5;
+const laneX = (i) => (i - (held.length - 1) / 2) * LANE;
+const nowZ = -last * STEP;
+
+const stage = createStage(document.getElementById('scene'), { shiftRight: 0.08, fog: 0.018 });
+addStadium(stage, { centerZ: nowZ / 2 - 8, length: -nowZ + 30, crowd: 8000 });
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(held.length * LANE + 6, -nowZ + 4),
+  new THREE.MeshBasicMaterial({ color: 0xBFD6F2, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false }));
+floor.rotation.x = -Math.PI / 2;
+floor.position.set(0, 0, nowZ / 2);
+stage.scene.add(floor);
+const floorEdge = new THREE.LineSegments(new THREE.EdgesGeometry(floor.geometry),
+  new THREE.LineBasicMaterial({ color: 0xBFD6F2, transparent: true, opacity: 0.35 }));
+floorEdge.rotation.x = -Math.PI / 2;
+floorEdge.position.copy(floor.position);
+stage.scene.add(floorEdge);
+
+const lanes = held.map((player, i) => {
+  const up = lastOf(player.price) >= player.costBasis;
+  const value = addRibbon(stage.scene, player.price, { toY: returnY(player), step: STEP, x: laneX(i), wiggle: 0.3,
+    color: up ? COLOR.price : COLOR.ask, core: up ? COLOR.priceCore : 0xFFD2B0, ground: 0 });
+  const rating = addRibbon(stage.scene, player.elo, { toY: eloY, step: STEP, x: laneX(i) + 1.4, wiggle: 0.3, color: COLOR.elo, core: COLOR.eloCore, curtain: false, radius: 0.035 });
+  return { value, rating, mix: 1 };
+});
+
+matchdays.forEach((m, i) => {
+  const z = nowZ - 8 - i * 7;
+  const width = held.length * LANE + 4;
+  const gate = new THREE.Mesh(new THREE.PlaneGeometry(width, 7),
+    new THREE.MeshBasicMaterial({ color: COLOR.elo, transparent: true, opacity: 0.05 - i * 0.012, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  gate.position.set(0, 2.5, z);
+  stage.scene.add(gate);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(gate.geometry), new THREE.LineBasicMaterial({ color: COLOR.elo, transparent: true, opacity: 0.6 - i * 0.15 }));
+  edge.position.copy(gate.position);
+  stage.scene.add(edge);
+  m.z = z;
+});
+
+await document.fonts.ready;
+matchdays.forEach((m) => {
+  const label = textSprite(`${m.label}  ${m.when.toUpperCase()}`, { color: '#FFF3CC', height: 0.8 });
+  label.position.set(0, 6.6, m.z);
+  stage.scene.add(label);
+});
+const paidLabel = textSprite('WHAT YOU PAID', { color: '#BFD6F2', height: 0.7 });
+paidLabel.position.set(-(held.length * LANE) / 2 - 1, 0.5, 0);
+stage.scene.add(paidLabel);
+held.forEach((p, i) => {
+  const label = textSprite(p.short.toUpperCase(), { height: 0.9 });
+  label.position.set(laneX(i), -0.4, 3);
+  stage.scene.add(label);
+});
+
+let focused = -1;
+const list = document.getElementById('holdings');
+list.addEventListener('pointerover', (event) => {
+  const row = event.target.closest('.holding');
+  focused = row ? Number(row.dataset.index) : -1;
+  stage.refresh();
+});
+list.addEventListener('pointerleave', () => { focused = -1; stage.refresh(); });
+list.addEventListener('focusin', (event) => { focused = Number(event.target.closest('.holding').dataset.index); stage.refresh(); });
+list.addEventListener('focusout', () => { focused = -1; stage.refresh(); });
+
+const pointer = pointerTracker();
+const lookAt = new THREE.Vector3(0, 1.5, nowZ + 6);
+stage.start((time) => {
+  const mouse = pointer.step();
+  lanes.forEach((lane, i) => {
+    const want = focused < 0 || focused === i ? 1 : 0.2;
+    lane.mix += (want - lane.mix) * (reducedMotion ? 1 : 0.1);
+    lane.value.setOpacity(lane.mix);
+    lane.rating.setOpacity(lane.mix);
+  });
+  const sway = reducedMotion ? 0 : Math.sin(time * 0.07) * 0.1;
+  const angle = 0.55 + sway + mouse.x * 0.3;
+  stage.camera.position.set(Math.sin(angle) * 30, 12 - mouse.y * 3, lookAt.z + Math.cos(angle) * 30);
+  stage.camera.lookAt(lookAt);
+});
+</script>
