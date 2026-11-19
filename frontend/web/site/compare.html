@@ -92,8 +92,8 @@
   async function draw() {
     const [pa, pb] = await Promise.all([getPlayer(a), getPlayer(b)]);
     const numbers = mergeFormations([
-      { formation: await textFormation(number.format(pa.rating), { center: [-4.2, 3, 0], width: 7 }), tag: 0 },
-      { formation: await textFormation(number.format(pb.rating), { center: [4.2, 3, 0], width: 7 }), tag: 1 }]);
+      { formation: await textFormation(number.format(pa.rating), { center: [-4.2, 3, 0], width: 7, edge: 3, depth: 0.3 }), tag: 0 },
+      { formation: await textFormation(number.format(pb.rating), { center: [4.2, 3, 0], width: 7, edge: 3, depth: 0.3 }), tag: 1 }]);
     const seasons = curveFormation([{ values: pa.history.map((h) => h.rating) }, { values: pb.history.map((h) => h.rating), alt: true }], { from: [-8, 0, 3], to: [8, 0, -6] });
     if (!stage) stage = immersive({
       formations: [numbers, seasons, fieldFormation()],

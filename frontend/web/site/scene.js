@@ -378,7 +378,8 @@ function createTour(onDepart) {
 /* ---------- formations ---------- */
 
 // Text drawn to a hidden canvas, every lit pixel a candidate point. width = world units across.
-export async function textFormation(text, { center = [0, 3, 0], width = 14, font = 'italic 900 220px "Barlow Condensed"', depth = 0.6 } = {}) {
+// `edge` above 1 samples the outline that many times more often, so the glyphs read crisper.
+export async function textFormation(text, { center = [0, 3, 0], width = 14, font = 'italic 900 220px "Barlow Condensed"', depth = 0.6, edge = 1 } = {}) {
   try { await document.fonts.load(font); } catch { /* fall back to whatever is loaded */ }
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d');
@@ -390,8 +391,13 @@ export async function textFormation(text, { center = [0, 3, 0], width = 14, font
   const data = ctx.getImageData(0, 0, c.width, c.height).data;
   const pts = [];
   const scale = width / w;
+  const lit = (x, y) => x >= 0 && y >= 0 && x < c.width && y < c.height && data[(y * c.width + x) * 4 + 3] > 128;
   for (let y = 0; y < c.height; y += 2) for (let x = 0; x < c.width; x += 2) {
-    if (data[(y * c.width + x) * 4 + 3] > 128) pts.push(center[0] + (x - w / 2) * scale, center[1] + (c.height / 2 - y) * scale, center[2] + (Math.random() - 0.5) * depth);
+    if (!lit(x, y)) continue;
+    const onEdge = edge > 1 && (!lit(x - 4, y) || !lit(x + 4, y) || !lit(x, y - 4) || !lit(x, y + 4));
+    if (!onEdge && edge > 1 && Math.random() < 0.45) continue;   // a lighter fill, so holes in 8s and 9s stay open
+    const copies = onEdge ? Math.round(edge) : 1;
+    for (let k = 0; k < copies; k++) pts.push(center[0] + (x - w / 2) * scale, center[1] + (c.height / 2 - y) * scale, center[2] + (Math.random() - 0.5) * (onEdge ? depth * 0.4 : depth));
   }
   return new Float32Array(pts.length ? pts : center);
 }
