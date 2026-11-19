@@ -188,8 +188,8 @@ td small { color: var(--muted); font-size: 14px; margin-left: 6px }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
 
 /* The tour: a veil for arriving and leaving, and the next-stop card at the bottom of every page */
-.warp-veil { position: fixed; inset: 0; z-index: 50; pointer-events: none; background: var(--night); opacity: 0; transition: opacity 380ms ease }
-.warp-veil.is-on { opacity: 1; transition-duration: 220ms }
+main { transition: opacity 500ms ease 250ms }
+main.is-arriving { opacity: 0; transition: none }
 .next-stop { display: flex; align-items: center; gap: 18px; width: min(520px, 100%); margin: clamp(40px, 8vw, 96px) auto 24px; padding: 18px 26px 18px 18px;
   border-radius: 999px; text-decoration: none; transform: translateY(calc(var(--pull, 0) * -6px)) scale(calc(1 + var(--pull, 0) * 0.04)) }
 .next-stop small { display: block; color: var(--muted); font-size: 15px }
@@ -198,7 +198,7 @@ td small { color: var(--muted); font-size: 14px; margin-left: 6px }
 .next-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 3 }
 .next-ring .fill { stroke: var(--elo); stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 0 6px rgba(255, 214, 107, 0.7)) }
 .next-stop.is-going .fill { stroke-dashoffset: 0; transition: stroke-dashoffset 400ms ease }
-@media (prefers-reduced-motion: reduce) { .warp-veil { display: none } .next-stop { transform: none } }
+@media (prefers-reduced-motion: reduce) { main { transition: none } .next-stop { transform: none } }
 
 /* Stages: near-empty stretches of page where the particles play in the open, with one line of caption */
 .stage { min-height: 88vh; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 7vh; pointer-events: none }

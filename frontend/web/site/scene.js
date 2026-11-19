@@ -13,6 +13,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addStadium } from '../design/stadium.js';
+import { go } from './router.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => window.innerWidth <= 860;
@@ -25,7 +26,6 @@ export const STATIONS = {
   'compare.html': [0, 0, 16], 'how.html': [-22, 0, -18], 'player.html': [10, 0, 2], 'club.html': [-10, 0, 2],
 };
 const pageOf = (href) => (new URL(href, location.href).pathname.split('/').pop() || 'index.html');
-const ARRIVAL_KEY = 'openelo-arrival';
 // The pose every page is approached from: in front of its spot, looking at it.
 const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[2] + 24], look: [station[0], station[1] + 3, station[2]] });
 
@@ -55,16 +55,21 @@ const FRAGMENT = /* glsl */`
 // Spring back to the shape, slowly: a swipe scatters particles and they drift home over a few seconds.
 const STIFFNESS = 2.4, DAMPING = 2.3, SWIPE = 0.14, PUSH = 3.2, RADIUS = 1.9, MAX_SPEED = 9;
 
-export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight = 0.2, count, next } = {}) {
-  const here = pageOf(location.href);
-  const station = STATIONS[here] || [0, 0, 0];
+let world = null;   // one scene for the whole visit: pages re-target it instead of rebuilding it
+
+export function immersive(options) {
+  if (!world) world = createWorld(options);
+  if (world) world.apply(options, world.started);
+  return world;
+}
+
+function createWorld({ count } = {}) {
   const canvas = document.getElementById('scene');
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   } catch {
-    canvas.remove();   // no WebGL: every page works without the scene
-    if (next) nextStop(next, null);
+    canvas?.remove();   // no WebGL: every page works without the scene
     return null;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, small() ? 1.5 : 2));
@@ -76,26 +81,11 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
   addStadium({ scene, camera, renderer, onFrame: (fn) => updaters.push(fn) }, { centerZ: -12, length: 64, crowd: small() ? 5000 : 9000 });
   scene.traverse((o) => { if (o.isSprite) o.material.opacity *= 0.5; });   // softer floodlights: they bloom through the glass
 
-  // particles: formations resampled to n points, offset to this page's spot
   const n = count || (small() ? 4500 : 9000);
-  const resample = (formation) => {
-    const { points, tags } = formation instanceof Float32Array ? { points: formation, tags: null } : formation;
-    const out = new Float32Array(n * 3), outTags = new Float32Array(n);
-    const len = points.length / 3;
-    for (let i = 0; i < n; i++) {
-      const j = Math.floor(Math.random() * len);
-      out[i * 3] = points[j * 3] + station[0]; out[i * 3 + 1] = points[j * 3 + 1] + station[1]; out[i * 3 + 2] = points[j * 3 + 2] + station[2];
-      outTags[i] = tags ? tags[j] : 0;
-    }
-    return { out, outTags };
-  };
-  const shapes = [0, 1, 2].map((i) => resample(formations[Math.min(i, formations.length - 1)]));
-  const home = shapes.map((s) => s.out);
+  const home = [new Float32Array(n * 3), new Float32Array(n * 3), new Float32Array(n * 3)];
   const tag = new Float32Array(n * 3);
-  shapes.forEach((s, k) => s.outTags.forEach((t, i) => { tag[i * 3 + k] = t; }));
   const rand = new Float32Array(n * 4).map(() => Math.random());
   const position = new Float32Array(n * 3);
-  position.set(home[0]);
   const offset = new Float32Array(n * 3), velocity = new Float32Array(n * 3), dyn = new Float32Array(n * 2);
   const geometry = new THREE.BufferGeometry();
   const positionAttr = new THREE.BufferAttribute(position, 3).setUsage(THREE.DynamicDrawUsage);
@@ -108,8 +98,8 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
   const uniforms = {
     uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() },
-    uColorA: { value: new THREE.Color(palette[0]) }, uColorB: { value: new THREE.Color(palette[1]) }, uColorC: { value: new THREE.Color(palette[2]) },
-    uSpark: { value: new THREE.Color(spark) }, uAlt: { value: new THREE.Color(alt) },
+    uColorA: { value: new THREE.Color() }, uColorB: { value: new THREE.Color() }, uColorC: { value: new THREE.Color() },
+    uSpark: { value: new THREE.Color() }, uAlt: { value: new THREE.Color() },
   };
   scene.add(new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
@@ -122,25 +112,24 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
     composer.addPass(new OutputPass());
   }
 
-  function resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    renderer.setSize(w, h, false);
-    composer?.setSize(w, h);
-    camera.aspect = w / h;
-    lastShift = null;   // the frame sets the view offset
-    if (reducedMotion) frame(0, 0);
-  }
-
-  // scroll: 0..1 over the page, eased; keyframes turn it into a camera path and a morph
+  // what the current page sets
+  let station = [0, 0, 0], shiftRight = 0.2, keys = [], next = null;
   let target = 0, progress = 0, lastShift = null;
-  const readScroll = () => {
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    target = max > 0 ? window.scrollY / max : 0;
-    if (reducedMotion) { progress = target; frame(0, 0); }
+  let arrival = null, boostStart = -1e9;
+  const currentLook = new THREE.Vector3();
+
+  const resample = (formation, into, tagIndex) => {
+    const { points, tags } = formation instanceof Float32Array ? { points: formation, tags: null } : formation;
+    const len = points.length / 3;
+    for (let i = 0; i < n; i++) {
+      const j = Math.floor(Math.random() * len);
+      into[i * 3] = points[j * 3] + station[0]; into[i * 3 + 1] = points[j * 3 + 1] + station[1]; into[i * 3 + 2] = points[j * 3 + 2] + station[2];
+      tag[i * 3 + tagIndex] = tags ? tags[j] : 0;
+    }
+    tagAttr.needsUpdate = true;
   };
   const shift = (v) => new THREE.Vector3(v[0] + station[0], v[1] + station[1], v[2] + station[2]);
   // `at` is a scroll fraction, or a selector: the moment that element's middle reaches the screen's middle
-  const keys = keyframes.map((k) => ({ ...k, shift: k.shift ?? shiftRight, anchor: typeof k.at === 'string' ? k.at : null, pos: shift(k.pos), look: shift(k.look) }));
   const resolveKeys = () => {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     for (const k of keys) {
@@ -152,8 +141,11 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
     }
     keys.sort((a, b) => a.at - b.at);
   };
-  resolveKeys();
-  new ResizeObserver(() => { resolveKeys(); readScroll(); }).observe(document.body);
+  const readScroll = () => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    target = max > 0 ? window.scrollY / max : 0;
+    if (reducedMotion) { progress = target; frame(0, 0); }
+  };
   const pose = (t) => {
     let i = 0;
     while (i < keys.length - 2 && t > keys[i + 1].at) i++;
@@ -162,21 +154,14 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
     return { pos: a.pos.clone().lerp(b.pos, u), look: a.look.clone().lerp(b.look, u), morph: a.morph + (b.morph - a.morph) * u, shift: a.shift + (b.shift - a.shift) * u };
   };
 
-  // arriving from another page: start from the pose the last page flew to, blend into this page's own
-  let arrival = null;
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(ARRIVAL_KEY) || 'null');
-    sessionStorage.removeItem(ARRIVAL_KEY);
-    if (saved && saved.page === here && Date.now() - saved.at < 15000 && !reducedMotion) {
-      const a = arrivalPose(station);
-      arrival = { pos: new THREE.Vector3(...a.pos), look: new THREE.Vector3(...a.look), t: 0, start: performance.now() };
-    }
-  } catch { /* storage blocked: no arrival blend */ }
-  const veil = document.createElement('div');
-  veil.className = 'warp-veil';
-  if (arrival) veil.classList.add('is-on');
-  document.body.append(veil);
-  requestAnimationFrame(() => requestAnimationFrame(() => veil.classList.remove('is-on')));
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    composer?.setSize(w, h);
+    camera.aspect = w / h;
+    lastShift = null;   // the frame sets the view offset
+    if (reducedMotion) frame(0, 0);
+  }
 
   // pointer: a ray from the camera; swipe velocity measured on the plane through what the camera looks at
   const ndc = new THREE.Vector2(9, 9), raycaster = new THREE.Raycaster(), plane = new THREE.Plane();
@@ -189,48 +174,32 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
   }, { passive: true });
   document.addEventListener('pointerleave', () => { ndc.set(9, 9); hasHit = false; });
 
-  // the tour: scroll past the end of the page to fly to the next page's spot
-  const tour = next ? nextStop(next, reducedMotion ? null : (href) => depart(href)) : null;
-  let leaving = null;
-  const currentLook = new THREE.Vector3();
-  function depart(href) {
-    if (leaving) return;
-    const a = arrivalPose(STATIONS[pageOf(href)] || station);
-    leaving = { href, t: 0, start: performance.now(), from: { pos: camera.position.clone(), look: currentLook.clone() }, to: { pos: new THREE.Vector3(...a.pos), look: new THREE.Vector3(...a.look) } };
-    try { sessionStorage.setItem(ARRIVAL_KEY, JSON.stringify({ page: pageOf(href), at: Date.now() })); } catch { /* fine */ }
-  }
+  // the tour: keep scrolling at the bottom of a page to fly to the next page's spot
+  const tour = createTour((href) => go(href));
 
   const tmp = new THREE.Vector3(), rel = new THREE.Vector3();
   const clock = new THREE.Clock();
   function frame(time, dt) {
+    if (!keys.length) return;
     if (!reducedMotion) progress += (target - progress) * Math.min(1, dt * 4.2);
     const p = pose(progress);
     let pos = p.pos, look = p.look;
-    if (arrival && arrival.t < 1) {
-      arrival.t = Math.min(1, (performance.now() - arrival.start) / 1400);   // wall-clock: the same on slow devices
-      const u = smooth(arrival.t);
-      pos = arrival.pos.clone().lerp(pos, u);
+    if (arrival) {   // flying in from the last page's viewpoint, in an arc
+      const t = Math.min(1, (performance.now() - arrival.start) / arrival.duration);   // wall-clock: the same on slow devices
+      const u = smooth(t);
+      pos = arrival.pos.clone().lerp(pos, u).add(tmp.set(0, Math.sin(u * Math.PI) * arrival.arc, 0));
       look = arrival.look.clone().lerp(look, u);
+      camera.fov = 50 + Math.sin(u * Math.PI) * arrival.swell;
+      lastShift = null;
+      if (t >= 1) { arrival = null; camera.fov = 50; }
     }
-    // a preview of the flight while the reader keeps scrolling at the bottom, then the flight itself
-    const pull = tour ? tour.pull() : 0;
-    if (pull && !leaving) {
+    const pull = next && !reducedMotion ? tour.pull() : 0;   // a preview of the flight while the reader keeps scrolling
+    if (pull) {
       const a = arrivalPose(STATIONS[pageOf(next.href)] || station);
       pos = pos.clone().lerp(new THREE.Vector3(...a.pos), pull * 0.18);
       look = look.clone().lerp(new THREE.Vector3(...a.look), pull * 0.25);
     }
-    if (leaving) {
-      leaving.t = Math.min(1, (performance.now() - leaving.start) / 1500);
-      const u = smooth(leaving.t);
-      pos = leaving.from.pos.clone().lerp(leaving.to.pos, u).add(tmp.set(0, Math.sin(u * Math.PI) * 6, 0));
-      look = leaving.from.look.clone().lerp(leaving.to.look, u);
-      camera.fov = 50 + Math.sin(u * Math.PI) * 18;
-      lastShift = null;
-      if (leaving.t > 0.82) veil.classList.add('is-on');
-      if (leaving.t >= 1 && !leaving.gone) { leaving.gone = true; location.href = leaving.href; }
-    }
-    // the scene sits to the right of hero text, centred on stages
-    const sh = small() ? 0 : p.shift;
+    const sh = small() ? 0 : p.shift;   // the scene sits right of hero text, centred on stages
     if (lastShift === null || Math.abs(sh - lastShift) > 0.0005) {
       const w = window.innerWidth, h = window.innerHeight;
       if (sh) camera.setViewOffset(w, h, -w * sh, 0, w, h); else camera.clearViewOffset();
@@ -243,7 +212,6 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
     camera.lookAt(look);
     currentLook.copy(look);
 
-    // pointer swipe velocity, in world units per second
     let swiping = false;
     if (!reducedMotion && Math.abs(ndc.x) <= 1 && dt > 0) {
       raycaster.setFromCamera(ndc, camera);
@@ -256,8 +224,10 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
     if (!swiping) swipe.multiplyScalar(0.8);
     const speed = swipe.length();
     const origin = raycaster.ray.origin, dir = raycaster.ray.direction;
+    // after a page change the springs are stiffer and faster, so the particles stream to the new spot
+    const boost = Math.max(0, 1 - (performance.now() - boostStart) / 2600);
+    const stiff = STIFFNESS + boost * 6, damp = DAMPING + boost * 2.2, maxSpeed = MAX_SPEED + boost * 80;
 
-    // per particle: home on the morphing shape, plus a sprung offset that a swipe kicks
     const morph = p.morph, seg = Math.min(Math.floor(morph), 1), local = morph - seg;
     const from = seg < 1 ? home[0] : home[1], to = seg < 1 ? home[1] : home[2];
     const t6 = time * 0.6;
@@ -273,7 +243,6 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
         hz += (Math.sin(qx * 0.7 - t6) + Math.sin(qy * 0.5 + t6 * 0.9)) * s;
       }
       hx += Math.sin(time * 0.7 + r2 * 6.28) * 0.05; hy += Math.cos(time * 0.6 + r3 * 6.28) * 0.05; hz += Math.sin(time * 0.5 + r1 * 6.28) * 0.05;
-
       let ox = offset[i3], oy = offset[i3 + 1], oz = offset[i3 + 2];
       let vx = velocity[i3], vy = velocity[i3 + 1], vz = velocity[i3 + 2];
       if (speed > 0.5 && dt > 0) {
@@ -291,8 +260,8 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
         }
       }
       const v2 = vx * vx + vy * vy + vz * vz;
-      if (v2 > MAX_SPEED * MAX_SPEED) { const c = MAX_SPEED / Math.sqrt(v2); vx *= c; vy *= c; vz *= c; }
-      vx += (-STIFFNESS * ox - DAMPING * vx) * dt; vy += (-STIFFNESS * oy - DAMPING * vy) * dt; vz += (-STIFFNESS * oz - DAMPING * vz) * dt;
+      if (v2 > maxSpeed * maxSpeed) { const c = maxSpeed / Math.sqrt(v2); vx *= c; vy *= c; vz *= c; }
+      vx += (-stiff * ox - damp * vx) * dt; vy += (-stiff * oy - damp * vy) * dt; vz += (-stiff * oz - damp * vz) * dt;
       ox += vx * dt; oy += vy * dt; oz += vz * dt;
       offset[i3] = ox; offset[i3 + 1] = oy; offset[i3 + 2] = oz;
       velocity[i3] = vx; velocity[i3 + 1] = vy; velocity[i3 + 2] = vz;
@@ -310,48 +279,65 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
 
   window.addEventListener('resize', resize);
   window.addEventListener('scroll', readScroll, { passive: true });
+  new ResizeObserver(() => { resolveKeys(); readScroll(); }).observe(document.body);
   resize();
-  readScroll();
-  if (reducedMotion) frame(0, 0);
-  else {
-    let last = 0;
-    renderer.setAnimationLoop(() => {
-      const time = clock.getElapsedTime();
-      frame(time, Math.min(1 / 30, time - last));
-      last = time;
-    });
-  }
-  return {
-    // swap a formation later (for example after the reader picks another player)
+
+  const api = {
+    started: false,
+    // point the running scene at a page: its spot, shapes, colours, camera path and next stop
+    apply({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight: sr = 0.2, next: nx = null }, transition) {
+      station = STATIONS[pageOf(location.href)] || [0, 0, 0];
+      shiftRight = sr;
+      next = nx;
+      [0, 1, 2].forEach((i) => resample(formations[Math.min(i, formations.length - 1)], home[i], i));
+      uniforms.uColorA.value.set(palette[0]); uniforms.uColorB.value.set(palette[1]); uniforms.uColorC.value.set(palette[2]);
+      uniforms.uSpark.value.set(spark); uniforms.uAlt.value.set(alt);
+      keys = keyframes.map((k) => ({ ...k, shift: k.shift ?? shiftRight, anchor: typeof k.at === 'string' ? k.at : null, pos: shift(k.pos), look: shift(k.look) }));
+      resolveKeys();
+      readScroll();
+      progress = target;
+      tour.card(next);
+      if (transition && !reducedMotion) {
+        // fly from where the camera is; particles keep their places and stream to the new shape
+        arrival = { pos: camera.position.clone(), look: currentLook.clone(), start: performance.now(), duration: 1700, arc: 5, swell: 12 };
+        for (let i = 0; i < n * 3; i++) { offset[i] = position[i] - home[0][i]; velocity[i] = 0; }
+        boostStart = performance.now();
+      } else if (!transition) {
+        position.set(home[0]);
+      }
+      if (!api.started) {
+        api.started = true;
+        if (reducedMotion) frame(0, 0);
+        else {
+          let last = 0;
+          renderer.setAnimationLoop(() => {
+            const time = clock.getElapsedTime();
+            frame(time, Math.min(1 / 30, time - last));
+            last = time;
+          });
+        }
+      } else if (reducedMotion) frame(0, 0);
+    },
+    // swap one shape later (for example after the reader picks another player)
     setFormation(index, formation) {
-      const { out, outTags } = resample(formation);
-      home[index].set(out);
-      outTags.forEach((t, i) => { tag[i * 3 + index] = t; });
-      tagAttr.needsUpdate = true;
+      resample(formation, home[index], index);
       if (reducedMotion) frame(0, 0);
     },
   };
+  return api;
 }
 
 /* The next stop: a card at the very bottom of the page. Keep scrolling (wheel or touch) at the bottom
    and its ring fills; full, the camera flies to the next page. Clicking it does the same. */
-function nextStop(next, onDepart) {
-  const page = document.querySelector('.page') || document.body;
-  const card = document.createElement('a');
-  card.className = 'next-stop liquid';
-  card.href = next.href;
-  card.innerHTML = `<svg class="next-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19"/><circle class="fill" cx="22" cy="22" r="19" pathLength="1"/></svg>
-    <span><small>${onDepart ? 'Keep scrolling to fly to' : 'Next stop'}</small><strong>${next.label}</strong></span>`;
-  page.append(card);
-  if (!onDepart) return null;
-  card.addEventListener('click', (e) => { e.preventDefault(); card.classList.add('is-going'); onDepart(next.href); });
+function createTour(onDepart) {
   const NEED = 900;
-  let charge = 0, lastInput = 0, touchY = null;
+  let charge = 0, lastInput = 0, touchY = null, lastPull = performance.now(), current = null, ring = null, el = null;
   const atBottom = () => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
   const feed = (amount) => {
+    if (!current || reducedMotion) return;
     charge = Math.min(NEED, charge + amount);
     lastInput = performance.now();
-    if (charge >= NEED && !card.classList.contains('is-going')) { card.classList.add('is-going'); onDepart(next.href); }
+    if (charge >= NEED && !el.classList.contains('is-going')) { el.classList.add('is-going'); onDepart(current.href); }
   };
   window.addEventListener('wheel', (e) => { if (atBottom() && e.deltaY > 0) feed(e.deltaY * (e.deltaMode === 1 ? 33 : 1)); }, { passive: true });
   window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
@@ -360,16 +346,28 @@ function nextStop(next, onDepart) {
     const d = touchY - e.touches[0].clientY;
     if (d > 0) { feed(d * 2.2); touchY = e.touches[0].clientY; }
   }, { passive: true });
-  const ring = card.querySelector('.fill');
-  let lastPull = performance.now();
   return {
+    card(next) {
+      document.querySelector('.next-stop')?.remove();
+      current = next; charge = 0; el = null; ring = null;
+      if (!next) return;
+      const page = document.querySelector('.page') || document.body;
+      el = document.createElement('a');
+      el.className = 'next-stop liquid';
+      el.href = next.href;
+      el.innerHTML = `<svg class="next-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19"/><circle class="fill" cx="22" cy="22" r="19" pathLength="1"/></svg>
+        <span><small>${reducedMotion ? 'Next stop' : 'Keep scrolling to fly to'}</small><strong>${next.label}</strong></span>`;
+      page.append(el);
+      ring = el.querySelector('.fill');
+    },
     pull() {
+      if (!el) return 0;
       const now = performance.now();
-      if (now - lastInput > 450 && !card.classList.contains('is-going')) charge *= Math.pow(0.9, (now - lastPull) / 16.7);   // eases back in about a second
+      if (now - lastInput > 450 && !el.classList.contains('is-going')) charge *= Math.pow(0.9, (now - lastPull) / 16.7);   // eases back in about a second
       lastPull = now;
       const pull = charge / NEED;
       ring.style.strokeDashoffset = String(1 - pull);
-      card.style.setProperty('--pull', pull.toFixed(3));
+      el.style.setProperty('--pull', pull.toFixed(3));
       return pull;
     },
   };

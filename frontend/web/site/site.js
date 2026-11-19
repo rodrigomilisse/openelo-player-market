@@ -1,5 +1,6 @@
 // Shared shell for every page: header with search, mock-data note, waitlist footer, formatters, chart.
 import { search, isMock } from './api.js';
+import { install } from './router.js';
 
 export const number = new Intl.NumberFormat('en-GB');
 export const signed = (v) => (v > 0 ? `+${number.format(v)}` : v < 0 ? `−${number.format(-v)}` : '0');
@@ -19,8 +20,11 @@ const NAV = [
 ];
 
 export function shell() {
-  const here = location.pathname.split('/').pop() || 'index.html';
+  install();
   const header = document.querySelector('[data-shell="header"]');
+  if (header.dataset.ready) return;   // a page change without reload: the header and footer stay
+  header.dataset.ready = '1';
+  const here = location.pathname.split('/').pop() || 'index.html';
   header.className = 'site-header liquid';
   document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <filter id="liquid-refraction" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
