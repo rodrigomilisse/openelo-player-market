@@ -13,7 +13,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addStadium } from '../design/stadium.js';
-import { go } from './router.js';
+import { go, rememberScene, prefetch } from './router.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => window.innerWidth <= 860;
@@ -58,6 +58,7 @@ const STIFFNESS = 2.4, DAMPING = 2.3, SWIPE = 0.14, PUSH = 3.2, RADIUS = 1.9, MA
 let world = null;   // one scene for the whole visit: pages re-target it instead of rebuilding it
 
 export function immersive(options) {
+  rememberScene(options);
   if (!world) world = createWorld(options);
   if (world) world.apply(options, world.started);
   return world;
@@ -366,6 +367,7 @@ function createTour(onDepart) {
       if (now - lastInput > 450 && !el.classList.contains('is-going')) charge *= Math.pow(0.9, (now - lastPull) / 16.7);   // eases back in about a second
       lastPull = now;
       const pull = charge / NEED;
+      if (pull > 0.2) prefetch(current.href);   // the reader is heading there: fetch it now
       ring.style.strokeDashoffset = String(1 - pull);
       el.style.setProperty('--pull', pull.toFixed(3));
       return pull;
