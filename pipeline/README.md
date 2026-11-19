@@ -40,6 +40,28 @@ season still in progress. A response that reports an error is not stored.
 League ids: Premier League 39, LaLiga 140, Serie A 135, Bundesliga 78, Ligue 1 61,
 Champions League 2, Europa League 3, Conference League 848.
 
+## Ratings
+
+```
+python rate.py                # team and player ratings, as of the day after the last finished match
+python rate.py --teams-only
+python rate.py --as-of 2025-01-01
+```
+
+`rate.py` runs the research models unchanged (`research/teamelo.py`,
+`research/player_v2.py`) with the current candidate's constants. `store_pg.py` gives
+them the research store's interface over this database, so they never see the
+provider's format. Each run appends a snapshot to `rating.snapshots`, with
+`rating.team_ratings` and `rating.player_ratings`; nothing is overwritten.
+
+- The first season in the data is the burn-in: every team starts at 1500 there
+  (`teamelo.BURN_IN_BEFORE`). Ratings from it are not meant for publishing.
+- Snapshots are provisional floats; nothing settles money on them. The exact integer
+  port is rating-service's job (ADR-0018).
+- National-team points are 0 until national results are added.
+- This imports from `research/`, which its README describes as never imported; the
+  quick path accepts that until rating-service exists.
+
 ## Free plan
 
 100 requests a day, 10 a minute, **seasons 2022 to 2024 only** (no current season),

@@ -34,6 +34,7 @@ STAGES = [
 FIT_SEASONS = range(2014, 2019)
 TEST_SEASONS = range(2019, 2026)
 MIN_PRIOR_MATCHES = 20
+BURN_IN_BEFORE = 2013   # teams first seen in a season before this one start at INITIAL_RATING
 
 
 @dataclass(frozen=True)
@@ -250,7 +251,7 @@ def run(matches: list[Match], constants: TeamConstants, burn_in_seed: bool = Tru
             seeds = {}
             for team in (match.home, match.away):
                 if team not in states:
-                    rating = INITIAL_RATING if match.season < 2013 and burn_in_seed else seeder.seed(match, states)
+                    rating = INITIAL_RATING if match.season < BURN_IN_BEFORE and burn_in_seed else seeder.seed(match, states)
                     states[team] = TeamState(rating, constants.initial_variance, match.day, 0)
                     seeds[team] = rating
             prediction = predict(match, states, constants)
