@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenElo: this week's player ratings</title>
+<meta name="description" content="Open player ratings from match results and minutes. Who rose and who fell this matchday.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .week-hero { padding-block: clamp(24px, 6vw, 72px) 8px; display: grid; gap: 16px; max-width: 980px }
+  .week-hero .when { margin: 0; color: var(--muted); font-size: 19px }
+  .story { display: grid; gap: 10px; max-width: 760px; margin-top: 8px }
+  .story h2 { font-size: clamp(34px, 4.4vw, 60px) }
+  .story h2 a { text-decoration: none }
+  .story h2 a:hover { color: var(--elo) }
+  .story p { margin: 0; color: var(--muted); font-size: 19px }
+  .story .story-figure { font-family: var(--display); font-weight: 900; font-style: italic; font-size: clamp(64px, 8vw, 120px); line-height: 0.8; color: var(--up) }
+  .explain-strip { margin-top: clamp(28px, 5vw, 56px); color: var(--muted); max-width: 70ch }
+  .explain-strip a { color: var(--elo) }
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="week-hero" aria-labelledby="week-title">
+      <p class="when" data-field="when"></p>
+      <h1 id="week-title" data-field="title">This week</h1>
+      <article class="story" data-field="story"></article>
+    </section>
+
+    <div class="grid-2">
+      <section class="glass-panel" aria-labelledby="risers-title">
+        <h2 id="risers-title">Biggest risers</h2>
+        <ol class="rows" data-field="risers"></ol>
+      </section>
+      <section class="glass-panel" aria-labelledby="fallers-title">
+        <h2 id="fallers-title">Biggest fallers</h2>
+        <ol class="rows" data-field="fallers"></ol>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="glass-panel" aria-labelledby="top-title">
+        <div class="section-head"><h2 id="top-title">The top ten</h2><a class="button" href="rankings.html">Full rankings</a></div>
+        <ol class="rows" data-field="top"></ol>
+      </section>
+      <section class="glass-panel" aria-labelledby="clubs-title">
+        <div class="section-head"><h2 id="clubs-title">Clubs that moved</h2><a class="button" href="leagues.html">All leagues</a></div>
+        <ol class="rows" data-field="clubs"></ol>
+      </section>
+    </div>
+
+    <p class="explain-strip">OpenElo rates every player from match results and minutes played: his club's rating, plus what he adds by starting, scoring and being picked for his country. <a href="how.html">How it works</a></p>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { getWeek } from './api.js';
+  import { shell, field, number, signed, direction, longDate, escape, playerUrl, clubUrl, moverRow } from './site.js';
+  shell();
+  const w = await getWeek();
+  field('when').textContent = `Matchday ${w.matchday}, ratings as of ${longDate(w.asOf)}`;
+  field('title').textContent = `Matchday ${w.matchday}`;
+  const star = w.risers[0];
+  field('story').innerHTML = `<span class="story-figure">${signed(star.change)}</span>
+    <h2><a href="${playerUrl(w.story.playerId)}">${escape(w.story.title)}</a></h2><p>${escape(w.story.text)}</p>`;
+  field('risers').innerHTML = w.risers.map((r) => moverRow(r)).join('');
+  field('fallers').innerHTML = w.fallers.map((r) => moverRow(r)).join('');
+  field('top').innerHTML = w.top.map((r, i) => moverRow({ ...r, note: `#${i + 1}` })).join('');
+  field('clubs').innerHTML = w.clubs.map((c) => `<li class="mover"><a href="${clubUrl(c.id)}">${escape(c.name)}</a><small>${escape(c.note)}</small>
+    <span class="e">${number.format(c.rating)}</span><span class="c ${direction(c.change)}">${signed(c.change)}</span></li>`).join('');
+</script>
+</body>
+</html>

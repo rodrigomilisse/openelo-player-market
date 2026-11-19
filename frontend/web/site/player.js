@@ -1,46 +1,38 @@
-// Player page. Reads one player in the read-API shape (see README.md) and renders it.
+// Player page: the rating as an equation, his season against his club's, what a move would do.
 import { THREE, COLOR, createStage, addStadium, addRibbon, glowSprite, scrollTracker, pointerTracker, smoothstep, reducedMotion } from '../design/stadium.js';
+import { getPlayer, getClubs } from './api.js';
+import { shell, field, param, number, signed, direction, shortDate, longDate, escape, clubUrl, playerUrl, lineChart, notFound } from './site.js';
 
-const params = new URLSearchParams(location.search);
-const id = (params.get('id') || 'tiago-mendonca').replace(/[^a-z0-9-]/g, '');
-const field = (name) => document.querySelector(`[data-field="${name}"]`);
-const number = new Intl.NumberFormat('en-GB');
-const signed = (v) => (v > 0 ? `+${number.format(v)}` : v < 0 ? `−${number.format(-v)}` : '0');
-const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
-const longDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-const asDate = (iso) => new Date(`${iso}T12:00:00Z`);
-
-const response = await fetch(`data/players/${id}.json`);
-if (!response.ok) {
-  field('name').textContent = 'Player not found';
-  field('identity').textContent = 'No player has this address. Check the link, or find him in the rankings.';
-  throw new Error(`player ${id}: ${response.status}`);
+shell();
+const player = await getPlayer((param('id') || 'tiago-mendonca').replace(/[^a-z0-9-]/g, ''));
+if (!player) {
+  document.querySelector('.nameplate')?.remove();
+  document.body.classList.remove('player-page');
+  notFound('player');
+} else {
+  render(player);
+  buildScene(player);
 }
-const player = await response.json();
-render(player);
-buildScene(player);
 
 function render(p) {
   document.title = `${p.name}: ${number.format(p.rating)} OpenElo`;
-  field('sample').hidden = !p.sample;
   field('surname').textContent = p.shortName;
   fitSurname();
-  field('identity').textContent = `${p.club.name}, ${p.position.toLowerCase()}, ${p.age}`;
+  field('identity').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}, ${p.age}, ${escape(p.nation)}`;
   field('name').textContent = p.name;
   field('legend-player').textContent = p.shortName;
   field('legend-club').textContent = p.club.name;
-  field('waitlist-title').textContent = `Back ${p.shortName}'s rating when the market opens`;
-  field('formula').textContent = `Rated with ${p.formula}, as of ${longDate.format(asDate(p.asOf))}.`;
-  field('footer').textContent = 'OpenElo rates players from public match results and minutes played. '
-    + 'Ratings are not a valuation, a transfer fee or an offer of anything.';
+  field('compare-link').href = `compare.html?a=${p.id}`;
+  field('formula').textContent = `Rated with ${p.formula}, as of ${longDate(p.asOf)}.`;
   renderEquation(p);
   renderRanks(p);
-  renderChart(p);
+  renderSeason(p);
+  renderTransfer(p);
+  renderPrice(p);
   renderMatches(p, 10);
   renderHow(p);
   renderNeighbours(p);
   wireShare(p);
-  wireWaitlist();
 }
 
 /* The surname fills the nameplate's height (desktop) without running off it. */
@@ -49,43 +41,43 @@ function fitSurname() {
   const fit = () => {
     el.style.fontSize = '';
     if (window.innerWidth <= 860) return;
-    const plate = el.parentElement.getBoundingClientRect();
     const size = parseFloat(getComputedStyle(el).fontSize);
-    const room = plate.height * 0.94;
+    const room = el.parentElement.getBoundingClientRect().height * 0.94;
     el.style.fontSize = `${Math.min(size, size * (room / el.offsetHeight))}px`;   // vertical text: its length is its height
   };
   document.fonts.ready.then(fit);
   window.addEventListener('resize', fit);
 }
 
+function partValue(part, i) { return i === 0 ? number.format(part.value) : signed(part.value); }
+
 /* The equation: club + what he adds = OpenElo. Each part explains itself. */
 function renderEquation(p) {
   const list = field('parts');
   const explain = field('explain');
-  const defaultText = `Tap a number to see where it comes from. Together they make <strong>${number.format(p.rating)}</strong>.`;
-  explain.innerHTML = defaultText;
+  const idle = `Tap a number to see where it comes from. Together they make <strong>${number.format(p.rating)}</strong>.`;
+  explain.innerHTML = idle;
   list.replaceChildren(...p.parts.map((part, i) => {
     const li = document.createElement('li');
     li.className = 'part';
     li.dataset.key = part.key;
     li.dataset.sign = part.value < 0 ? 'minus' : 'plus';
+    if (part.value === 0) li.dataset.zero = '';
     li.style.setProperty('--i', i);
-    const shown = i === 0 ? number.format(part.value) : signed(part.value);
-    li.innerHTML = `<button type="button" aria-pressed="false"><span class="part-value" data-to="${part.value}" data-first="${i === 0}">${shown}</span>`
-      + `<span class="part-label">${part.label}</span></button>`;
+    li.innerHTML = `<button type="button" aria-pressed="false"><span class="part-value" data-to="${part.value}" data-first="${i === 0}">${partValue(part, i)}</span>`
+      + `<span class="part-label">${escape(part.label)}</span></button>`;
     li.querySelector('button').addEventListener('click', (event) => {
       const button = event.currentTarget;
       const pressed = button.getAttribute('aria-pressed') === 'true';
       list.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', 'false'));
       button.setAttribute('aria-pressed', String(!pressed));
-      explain.innerHTML = pressed ? defaultText : `<strong>${part.label}, ${i === 0 ? number.format(part.value) : signed(part.value)}.</strong> ${part.explain}`;
+      explain.innerHTML = pressed ? idle : `<strong>${escape(part.label)}, ${partValue(part, i)}.</strong> ${escape(part.explain)}`;
     });
     return li;
   }));
   document.querySelector('.total').style.setProperty('--i', p.parts.length);
   const total = field('rating');
   total.textContent = number.format(p.rating);
-
   const equation = document.querySelector('.equation');
   if (reducedMotion) { equation.classList.add('is-in'); return; }
   // One orchestrated moment: the parts count up in turn, then the total lands.
@@ -112,107 +104,111 @@ function countUp(el, to, delay, duration, format) {
 function renderRanks(p) {
   const rows = [
     [`#${number.format(p.rank.world)}`, `of ${number.format(p.rank.worldOf)}`, 'in the world'],
-    [`#${p.rank.position}`, '', `of ${number.format(p.rank.positionOf)} ${p.position.toLowerCase()} players`],
+    [`#${p.rank.position}`, '', `of ${number.format(p.rank.positionOf)} ${p.position.toLowerCase()}s`],
+    [`#${p.rank.club}`, '', `at ${p.club.name}`],
     [signed(p.change.season), '', 'this season'],
   ];
   field('ranks').replaceChildren(...rows.map(([value, small, label]) => {
     const div = document.createElement('div');
-    div.innerHTML = `<dt>${label}</dt><dd>${value}${small ? ` <small>${small}</small>` : ''}</dd>`;
+    div.innerHTML = `<dt>${escape(label)}</dt><dd>${value}${small ? ` <small>${small}</small>` : ''}</dd>`;
     return div;
   }));
 }
 
-/* Season chart: his rating against his club's, the gap shaded, moments pinned. */
-function renderChart(p) {
-  const svg = document.querySelector('.chart-svg');
-  const readout = field('readout');
-  const h = p.history;
-  const lo = Math.min(...h.map((d) => d.clubRating)) - 20;
-  const hi = Math.max(...h.map((d) => d.rating)) + 20;
-  const first = h[0];
-  const last = h[h.length - 1];
-  field('chart-summary').textContent = `${p.shortName}'s rating went from ${first.rating} to ${last.rating} this season; `
-    + `${p.club.name}'s from ${first.clubRating} to ${last.clubRating}.`;
+function matchTitle(m) { return `${m.goalsFor}–${m.goalsAgainst} ${m.home ? 'vs' : 'at'} ${m.opponent}`; }
 
-  function draw() {
-    const width = svg.clientWidth;
-    const height = svg.clientHeight;
-    const pad = { l: 44, r: 12, t: 26, b: 28 };
-    const x = (i) => pad.l + (i / (h.length - 1)) * (width - pad.l - pad.r);
-    const y = (v) => pad.t + (1 - (v - lo) / (hi - lo)) * (height - pad.t - pad.b);
-    const path = (key) => h.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`).join('');
-    const gap = `${path('rating')}${h.map((d, i) => `L${x(h.length - 1 - i).toFixed(1)},${y(h[h.length - 1 - i].clubRating).toFixed(1)}`).join('')}Z`;
-    const step = (hi - lo) > 300 ? 100 : 50;
-    const ticks = [];
-    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
-    const months = h.map((d, i) => [i, asDate(d.date)]).filter(([i, d], k, all) => k === 0 || d.getUTCMonth() !== all[k - 1][1].getUTCMonth());
-    const moments = (p.moments || []).map((m) => [h.findIndex((d) => d.date === m.date), m]).filter(([i]) => i >= 0);
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    svg.innerHTML = `
-      <defs><linearGradient id="gapFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#FFD66B" stop-opacity="0.22"/><stop offset="1" stop-color="#FFD66B" stop-opacity="0.04"/></linearGradient></defs>
-      <g class="grid">${ticks.map((v) => `<line x1="${pad.l}" x2="${width - pad.r}" y1="${y(v)}" y2="${y(v)}"/><text x="${pad.l - 8}" y="${y(v) + 4}" text-anchor="end">${number.format(v)}</text>`).join('')}</g>
-      <g class="axis">${months.map(([i, d]) => `<text x="${x(i)}" y="${height - 6}" text-anchor="${i === 0 ? 'start' : 'middle'}">${d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}</text>`).join('')}</g>
-      <path class="gap" d="${gap}"/>
-      <path class="club-line" d="${path('clubRating')}"/>
-      <path class="player-line" d="${path('rating')}" pathLength="1"/>
-      ${moments.map(([i, m], k) => `<g class="moment"><line x1="${x(i)}" x2="${x(i)}" y1="${pad.t - 6}" y2="${height - pad.b}"/>
-        <circle cx="${x(i)}" cy="${y(h[i].rating)}" r="4.5"/>
-        <text x="${x(i) + (i > h.length * 0.7 ? -8 : 8)}" y="${pad.t - 10 + (k % 2) * 0}" text-anchor="${i > h.length * 0.7 ? 'end' : 'start'}">${m.text}</text></g>`).join('')}
-      <g class="cursor" visibility="hidden"><line y1="${pad.t}" y2="${height - pad.b}"/><circle r="5"/><circle class="club-dot" r="3.5"/></g>`;
-    const cursor = svg.querySelector('.cursor');
-    const show = (i) => {
+function renderSeason(p) {
+  const h = p.history;
+  const last = h[h.length - 1];
+  field('season-summary').textContent = `${p.shortName}'s rating went from ${h[0].rating} to ${last.rating} this season; ${p.club.name}'s from ${h[0].clubRating} to ${last.clubRating}.`;
+  lineChart(field('season-chart'), field('season-readout'), {
+    dates: h.map((d) => d.date),
+    series: [
+      { label: p.shortName, cls: 'line-player', values: h.map((d) => d.rating), color: '#FFD66B' },
+      { label: p.club.name, cls: 'line-club', values: h.map((d) => d.clubRating), color: '#A9BBD0' },
+    ],
+    band: [0, 1],
+    moments: p.moments,
+    idle: `Point at the chart to read any matchday. Today he adds <strong>${signed(last.rating - last.clubRating)}</strong> to ${escape(p.club.name)}'s ${number.format(last.clubRating)}.`,
+    read: (i) => {
       const d = h[i];
       const m = p.matches[i];
-      cursor.setAttribute('visibility', 'visible');
-      cursor.querySelector('line').setAttribute('x1', x(i));
-      cursor.querySelector('line').setAttribute('x2', x(i));
-      cursor.querySelector('circle').setAttribute('cx', x(i));
-      cursor.querySelector('circle').setAttribute('cy', y(d.rating));
-      cursor.querySelector('.club-dot').setAttribute('cx', x(i));
-      cursor.querySelector('.club-dot').setAttribute('cy', y(d.clubRating));
-      readout.innerHTML = `<strong>${longDate.format(asDate(d.date))}</strong>, ${matchTitle(m)}. `
-        + `${p.shortName} <span class="gold">${number.format(d.rating)}</span> (${signed(m.change)}), `
-        + `${p.club.name} ${number.format(d.clubRating)}: he adds ${signed(d.rating - d.clubRating)}.`;
-    };
-    const pick = (event) => {
-      const box = svg.getBoundingClientRect();
-      const i = Math.round(((event.clientX - box.left - pad.l) / (box.width - pad.l - pad.r)) * (h.length - 1));
-      show(Math.max(0, Math.min(h.length - 1, i)));
-    };
-    svg.onpointermove = pick;
-    svg.onpointerdown = pick;
-    svg.onpointerleave = () => { cursor.setAttribute('visibility', 'hidden'); resetReadout(); };
-  }
-  const resetReadout = () => {
-    readout.innerHTML = `Point at the chart to read any matchday. Today he adds <strong>${signed(last.rating - last.clubRating)}</strong> `
-      + `to ${p.club.name}'s ${number.format(last.clubRating)}.`;
-  };
-  resetReadout();
-  draw();
-  new ResizeObserver(draw).observe(svg);
+      return `<strong>${longDate(d.date)}</strong>, ${escape(matchTitle(m))}. ${escape(p.shortName)} <span class="gold">${number.format(d.rating)}</span> (${signed(m.change)}), `
+        + `${escape(p.club.name)} ${number.format(d.clubRating)}: he adds ${signed(d.rating - d.clubRating)}.`;
+    },
+  });
 }
 
-function matchTitle(m) {
-  const where = m.home ? 'vs' : 'at';
-  return `${m.goalsFor}–${m.goalsAgainst} ${where} ${m.opponent}`;
+/* If he moved: his club's rating is swapped for another club's; selection as chosen; the rest unchanged.
+   Rotation and bench use the selection bonus a typical rotation or bench player gets (400 × share gap). */
+async function renderTransfer(p) {
+  const clubs = await getClubs();
+  const select = field('transfer-club');
+  const byLeague = {};
+  clubs.filter((c) => c.id !== p.club.id).forEach((c) => (byLeague[c.league.name] ||= []).push(c));
+  const rumoured = clubs.filter((c) => p.rumours.includes(c.id));
+  select.innerHTML = (rumoured.length ? `<optgroup label="Rumoured">${rumoured.map((c) => `<option value="${c.id}">${escape(c.name)} (${number.format(c.rating)})</option>`).join('')}</optgroup>` : '')
+    + Object.entries(byLeague).map(([league, list]) => `<optgroup label="${escape(league)}">${list.map((c) => `<option value="${c.id}">${escape(c.name)} (${number.format(c.rating)})</option>`).join('')}</optgroup>`).join('');
+  const strongest = clubs.find((c) => c.id !== p.club.id);
+  select.value = (rumoured[0] || strongest).id;
+  field('rumours').innerHTML = rumoured.length
+    ? `<span>Linked with</span>${rumoured.map((c) => `<button type="button" class="rumour" data-club="${c.id}" aria-pressed="false">${escape(c.name)}</button>`).join('')}`
+    : '';
+  const parts = Object.fromEntries(p.parts.map((x) => [x.key, x.value]));
+  const selectionFor = { same: parts.selection, rotation: Math.min(parts.selection, -110), bench: Math.min(parts.selection, -230) };
+  let role = 'same';
+  const update = () => {
+    const club = clubs.find((c) => c.id === select.value);
+    const selection = selectionFor[role];
+    const rest = parts.goals + parts.national + parts.absence;
+    const projected = club.rating + selection + rest;
+    const change = projected - p.rating;
+    field('transfer-sum').innerHTML = `<span class="club">${number.format(club.rating)}</span><span class="op">${escape(club.name)}</span>`
+      + `<span>${signed(selection)}</span><span class="op">${role === 'same' ? 'as now' : role}</span>`
+      + `<span>${signed(rest)}</span><span class="op">the rest</span><span class="op">=</span>`
+      + `<span class="projected">${number.format(projected)}</span><span class="${direction(change)}">${signed(change)}</span>`
+      + `<small>${change >= 0 ? 'Up' : 'Down'} ${Math.abs(change)} from today's ${number.format(p.rating)}, ${club.rating > p.club.rating ? 'a step up' : 'a step down'} from ${escape(p.club.name)} (${number.format(p.club.rating)}).</small>`;
+    document.querySelectorAll('.rumour').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.club === select.value)));
+  };
+  select.addEventListener('change', update);
+  field('rumours').addEventListener('click', (event) => {
+    const button = event.target.closest('.rumour');
+    if (button) { select.value = button.dataset.club; update(); }
+  });
+  field('transfer-role').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-role]');
+    if (!button) return;
+    role = button.dataset.role;
+    field('transfer-role').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b === button)));
+    update();
+  });
+  update();
+}
+
+function renderPrice(p) {
+  const credits = (v) => `${v.toFixed(2)} cr`;
+  const first = p.price[0].price;
+  const last = p.price[p.price.length - 1].price;
+  lineChart(field('price-chart'), field('price-readout'), {
+    dates: p.price.map((d) => d.date),
+    series: [{ label: 'Price', cls: 'line-price', values: p.price.map((d) => d.price), color: '#5AA9FF' }],
+    format: (v) => v.toFixed(v < 10 ? 2 : 1),
+    idle: `Simulated price today <strong>${credits(last)}</strong>, ${signed(Math.round((last / first - 1) * 100))}% this season.`,
+    read: (i) => `<strong>${shortDate(p.price[i].date)}</strong>: ${credits(p.price[i].price)} a share, rating ${number.format(p.history[i].rating)}.`,
+  });
 }
 
 function renderMatches(p, count) {
-  const list = field('matches');
   const shown = (count === 'all' ? p.matches : p.matches.slice(-count)).slice().reverse();
-  list.replaceChildren(...shown.map((m) => {
+  field('matches').replaceChildren(...shown.map((m) => {
     const li = document.createElement('li');
     li.className = 'match';
     if (!m.listed) li.dataset.out = '';
-    const direction = m.change > 0 ? 'up' : m.change < 0 ? 'down' : 'flat';
     const role = !m.listed ? 'Not in the squad' : m.started ? `Started, ${m.minutes} min` : m.minutes ? `Came on, ${m.minutes} min` : 'Unused substitute';
-    li.innerHTML = `
-      <span class="match-date">${shortDate.format(asDate(m.date))}</span>
-      <span class="match-main"><span class="match-title"><span class="score">${m.goalsFor}–${m.goalsAgainst}</span>${m.home ? 'vs' : 'at'} ${m.opponent}</span>
-        <span class="match-note">${m.note || role}</span></span>
+    li.innerHTML = `<span class="match-date">${shortDate(m.date)}</span>
+      <span class="match-main"><span class="match-title"><span class="score">${m.goalsFor}–${m.goalsAgainst}</span>${m.home ? 'vs' : 'at'} ${escape(m.opponent)}<span class="match-note">${escape(m.note || role)}</span></span></span>
       <span class="minutes" aria-label="${role}"><span>${m.listed ? `${m.minutes}′` : 'Out'}</span><span class="minutes-bar"><i style="width:${(Math.min(m.minutes, 90) / 90) * 100}%"></i></span></span>
-      <span class="change ${direction}" aria-label="Rating change ${signed(m.change)}">${signed(m.change)}</span>`;
+      <span class="change ${direction(m.change)}" aria-label="Rating change ${signed(m.change)}">${signed(m.change)}</span>`;
     return li;
   }));
   document.querySelectorAll('[data-range]').forEach((button) => {
@@ -224,9 +220,8 @@ function renderMatches(p, count) {
 function renderHow(p) {
   field('how').replaceChildren(...p.parts.map((part, i) => {
     const li = document.createElement('li');
-    const cls = part.key === 'club' ? 'club' : part.value < 0 ? 'minus' : '';
-    li.innerHTML = `<span class="v ${cls}">${i === 0 ? number.format(part.value) : signed(part.value)}</span>`
-      + `<span class="t"><strong>${part.label}.</strong> ${part.explain}</span>`;
+    li.innerHTML = `<span class="v ${part.key === 'club' ? 'club' : part.value < 0 ? 'minus' : ''}">${partValue(part, i)}</span>`
+      + `<span class="t"><strong>${escape(part.label)}.</strong> ${escape(part.explain)}</span>`;
     return li;
   }));
 }
@@ -235,8 +230,7 @@ function renderNeighbours(p) {
   field('neighbours').replaceChildren(...p.neighbours.map((n) => {
     const li = document.createElement('li');
     if (n.id === p.id) li.setAttribute('aria-current', 'true');
-    const name = n.id === p.id ? `<strong>${n.name}</strong>` : `<a href="?id=${n.id}">${n.name}</a>`;
-    li.innerHTML = `<span class="r">#${n.rank}</span><span class="n">${name}<small>${n.club}</small></span><span class="e">${number.format(n.rating)}</span>`;
+    li.innerHTML = `<span class="r">#${n.rank}</span><span class="n">${n.id === p.id ? `<strong>${escape(n.name)}</strong>` : `<a href="${playerUrl(n.id)}">${escape(n.name)}</a>`}<small>${escape(n.club)}</small></span><span class="e">${number.format(n.rating)}</span>`;
     return li;
   }));
 }
@@ -244,9 +238,8 @@ function renderNeighbours(p) {
 function wireShare(p) {
   const button = document.querySelector('[data-action="share"]');
   button.addEventListener('click', async () => {
-    const data = { title: document.title, text: `${p.name} is rated ${number.format(p.rating)} on OpenElo`, url: location.href };
     try {
-      if (navigator.share) { await navigator.share(data); return; }
+      if (navigator.share) { await navigator.share({ title: document.title, text: `${p.name} is rated ${number.format(p.rating)} on OpenElo`, url: location.href }); return; }
       await navigator.clipboard.writeText(location.href);
       button.textContent = 'Link copied';
     } catch {
@@ -256,17 +249,7 @@ function wireShare(p) {
   });
 }
 
-function wireWaitlist() {
-  // No backend yet: the form confirms locally. Wire it to the waitlist endpoint when it exists.
-  const form = document.querySelector('[data-action="waitlist"]');
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    field('waitlist-status').textContent = `You're on the list. We'll email ${form.email.value} when the market opens.`;
-    form.reset();
-  });
-}
-
-/* Behind the page: the night stadium, his rating as a gold ribbon, his club's as a silver one. */
+/* Behind the hero: the night stadium, his rating as a gold ribbon, his club's as a silver one. */
 function buildScene(p) {
   const canvas = document.getElementById('scene');
   let stage;
@@ -280,18 +263,16 @@ function buildScene(p) {
   const STEP = 1.1;
   const ratings = p.history.map((d) => d.rating);
   const clubs = p.history.map((d) => d.clubRating);
-  const lo = Math.min(...clubs) - 40;
-  const hi = Math.max(...ratings) + 40;
+  const lo = Math.min(...clubs, ...ratings) - 40;
+  const hi = Math.max(...ratings, ...clubs) + 40;
   const toY = (v) => -0.6 + ((v - lo) / (hi - lo)) * 6.5;
   const length = (ratings.length - 1) * STEP;
   addStadium(stage, { centerZ: -length / 2, length: length + 10, crowd: 7000 });
   const gold = addRibbon(stage.scene, ratings, { toY, step: STEP, color: COLOR.elo, core: COLOR.eloCore, wiggle: 0.5, radius: 0.07 });
   const club = addRibbon(stage.scene, clubs, { toY, step: STEP, x: -3.2, color: 0xA9BBD0, core: 0xE4ECF5, wiggle: 0.5, radius: 0.035, curtain: false });
-  const now = gold.points[gold.points.length - 1];
   const halo = glowSprite([255, 214, 107], 3.2);
-  halo.position.copy(now);
+  halo.position.copy(gold.points[gold.points.length - 1]);
   stage.scene.add(halo);
-
   const scroll = scrollTracker(0.06);
   const pointer = pointerTracker(0.05);
   const narrow = () => window.innerWidth <= 860;
@@ -304,7 +285,7 @@ function buildScene(p) {
     stage.camera.position.set(5.5 + mouse.x * 1.5, 3 - mouse.y * 0.8, -length - 12 - drift * 6);
     stage.camera.lookAt(0, toY((lo + hi) / 2) + 2, -length * 0.3 - drift * 6);
     // The ribbons belong to the hero: they fade as the reader moves on to the details.
-    const fade = 1 - 0.8 * smoothstep(0.08, 0.3, progress);
+    const fade = 1 - 0.8 * smoothstep(0.06, 0.22, progress);
     gold.setOpacity(fade * (narrow() ? 0.4 : 1));
     club.setOpacity(fade * (narrow() ? 0.35 : 0.9));
     halo.material.opacity = fade * (0.75 + Math.sin(time * 2.2) * 0.2);

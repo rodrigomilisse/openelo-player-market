@@ -1,51 +1,76 @@
-# Public site: player pages
+# Public site
 
-The public OpenElo site: a player's rating, how it is made, and how it moved. No
-trading here; the market's design prototypes are in `../design/`, and this page borrows
-their night-stadium language (and `../design/stadium.js` for the 3D scene).
+The public OpenElo site: player and club ratings, how they are made, and how they moved.
+No trading here; the market's design prototypes are in `../design/`. The site borrows their
+night-stadium language, and `../design/stadium.js` for the player page's 3D scene.
 
 ```sh
 cd frontend/web
-python3 -m http.server 8000   # then open http://localhost:8000/site/player.html
+python3 -m http.server 8000   # then open http://localhost:8000/site/
 ```
 
-`player.html?id=<player-id>` loads `data/players/<player-id>.json`. Today there is one
-fictional sample player (`tiago-mendonca`, the same fictional world as the prototypes);
-the page labels it as a sample.
+## Pages
 
-## The page
+| Page | What it shows |
+|---|---|
+| `index.html` | This week: the matchday's headline mover, biggest risers and fallers, the top ten, clubs that moved |
+| `rankings.html` | Every player: filter by name, league, club, position and age; sort by rating, last match, season, age |
+| `player.html?id=` | The rating as an equation (club + selection + goals and assists + national team − absence), his season against his club's (3D behind the hero, 2D chart), **if he moved** (swap in any club's rating, choose how often he'd play), **market price** (simulated preview), matches, the parts explained, ranking neighbours |
+| `club.html?id=` | Club rating and ranks, **who carries the team** (each player's gap above or below the club), the club's season, results |
+| `compare.html?a=&b=` | Two players side by side: verdict, part by part, both seasons on one chart |
+| `leagues.html` | Leagues by average club rating; each league's clubs by rating against their table position |
+| `how.html` | The formula in plain steps, a worked example, how to check it, questions |
 
-- **The equation** is the one bold element: club rating + what he adds = OpenElo, each
-  part tappable for a plain-language explanation. It assembles once on load (skipped
-  with reduced motion).
-- **Behind the hero**, the 3D scene: his rating as a gold ribbon and his club's as a
-  silver one, seen from today looking back at August, so the season climbs towards the
-  viewer. The ribbons fade once the reader scrolls on.
-- **Season chart**: his rating against his club's, the gap shaded, moments pinned;
-  pointing reads out any matchday.
-- **What moved him**: matches with minutes and rating change (blue up, orange down).
-- **Anyone can check this number**, **Around him in the world rankings**, and the
-  **waitlist** (local confirmation only until a waitlist endpoint exists).
-- No player photos: image rights are an open question, so the vertical surname is the
-  portrait.
+Every page shares `site.js` (header with search, mock-data note, waitlist footer, formatters,
+the line chart) and `site.css` (tokens and components).
 
-## Data contract (the future read API, `GET /players/{id}`)
+## Data: mock today, real later
+
+`api.js` is the only data access. Today it returns `mock.js`: a seeded, fictional world (3
+leagues, 36 clubs, 792 players, one simulated season) generated in the browser, following
+the real formula's structure, so each player's parts sum to his rating. Every page says the
+data is mock. When the rating service publishes real data, each `api.js` function fetches it
+instead; the pages do not change.
+
+Still mock or local even with real ratings, and labelled as such:
+- **Market price** is simulated: the market does not exist yet.
+- **Leagues**: comparing leagues needs European-competition results in the database.
+- **Waitlist** confirms in the browser only, until a waitlist endpoint exists.
+- **If he moved** is a projection: the new club's rating replaces his club's; selection is
+  his current bonus, or a typical rotation (−110) or bench (−230) bonus.
+
+## Data contract (the future read API)
+
+`getPlayer(id)`, `GET /players/{id}`:
 
 | Field | Meaning |
 |---|---|
 | `id`, `name`, `shortName`, `position`, `age`, `nation` | identity |
-| `club` | `{ id, name, rating }`, the club's rating at `asOf` |
+| `club` | `{ id, name, rating, league: { id, name } }`, the club's rating at `asOf` |
 | `rating`, `asOf`, `formula` | the published rating, its date, the rating version |
 | `rank` | `{ world, worldOf, position, positionOf, club, clubOf }` |
 | `change` | `{ lastMatch, season }` in rating points |
 | `parts` | `[{ key, value, label, explain }]`, keys `club`, `selection`, `goals`, `national`, `absence`; values sum to `rating` |
 | `history` | `[{ date, rating, clubRating }]`, one per club match |
 | `matches` | `[{ date, opponent, home, goalsFor, goalsAgainst, listed, started, minutes, goals, assists, note?, change, rating, clubRating }]` |
-| `moments` | `[{ date, kind, text }]`, pinned on the chart (`date` matches a `history` date) |
+| `moments` | `[{ date, kind, text }]`, pinned on the chart |
 | `neighbours` | `[{ rank, id, name, club, rating }]` around him in the world ranking |
-| `sample` | true for fictional data |
+| `rumours` | club ids he is linked with (prefills "if he moved") |
+| `price` | `[{ date, price }]`, market price per share; simulated until the market exists |
 
-The parts map onto the player model (`research/player_v2.py`, `Player.published`):
-team rating after his last match, minutes bonus, national-team points, goal and assist
-points, minus the absence discount. `pipeline/rate.py` (on the development branch)
-stores the total today; exporting the parts and this JSON is the next step there.
+`getClub(id)`: `{ id, name, rating, league, rank: { world, worldOf, league, leagueOf, table, points }, change, history: [{ date, rating }], matches: [{ date, opponent, opponentId, home, goalsFor, goalsAgainst, change, rating }], squad: [{ id, name, position, age, rating, gap, parts, starts, lastMatch }] }`
+
+`getRankings()`: `{ asOf, players: [{ rank, id, name, club, clubId, league, leagueId, position, age, nation, rating, week, season }] }`
+
+`getClubs()`: `[{ id, name, rating, league, rank, week, points }]`, best first.
+
+`getLeagues()`: `{ asOf, leagues: [{ id, name, country, rating, clubs: [{ id, name, rating, week, table, points, gd }] }] }`
+
+`getWeek()`: `{ asOf, matchday, risers, fallers, top, clubs, story: { playerId, title, text } }`
+
+`search(query)`: `[{ kind: 'player' | 'club', id, name, detail, rating }]`
+
+The parts map onto the player model (`research/player_v2.py`, `Player.published`): team
+rating after his last match, minutes bonus, national-team points, goal and assist points,
+minus the absence discount. `pipeline/rate.py` (development branch) stores the total today;
+exporting the parts and these shapes is the next step there.
