@@ -1,0 +1,201 @@
+/* Player page: the night-stadium language, with the rating (gold) at the centre. */
+:root {
+  color-scheme: dark;
+  --night: #060B14;
+  --ink: #E4ECF5;
+  --muted: #93A6BC;
+  --elo: #FFD66B;
+  --club: #A9BBD0;
+  --up: #5AA9FF;
+  --down: #FF9A4D;
+  --glass: rgba(14, 26, 44, 0.62);
+  --glass-edge: rgba(150, 190, 235, 0.16);
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --ui: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --plate: clamp(132px, 17vw, 260px);
+  --gutter: clamp(16px, 4vw, 56px);
+}
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth }
+body { margin: 0; background: var(--night); color: var(--ink); font-family: var(--ui); font-size: 17px; line-height: 1.5;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased }
+a { color: inherit }
+button, input { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--elo); outline-offset: 3px; border-radius: 4px }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0 }
+.grain { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.08; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") }
+
+/* The nameplate: his surname, set vertically, is the portrait. */
+.nameplate { position: fixed; z-index: 2; inset: 0 auto 0 0; width: var(--plate); overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 214, 107, 0.07), rgba(255, 214, 107, 0.015) 70%, transparent);
+  border-right: 1px solid rgba(255, 214, 107, 0.14) }
+.nameplate-surname { position: absolute; left: 50%; bottom: 3vh; writing-mode: vertical-rl; transform: translateX(-50%) rotate(180deg);
+  white-space: nowrap; font-family: var(--display); font-style: italic; font-weight: 900; text-transform: uppercase;
+  font-size: calc(var(--plate) * 0.92); line-height: 0.8; letter-spacing: -0.01em;
+  color: transparent; -webkit-text-stroke: 1.5px rgba(255, 214, 107, 0.72) }
+
+.page { position: relative; z-index: 3; margin-left: var(--plate); padding: 0 var(--gutter) 40px }
+
+.site-header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; padding-block: 18px }
+.logo { font-family: var(--display); font-weight: 800; font-size: 24px; text-decoration: none }
+.site-header nav { display: flex; flex-wrap: wrap; gap: 4px 22px }
+.site-header nav a { color: var(--muted); text-decoration: none; font-weight: 500 }
+.site-header nav a:hover { color: var(--ink) }
+.header-cta { margin-left: auto; text-decoration: none; font-weight: 700; color: var(--night); background: var(--elo);
+  padding: 7px 16px; border-radius: 999px }
+
+/* Hero */
+.hero { min-height: calc(100vh - 72px); min-height: calc(100svh - 72px); display: flex; flex-direction: column; justify-content: center;
+  gap: 18px; padding-block: 24px 48px; max-width: min(700px, 54vw) }
+.sample-note { margin: 0; align-self: flex-start; font-size: 14px; color: var(--muted); border: 1px dashed rgba(147, 166, 188, 0.4);
+  border-radius: 6px; padding: 3px 10px }
+.identity { margin: 0; color: var(--muted); font-size: 19px }
+h1 { margin: 0; font-family: var(--display); font-weight: 900; font-style: italic; text-transform: uppercase;
+  font-size: clamp(54px, 7.6vw, 128px); line-height: 0.84; letter-spacing: -0.01em; text-wrap: balance }
+
+/* The equation: the one bold thing on the page */
+.equation { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px clamp(14px, 2.2vw, 30px); margin-top: 18px }
+.parts { list-style: none; margin: 0; padding: 0; display: contents }
+.part { display: flex; flex-direction: column; align-items: flex-start; gap: 2px }
+.part button { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 4px; padding: 4px 2px; border-radius: 6px }
+.part button:focus-visible { outline: 2px solid var(--elo); outline-offset: 4px }
+.part-value { font-family: var(--display); font-weight: 800; font-size: clamp(32px, 3.3vw, 52px); line-height: 0.9; white-space: nowrap }
+.part-label { font-size: 15px; color: var(--muted); border-bottom: 1px dotted rgba(147, 166, 188, 0.5); white-space: nowrap }
+.part[data-key="club"] .part-value { color: var(--club) }
+.part[data-sign="plus"]:not([data-key="club"]) .part-value { color: var(--ink) }
+.part[data-sign="minus"] .part-value { color: var(--down) }
+.part button[aria-pressed="true"] .part-label, .part button:hover .part-label { color: var(--ink); border-bottom-color: var(--elo) }
+.total { display: flex; align-items: flex-end; gap: clamp(10px, 1.6vw, 22px); padding-left: 4px }
+.equals { font-family: var(--display); font-weight: 500; font-size: clamp(40px, 5vw, 76px); line-height: 0.9; color: var(--muted) }
+.total-value { font-family: var(--display); font-weight: 900; font-style: italic; color: var(--elo);
+  font-size: clamp(76px, 10vw, 164px); line-height: 0.78; text-shadow: 0 0 42px rgba(255, 214, 107, 0.35) }
+.total-label { font-size: 16px; color: var(--elo); padding-bottom: 6px }
+.part-explain { margin: 0; min-height: 3em; max-width: 62ch; color: var(--muted); font-size: 17px }
+.part-explain strong { color: var(--ink); font-weight: 600 }
+
+/* load sequence: parts arrive, then the total */
+.equation .part, .equation .total { opacity: 0; transform: translateY(14px) }
+.equation.is-in .part, .equation.is-in .total { opacity: 1; transform: none;
+  transition: opacity 420ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1); transition-delay: calc(var(--i) * 140ms) }
+
+.hero-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px 40px; margin-top: 10px }
+.ranks { display: flex; flex-wrap: wrap; gap: 14px 36px; margin: 0 }
+.ranks div { display: flex; flex-direction: column }
+.ranks dt { order: 2; color: var(--muted); font-size: 14px }
+.ranks dd { order: 1; margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1 }
+.ranks dd small { font-size: 18px; font-weight: 600; color: var(--muted) }
+.share { background: transparent; border: 1px solid var(--glass-edge); border-radius: 999px; padding: 7px 18px;
+  font-weight: 600; cursor: pointer }
+.share:hover { border-color: rgba(255, 214, 107, 0.5) }
+
+/* Sections */
+main > section, .pair { margin-top: clamp(28px, 5vw, 64px) }
+.glass-panel { background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 14px; padding: clamp(18px, 3vw, 32px);
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3) }
+h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(30px, 3.4vw, 46px); line-height: 0.98; text-wrap: balance }
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 24px }
+.section-lede { margin: 10px 0 0; color: var(--muted); max-width: 70ch }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; font-size: 15px; color: var(--muted) }
+.legend > span { display: inline-flex; align-items: center; gap: 8px }
+.swatch { width: 24px; height: 4px; border-radius: 2px; display: inline-block }
+.swatch-player { background: var(--elo); box-shadow: 0 0 8px var(--elo) }
+.swatch-club { background: var(--club) }
+
+/* Season chart */
+.chart { position: relative; margin: 18px 0 0 }
+.chart-svg { display: block; width: 100%; height: clamp(240px, 32vw, 380px); overflow: visible; touch-action: pan-y }
+.chart-svg .grid line { stroke: rgba(150, 190, 235, 0.09) }
+.chart-svg .grid text, .chart-svg .axis text { fill: var(--muted); font-size: 12px; font-family: var(--ui) }
+.chart-svg .gap { fill: url(#gapFill) }
+.chart-svg .club-line { fill: none; stroke: var(--club); stroke-width: 1.6; opacity: 0.85 }
+.chart-svg .player-line { fill: none; stroke: var(--elo); stroke-width: 2.6; filter: drop-shadow(0 0 6px rgba(255, 214, 107, 0.55)) }
+.chart-svg .moment line { stroke: rgba(228, 236, 245, 0.28); stroke-dasharray: 2 4 }
+.chart-svg .moment circle { fill: var(--night); stroke: var(--ink); stroke-width: 1.5 }
+.chart-svg .moment text { fill: var(--ink); font-size: 12.5px; font-family: var(--ui) }
+.chart-svg .cursor line { stroke: rgba(255, 214, 107, 0.6) }
+.chart-svg .cursor circle { fill: var(--elo) }
+.chart-svg .cursor .club-dot { fill: var(--club) }
+.chart-readout { min-height: 3.2em; margin-top: 10px; color: var(--muted); font-size: 16px }
+.chart-readout strong { color: var(--ink); font-weight: 600 }
+.chart-readout .gold { color: var(--elo); font-weight: 700 }
+
+/* Matches */
+.matches { padding-inline: 2px }
+.seg { display: inline-grid; grid-auto-flow: column; gap: 4px; background: rgba(6, 11, 20, 0.65); padding: 4px; border-radius: 999px;
+  border: 1px solid var(--glass-edge) }
+.seg button { border: 0; background: transparent; padding: 5px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); font-weight: 600 }
+.seg button[aria-checked="true"] { background: rgba(255, 214, 107, 0.16); color: var(--elo) }
+.match-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 2px }
+.match { display: grid; grid-template-columns: 5.2em minmax(0, 1fr) 7em 4.6em; align-items: center; gap: 4px 18px;
+  padding: 12px 16px; border-radius: 10px; background: rgba(10, 19, 33, 0.55) }
+.match:nth-child(odd) { background: rgba(14, 26, 44, 0.62) }
+.match-date { color: var(--muted); font-size: 15px }
+.match-main { min-width: 0 }
+.match-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.match-title .score { font-family: var(--display); font-weight: 800; font-size: 20px; margin-right: 6px }
+.match-note { color: var(--muted); font-size: 15px }
+.minutes { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted) }
+.minutes-bar { height: 4px; border-radius: 2px; background: rgba(150, 190, 235, 0.14); overflow: hidden }
+.minutes-bar i { display: block; height: 100%; background: var(--club) }
+.match[data-out] .match-title { color: var(--muted) }
+.change { justify-self: end; font-family: var(--display); font-weight: 800; font-size: 24px }
+.change.up { color: var(--up) }
+.change.down { color: var(--down) }
+.change.flat { color: var(--muted) }
+
+/* How it works, neighbours */
+.pair { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 28px) }
+.how p { margin: 12px 0 0; max-width: 62ch }
+.how-list { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 10px }
+.how-list li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 14px; align-items: baseline }
+.how-list .v { font-family: var(--display); font-weight: 800; font-size: 22px; text-align: right }
+.how-list .v.club { color: var(--club) }
+.how-list .v.minus { color: var(--down) }
+.how-list .t { color: var(--muted) }
+.how-list .t strong { color: var(--ink); font-weight: 600 }
+.formula { color: var(--muted); font-size: 15px }
+.neighbour-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 2px }
+.neighbour-list li { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; gap: 12px; align-items: baseline;
+  padding: 9px 12px; border-radius: 8px }
+.neighbour-list li[aria-current] { background: rgba(255, 214, 107, 0.12); box-shadow: inset 3px 0 0 var(--elo) }
+.neighbour-list .r { color: var(--muted) }
+.neighbour-list .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.neighbour-list .n a { text-decoration: none; font-weight: 600 }
+.neighbour-list .n a:hover { color: var(--elo) }
+.neighbour-list .n small { color: var(--muted); font-size: 14px; margin-left: 8px }
+.neighbour-list .e { font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--elo) }
+
+/* Waitlist */
+.waitlist { padding: clamp(28px, 5vw, 56px) 0 12px; max-width: 760px }
+.waitlist p { margin: 12px 0 0; color: var(--muted); max-width: 60ch }
+.waitlist-form { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px }
+.waitlist-form input { flex: 1 1 240px; min-width: 0; background: rgba(6, 11, 20, 0.7); border: 1px solid var(--glass-edge);
+  border-radius: 999px; padding: 11px 18px }
+.waitlist-form button { background: var(--elo); color: var(--night); border: 0; border-radius: 999px; padding: 11px 22px; font-weight: 700; cursor: pointer }
+.waitlist-status { min-height: 1.5em; color: var(--elo) }
+
+.site-footer { margin-top: 40px; color: var(--muted); font-size: 14px; max-width: 80ch }
+
+/* Narrow screens: the nameplate becomes a band behind the header */
+@media (max-width: 860px) {
+  :root { --plate: 0px }
+  .nameplate { position: absolute; inset: 0 0 auto 0; width: auto; height: 210px; border-right: 0;
+    border-bottom: 1px solid rgba(255, 214, 107, 0.14) }
+  .nameplate-surname { left: -2%; bottom: -10px; writing-mode: horizontal-tb; transform: none; font-size: 150px }
+  .hero { min-height: auto; padding-top: 96px; max-width: none }
+  .pair { grid-template-columns: minmax(0, 1fr) }
+  .header-cta { padding: 6px 12px; font-size: 15px }
+  .match { grid-template-columns: minmax(0, 1fr) auto; padding: 12px }
+  .match-date { grid-column: 1 / -1; font-size: 14px }
+  .minutes { grid-column: 1; grid-row: 3 }
+  .change { grid-row: 2 / 4; grid-column: 2 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto }
+  .equation .part, .equation .total { opacity: 1; transform: none; transition: none }
+}
