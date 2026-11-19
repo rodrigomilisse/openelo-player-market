@@ -1,5 +1,5 @@
 // Player page: the rating as an equation, his season against his club's, what a move would do.
-import { immersive, curveFormation, sphereFormation, fieldFormation } from './scene.js';
+import { immersive, curveFormation, textFormation, fieldFormation } from './scene.js';
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 import { getPlayer, getClubs } from './api.js';
 import { shell, field, param, number, signed, direction, shortDate, longDate, escape, clubUrl, playerUrl, lineChart, notFound } from './site.js';
@@ -26,6 +26,7 @@ function render(p) {
   field('compare-link').href = `compare.html?a=${p.id}`;
   field('formula').textContent = `Rated with ${p.formula}, as of ${longDate(p.asOf)}.`;
   renderEquation(p);
+  field('stage-rating').innerHTML = `<span class="gold">${number.format(p.rating)}</span>: ${escape(p.club.name)}'s ${number.format(p.club.rating)}, plus <strong>${signed(p.rating - p.club.rating)}</strong> he adds himself.`;
   renderRanks(p);
   renderSeason(p);
   renderTransfer(p);
@@ -252,20 +253,21 @@ function wireShare(p) {
 
 /* Behind the page: his season against his club's in particles (gold and silver) beside the hero, which
    gather into a football mid-page and settle over the pitch at the end. The camera flies with them. */
-function buildScene(p) {
+async function buildScene(p) {
   immersive({
     formations: [
       curveFormation([{ values: p.history.map((d) => d.rating), weight: 1.5 }, { values: p.history.map((d) => d.clubRating), weight: 0.8, alt: true }],
         { from: [-3.5, -0.3, 3], to: [8.5, -0.3, -7], height: 6.2 }),
-      sphereFormation({ center: [0, 3, -2], radius: 3.2 }),
+      await textFormation(number.format(p.rating), { center: [0, 3.2, -2], width: 13 }),
       fieldFormation(),
     ],
-    palette: ['#FFD66B', '#E4ECF5', '#7FA7D8'],
+    palette: ['#FFD66B', '#FFD66B', '#7FA7D8'],
+    next: { href: clubUrl(p.club.id), label: p.club.name },
     keyframes: [
-      { at: 0, morph: 0, pos: [-1.5, 3.2, 21], look: [-1.2, 2.6, -2] },
-      { at: 0.12, morph: 0, pos: [1.5, 3.8, 18], look: [-0.8, 2.6, -2] },
-      { at: 0.38, morph: 1, pos: [2, 3.5, 15], look: [0, 3, -2] },
-      { at: 0.55, morph: 1, pos: [-2.5, 4, 14], look: [0, 3, -2] },
+      { at: 0, morph: 0, pos: [-2, 3.2, 21], look: [-2.2, 2.6, -2] },
+      { at: 0.12, morph: 0, pos: [1, 3.8, 18], look: [-1.8, 2.6, -2] },
+      { at: '#stage-rating', morph: 1, pos: [0, 3.3, 15], look: [0, 2.4, -2], shift: 0 },
+      { at: '#season-title', morph: 1, pos: [-3, 4.6, 17], look: [0, 3, -3] },
       { at: 0.8, morph: 2, pos: [0, 10, 26], look: [0, 0, -12] },
       { at: 1, morph: 2, pos: [-7, 6, 16], look: [0, 1, -22] },
     ],

@@ -62,6 +62,8 @@
       <div class="club-rating"><p class="big" data-field="rating"></p><dl class="facts" data-field="facts"></dl></div>
     </section>
 
+    <section class="stage" id="stage-squad" aria-label="The squad against the club"><p class="stage-caption" data-field="stage-squad"></p></section>
+
     <section class="glass-panel" aria-labelledby="carry-title">
       <div class="section-head"><h2 id="carry-title">Who carries the team</h2>
         <p class="legend"><span><i class="swatch swatch-player"></i>Above the club</span><span><i class="swatch" style="background:rgba(147,166,188,.45)"></i>Below it</span></p></div>
@@ -86,7 +88,7 @@
 </div>
 <script type="module">
   import { getClub } from './api.js';
-  import { immersive, textFormation, columnsFormation, fieldFormation } from './scene.js';
+  import { immersive, curveFormation, columnsFormation, fieldFormation } from './scene.js';
   import { shell, field, param, number, signed, direction, shortDate, longDate, escape, playerUrl, clubUrl, lineChart, notFound } from './site.js';
   shell();
   const c = await getClub((param('id') || 'vale-do-sado-fc').replace(/[^a-z0-9-]/g, ''));
@@ -94,16 +96,16 @@
   else {
     immersive({
       formations: [
-        await textFormation(number.format(c.rating), { center: [0, 3, 0], width: 12 }),
+        curveFormation([{ values: c.history.map((h) => h.rating) }], { from: [-3, -0.3, 3], to: [9, -0.3, -7], height: 6 }),
         columnsFormation(c.squad.slice().sort((a, b) => b.gap - a.gap).map((p) => p.gap), { center: [0, 2.2, -1], width: 16, scale: 0.014 }),
         fieldFormation(),
       ],
-      palette: ['#A9BBD0', '#FFD66B', '#7FA7D8'], alt: '#6E8299',
+      palette: ['#A9BBD0', '#FFD66B', '#7FA7D8'], alt: '#7D90A8', next: { href: `leagues.html#${c.league.id}`, label: c.league.name },
       keyframes: [
-        { at: 0, morph: 0, pos: [-1, 3, 20], look: [-1.5, 3, 0] },
-        { at: 0.1, morph: 0, pos: [1, 3.4, 19], look: [-1, 3, 0] },
-        { at: 0.32, morph: 1, pos: [0, 4.5, 17], look: [0, 2, -1] },
-        { at: 0.6, morph: 1, pos: [-4, 3.5, 14], look: [0, 2, -1] },
+        { at: 0, morph: 0, pos: [-2, 3.2, 21], look: [-2.2, 2.6, -2] },
+        { at: 0.06, morph: 0, pos: [0, 3.6, 19], look: [-1.8, 2.6, -2] },
+        { at: '#stage-squad', morph: 1, pos: [0, 4.2, 15], look: [0, 0.9, -1], shift: 0 },
+        { at: '#carry-title', morph: 1, pos: [-4, 3.8, 15], look: [0, 2, -1] },
         { at: 0.85, morph: 2, pos: [0, 10, 26], look: [0, 0, -12] },
         { at: 1, morph: 2, pos: [6, 6, 16], look: [0, 1, -22] },
       ],
@@ -111,6 +113,8 @@
     document.title = `${c.name}: ${number.format(c.rating)} OpenElo`;
     field('identity').innerHTML = `<a href="leagues.html#${c.league.id}">${escape(c.league.name)}</a>, ratings as of ${longDate(c.asOf)}`;
     field('name').textContent = c.name;
+    const above = c.squad.filter((p) => p.gap > 0).length;
+    field('stage-squad').innerHTML = `Every player against the club's ${number.format(c.rating)}: <span class="gold">${above} above it</span>, ${c.squad.length - above} below.`;
     field('rating').innerHTML = `${number.format(c.rating)}<small>OpenElo</small>`;
     field('facts').innerHTML = [[`#${c.rank.league}`, `by rating in the ${c.league.name}`], [`${c.rank.table}${['st','nd','rd'][c.rank.table - 1] || 'th'}`, `in the table, ${c.rank.points} points`],
       [`#${c.rank.world}`, `of ${c.rank.worldOf} clubs rated`], [signed(c.change.season), 'this season']]

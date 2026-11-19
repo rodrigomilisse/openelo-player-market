@@ -1,12 +1,12 @@
 // The site's living backdrop: the night stadium, with thousands of particles that assemble into each
-// page's data (a rating, a season, a squad), morph as the page scrolls, and part around the pointer.
-// The camera flies a path through the stadium on scroll. Bloom adds the glow.
+// page's data, morph as the page scrolls, and scatter when the pointer swipes through them, drifting
+// back over a few seconds. Every page has its own spot in the stadium; scrolling past the end of a
+// page flies the camera to the next page's spot and opens it there.
 //
-//   immersive({ formations: [A, B, C], keyframes: [{ at, morph, pos, look }], palette, shiftRight })
+//   immersive({ formations: [A, B, C], keyframes: [{ at, morph, pos, look }], palette, alt, next, shiftRight })
 //
-// A formation is a Float32Array of xyz points (any length: it is resampled to the particle count).
-// Build them with textFormation, curveFormation, columnsFormation, sphereFormation, fieldFormation,
-// galaxyFormation. `morph` 0 shows A, 1 shows B, 2 shows C, in between they travel.
+// A formation is a Float32Array of xyz points, or { points, tags } where tag 1 takes the `alt` colour.
+// Positions in formations and keyframes are relative to the page's spot (STATIONS).
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -17,34 +17,32 @@ import { addStadium } from '../design/stadium.js';
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => window.innerWidth <= 860;
 const smooth = (t) => t * t * (3 - 2 * t);
+const clamp01 = (t) => Math.min(1, Math.max(0, t));
+
+// Where each page stands in the stadium (the pitch runs along z, centre circle near z = -12).
+export const STATIONS = {
+  'index.html': [0, 0, -12], 'rankings.html': [0, 0, -40], 'leagues.html': [22, 0, -18],
+  'compare.html': [0, 0, 16], 'how.html': [-22, 0, -18], 'player.html': [10, 0, 2], 'club.html': [-10, 0, 2],
+};
+const pageOf = (href) => (new URL(href, location.href).pathname.split('/').pop() || 'index.html');
+const ARRIVAL_KEY = 'openelo-arrival';
+// The pose every page is approached from: in front of its spot, looking at it.
+const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[2] + 24], look: [station[0], station[1] + 3, station[2]] });
 
 const VERTEX = /* glsl */`
-  attribute vec3 aA; attribute vec3 aB; attribute vec3 aC; attribute vec4 aRand; attribute vec3 aTag;
-  uniform float uMorph; uniform float uTime; uniform vec3 uMouse; uniform float uPush; uniform float uRadius; uniform float uPixelRatio;
+  attribute vec4 aRand; attribute vec3 aTag; attribute vec2 aDyn;
+  uniform float uSeg; uniform float uTime; uniform float uPixelRatio;
   uniform vec3 uColorA; uniform vec3 uColorB; uniform vec3 uColorC; uniform vec3 uSpark; uniform vec3 uAlt;
   varying vec3 vColor; varying float vAlpha;
-  vec3 flow(vec3 p, float t) {   // a cheap swirling field: particles travel on curves, not straight lines
-    return vec3(sin(p.y * 0.9 + t) + sin(p.z * 0.7 - t * 0.8), sin(p.z * 0.8 + t * 1.1) + sin(p.x * 0.6 + t), sin(p.x * 0.7 - t) + sin(p.y * 0.5 + t * 0.9));
-  }
   void main() {
-    // each particle starts its move a little later than the last: the shape dissolves and re-forms
-    float seg = min(floor(uMorph), 1.0);
-    float k = smoothstep(0.0, 1.0, clamp((uMorph - seg) * 1.35 - aRand.x * 0.35, 0.0, 1.0));
-    vec3 p = seg < 1.0 ? mix(aA, aB, k) : mix(aB, aC, k);
-    float travel = sin(k * 3.14159);
-    p += flow(p * 0.35 + aRand.z * 6.0, uTime * 0.6) * travel * (1.2 + aRand.y * 2.0);
-    p += vec3(sin(uTime * 0.7 + aRand.z * 6.28), cos(uTime * 0.6 + aRand.w * 6.28), sin(uTime * 0.5 + aRand.y * 6.28)) * 0.05;
-    vec3 away = p - uMouse;
-    float d = length(away);
-    float push = exp(-d * d / (uRadius * uRadius)) * uPush;
-    p += normalize(away + vec3(0.0001)) * push + vec3(0.0, push * 0.35, 0.0);
-    vec4 view = modelViewMatrix * vec4(p, 1.0);
+    vec4 view = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * view;
-    gl_PointSize = (1.4 + aRand.y * 2.4) * uPixelRatio * (26.0 / -view.z) * (1.0 + push * 0.6);
+    float speed = clamp(aDyn.y, 0.0, 1.0);
+    gl_PointSize = (1.4 + aRand.y * 2.4) * uPixelRatio * (26.0 / -view.z) * (1.0 + speed * 0.9);
     vec3 cA = mix(uColorA, uAlt, aTag.x), cB = mix(uColorB, uAlt, aTag.y), cC = mix(uColorC, uAlt, aTag.z);
-    vec3 base = seg < 1.0 ? mix(cA, cB, k) : mix(cB, cC, k);
-    vColor = mix(base, uSpark, step(0.94, aRand.w) * 0.8);
-    vAlpha = 0.6 + 0.22 * sin(uTime * (0.8 + aRand.w) + aRand.z * 12.0) + 0.2 * travel;
+    vec3 base = uSeg < 1.0 ? mix(cA, cB, aDyn.x) : mix(cB, cC, aDyn.x);
+    vColor = mix(base, uSpark, max(step(0.94, aRand.w) * 0.8, speed * 0.55));
+    vAlpha = 0.6 + 0.22 * sin(uTime * (0.8 + aRand.w) + aRand.z * 12.0) + 0.3 * speed;
   }`;
 const FRAGMENT = /* glsl */`
   varying vec3 vColor; varying float vAlpha;
@@ -54,63 +52,68 @@ const FRAGMENT = /* glsl */`
     gl_FragColor = vec4(vColor, vAlpha * smoothstep(0.5, 0.05, r));
   }`;
 
-export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight = 0.2, count, extras } = {}) {
+// Spring back to the shape, slowly: a swipe scatters particles and they drift home over a few seconds.
+const STIFFNESS = 2.4, DAMPING = 2.3, SWIPE = 0.14, PUSH = 3.2, RADIUS = 1.9, MAX_SPEED = 9;
+
+export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight = 0.2, count, next } = {}) {
+  const here = pageOf(location.href);
+  const station = STATIONS[here] || [0, 0, 0];
   const canvas = document.getElementById('scene');
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   } catch {
     canvas.remove();   // no WebGL: every page works without the scene
+    if (next) nextStop(next, null);
     return null;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, small() ? 1.5 : 2));
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x060B14);
-  scene.fog = new THREE.FogExp2(0x060B14, 0.016);
+  scene.fog = new THREE.FogExp2(0x060B14, 0.014);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
   const updaters = [];
-  const stage = { scene, camera, renderer, onFrame: (fn) => updaters.push(fn) };
-  addStadium(stage, { centerZ: -12, length: 64, crowd: small() ? 5000 : 9000 });
+  addStadium({ scene, camera, renderer, onFrame: (fn) => updaters.push(fn) }, { centerZ: -12, length: 64, crowd: small() ? 5000 : 9000 });
+  scene.traverse((o) => { if (o.isSprite) o.material.opacity *= 0.5; });   // softer floodlights: they bloom through the glass
 
-  // particles
+  // particles: formations resampled to n points, offset to this page's spot
   const n = count || (small() ? 4500 : 9000);
-  const geometry = new THREE.BufferGeometry();
-  // a formation is points, or { points, tags } where tag 1 takes the alternative colour
   const resample = (formation) => {
     const { points, tags } = formation instanceof Float32Array ? { points: formation, tags: null } : formation;
     const out = new Float32Array(n * 3), outTags = new Float32Array(n);
     const len = points.length / 3;
     for (let i = 0; i < n; i++) {
       const j = Math.floor(Math.random() * len);
-      out.set([points[j * 3], points[j * 3 + 1], points[j * 3 + 2]], i * 3);
+      out[i * 3] = points[j * 3] + station[0]; out[i * 3 + 1] = points[j * 3 + 1] + station[1]; out[i * 3 + 2] = points[j * 3 + 2] + station[2];
       outTags[i] = tags ? tags[j] : 0;
     }
     return { out, outTags };
   };
-  const rand = new Float32Array(n * 4).map(() => Math.random());
-  const sampled = [0, 1, 2].map((i) => resample(formations[Math.min(i, formations.length - 1)]));
-  const [A, B, C] = sampled.map((x) => x.out);
+  const shapes = [0, 1, 2].map((i) => resample(formations[Math.min(i, formations.length - 1)]));
+  const home = shapes.map((s) => s.out);
   const tag = new Float32Array(n * 3);
-  sampled.forEach((x, k) => x.outTags.forEach((t, i) => { tag[i * 3 + k] = t; }));
-  geometry.setAttribute('position', new THREE.BufferAttribute(A.slice(), 3));
-  geometry.setAttribute('aA', new THREE.BufferAttribute(A, 3));
-  geometry.setAttribute('aB', new THREE.BufferAttribute(B, 3));
-  geometry.setAttribute('aC', new THREE.BufferAttribute(C, 3));
+  shapes.forEach((s, k) => s.outTags.forEach((t, i) => { tag[i * 3 + k] = t; }));
+  const rand = new Float32Array(n * 4).map(() => Math.random());
+  const position = new Float32Array(n * 3);
+  position.set(home[0]);
+  const offset = new Float32Array(n * 3), velocity = new Float32Array(n * 3), dyn = new Float32Array(n * 2);
+  const geometry = new THREE.BufferGeometry();
+  const positionAttr = new THREE.BufferAttribute(position, 3).setUsage(THREE.DynamicDrawUsage);
+  const dynAttr = new THREE.BufferAttribute(dyn, 2).setUsage(THREE.DynamicDrawUsage);
+  const tagAttr = new THREE.BufferAttribute(tag, 3);
+  geometry.setAttribute('position', positionAttr);
   geometry.setAttribute('aRand', new THREE.BufferAttribute(rand, 4));
-  geometry.setAttribute('aTag', new THREE.BufferAttribute(tag, 3));
-  geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 200);
+  geometry.setAttribute('aTag', tagAttr);
+  geometry.setAttribute('aDyn', dynAttr);
+  geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
   const uniforms = {
-    uMorph: { value: 0 }, uTime: { value: 0 }, uMouse: { value: new THREE.Vector3(999, 999, 999) }, uPush: { value: 0 }, uRadius: { value: 2.2 },
-    uPixelRatio: { value: renderer.getPixelRatio() },
+    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() },
     uColorA: { value: new THREE.Color(palette[0]) }, uColorB: { value: new THREE.Color(palette[1]) }, uColorC: { value: new THREE.Color(palette[2]) },
     uSpark: { value: new THREE.Color(spark) }, uAlt: { value: new THREE.Color(alt) },
   };
-  const material = new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-  const points = new THREE.Points(geometry, material);
-  scene.add(points);
-  if (extras) extras({ scene, THREE });
+  scene.add(new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
 
-  // bloom on larger screens
   let composer = null;
   if (!small()) {
     composer = new EffectComposer(renderer);
@@ -124,55 +127,183 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
     renderer.setSize(w, h, false);
     composer?.setSize(w, h);
     camera.aspect = w / h;
-    if (!small() && shiftRight) camera.setViewOffset(w, h, -w * shiftRight, 0, w, h); else camera.clearViewOffset();
-    camera.updateProjectionMatrix();
-    if (reducedMotion) frame(0);
+    lastShift = null;   // the frame sets the view offset
+    if (reducedMotion) frame(0, 0);
   }
 
-  // scroll: 0..1 over the page, eased; the keyframes turn it into a camera path and a morph
-  let target = 0, progress = 0;
+  // scroll: 0..1 over the page, eased; keyframes turn it into a camera path and a morph
+  let target = 0, progress = 0, lastShift = null;
   const readScroll = () => {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     target = max > 0 ? window.scrollY / max : 0;
-    if (reducedMotion) { progress = target; frame(0); }
+    if (reducedMotion) { progress = target; frame(0, 0); }
   };
-  const keys = keyframes.map((k) => ({ ...k, pos: new THREE.Vector3(...k.pos), look: new THREE.Vector3(...k.look) }));
+  const shift = (v) => new THREE.Vector3(v[0] + station[0], v[1] + station[1], v[2] + station[2]);
+  // `at` is a scroll fraction, or a selector: the moment that element's middle reaches the screen's middle
+  const keys = keyframes.map((k) => ({ ...k, shift: k.shift ?? shiftRight, anchor: typeof k.at === 'string' ? k.at : null, pos: shift(k.pos), look: shift(k.look) }));
+  const resolveKeys = () => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    for (const k of keys) {
+      if (!k.anchor) continue;
+      const el = document.querySelector(k.anchor);
+      if (!el || max <= 0) continue;
+      const box = el.getBoundingClientRect();
+      k.at = clamp01((box.top + window.scrollY + box.height / 2 - window.innerHeight / 2) / max);
+    }
+    keys.sort((a, b) => a.at - b.at);
+  };
+  resolveKeys();
+  new ResizeObserver(() => { resolveKeys(); readScroll(); }).observe(document.body);
   const pose = (t) => {
     let i = 0;
     while (i < keys.length - 2 && t > keys[i + 1].at) i++;
     const a = keys[i], b = keys[i + 1] || a;
-    const u = b === a ? 0 : smooth(Math.min(1, Math.max(0, (t - a.at) / (b.at - a.at))));
-    return { pos: a.pos.clone().lerp(b.pos, u), look: a.look.clone().lerp(b.look, u), morph: a.morph + (b.morph - a.morph) * u };
+    const u = b === a ? 0 : smooth(clamp01((t - a.at) / (b.at - a.at)));
+    return { pos: a.pos.clone().lerp(b.pos, u), look: a.look.clone().lerp(b.look, u), morph: a.morph + (b.morph - a.morph) * u, shift: a.shift + (b.shift - a.shift) * u };
   };
 
-  // pointer: a point on the plane facing the camera through what it looks at; speed adds strength
-  const ndc = new THREE.Vector2(9, 9), last = new THREE.Vector2(), raycaster = new THREE.Raycaster(), plane = new THREE.Plane(), hit = new THREE.Vector3();
-  let speed = 0, mouse = { x: 0, y: 0 }, mouseEased = { x: 0, y: 0 };
+  // arriving from another page: start from the pose the last page flew to, blend into this page's own
+  let arrival = null;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(ARRIVAL_KEY) || 'null');
+    sessionStorage.removeItem(ARRIVAL_KEY);
+    if (saved && saved.page === here && Date.now() - saved.at < 15000 && !reducedMotion) {
+      const a = arrivalPose(station);
+      arrival = { pos: new THREE.Vector3(...a.pos), look: new THREE.Vector3(...a.look), t: 0, start: performance.now() };
+    }
+  } catch { /* storage blocked: no arrival blend */ }
+  const veil = document.createElement('div');
+  veil.className = 'warp-veil';
+  if (arrival) veil.classList.add('is-on');
+  document.body.append(veil);
+  requestAnimationFrame(() => requestAnimationFrame(() => veil.classList.remove('is-on')));
+
+  // pointer: a ray from the camera; swipe velocity measured on the plane through what the camera looks at
+  const ndc = new THREE.Vector2(9, 9), raycaster = new THREE.Raycaster(), plane = new THREE.Plane();
+  const hit = new THREE.Vector3(), lastHit = new THREE.Vector3(), swipe = new THREE.Vector3();
+  let hasHit = false, mouse = { x: 0, y: 0 };
+  const mouseEased = { x: 0, y: 0 };
   window.addEventListener('pointermove', (e) => {
     ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
-    speed = Math.min(1, speed + last.distanceTo(ndc) * 3);
-    last.copy(ndc);
     mouse = { x: e.clientX / window.innerWidth - 0.5, y: e.clientY / window.innerHeight - 0.5 };
   }, { passive: true });
-  window.addEventListener('pointerleave', () => ndc.set(9, 9));
+  document.addEventListener('pointerleave', () => { ndc.set(9, 9); hasHit = false; });
 
+  // the tour: scroll past the end of the page to fly to the next page's spot
+  const tour = next ? nextStop(next, reducedMotion ? null : (href) => depart(href)) : null;
+  let leaving = null;
+  const currentLook = new THREE.Vector3();
+  function depart(href) {
+    if (leaving) return;
+    const a = arrivalPose(STATIONS[pageOf(href)] || station);
+    leaving = { href, t: 0, start: performance.now(), from: { pos: camera.position.clone(), look: currentLook.clone() }, to: { pos: new THREE.Vector3(...a.pos), look: new THREE.Vector3(...a.look) } };
+    try { sessionStorage.setItem(ARRIVAL_KEY, JSON.stringify({ page: pageOf(href), at: Date.now() })); } catch { /* fine */ }
+  }
+
+  const tmp = new THREE.Vector3(), rel = new THREE.Vector3();
   const clock = new THREE.Clock();
-  function frame(time) {
-    if (!reducedMotion) progress += (target - progress) * 0.07;
-    const { pos, look, morph } = pose(progress);
+  function frame(time, dt) {
+    if (!reducedMotion) progress += (target - progress) * Math.min(1, dt * 4.2);
+    const p = pose(progress);
+    let pos = p.pos, look = p.look;
+    if (arrival && arrival.t < 1) {
+      arrival.t = Math.min(1, (performance.now() - arrival.start) / 1400);   // wall-clock: the same on slow devices
+      const u = smooth(arrival.t);
+      pos = arrival.pos.clone().lerp(pos, u);
+      look = arrival.look.clone().lerp(look, u);
+    }
+    // a preview of the flight while the reader keeps scrolling at the bottom, then the flight itself
+    const pull = tour ? tour.pull() : 0;
+    if (pull && !leaving) {
+      const a = arrivalPose(STATIONS[pageOf(next.href)] || station);
+      pos = pos.clone().lerp(new THREE.Vector3(...a.pos), pull * 0.18);
+      look = look.clone().lerp(new THREE.Vector3(...a.look), pull * 0.25);
+    }
+    if (leaving) {
+      leaving.t = Math.min(1, (performance.now() - leaving.start) / 1500);
+      const u = smooth(leaving.t);
+      pos = leaving.from.pos.clone().lerp(leaving.to.pos, u).add(tmp.set(0, Math.sin(u * Math.PI) * 6, 0));
+      look = leaving.from.look.clone().lerp(leaving.to.look, u);
+      camera.fov = 50 + Math.sin(u * Math.PI) * 18;
+      lastShift = null;
+      if (leaving.t > 0.82) veil.classList.add('is-on');
+      if (leaving.t >= 1 && !leaving.gone) { leaving.gone = true; location.href = leaving.href; }
+    }
+    // the scene sits to the right of hero text, centred on stages
+    const sh = small() ? 0 : p.shift;
+    if (lastShift === null || Math.abs(sh - lastShift) > 0.0005) {
+      const w = window.innerWidth, h = window.innerHeight;
+      if (sh) camera.setViewOffset(w, h, -w * sh, 0, w, h); else camera.clearViewOffset();
+      camera.updateProjectionMatrix();
+      lastShift = sh;
+    }
     mouseEased.x += (mouse.x - mouseEased.x) * 0.05;
     mouseEased.y += (mouse.y - mouseEased.y) * 0.05;
-    camera.position.copy(pos).add(new THREE.Vector3(mouseEased.x * 1.6, -mouseEased.y * 0.9, 0));
+    camera.position.copy(pos).add(tmp.set(mouseEased.x * 1.6, -mouseEased.y * 0.9, 0));
     camera.lookAt(look);
-    uniforms.uMorph.value = morph;
-    uniforms.uTime.value = time;
-    if (!reducedMotion && Math.abs(ndc.x) <= 1) {
+    currentLook.copy(look);
+
+    // pointer swipe velocity, in world units per second
+    let swiping = false;
+    if (!reducedMotion && Math.abs(ndc.x) <= 1 && dt > 0) {
       raycaster.setFromCamera(ndc, camera);
-      plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()).negate(), look);
-      if (raycaster.ray.intersectPlane(plane, hit)) uniforms.uMouse.value.lerp(hit, 0.25);
-      uniforms.uPush.value += ((0.9 + speed * 2.6) - uniforms.uPush.value) * 0.12;
-    } else uniforms.uPush.value *= 0.92;
-    speed *= 0.94;
+      plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(tmp).negate(), look);
+      if (raycaster.ray.intersectPlane(plane, hit)) {
+        if (hasHit) swipe.copy(hit).sub(lastHit).divideScalar(dt).clampLength(0, 30);
+        lastHit.copy(hit); hasHit = true; swiping = true;
+      }
+    }
+    if (!swiping) swipe.multiplyScalar(0.8);
+    const speed = swipe.length();
+    const origin = raycaster.ray.origin, dir = raycaster.ray.direction;
+
+    // per particle: home on the morphing shape, plus a sprung offset that a swipe kicks
+    const morph = p.morph, seg = Math.min(Math.floor(morph), 1), local = morph - seg;
+    const from = seg < 1 ? home[0] : home[1], to = seg < 1 ? home[1] : home[2];
+    const t6 = time * 0.6;
+    for (let i = 0, i3 = 0; i < n; i++, i3 += 3) {
+      const r0 = rand[i * 4], r1 = rand[i * 4 + 1], r2 = rand[i * 4 + 2], r3 = rand[i * 4 + 3];
+      const k = smooth(clamp01(local * 1.35 - r0 * 0.35));
+      let hx = from[i3] + (to[i3] - from[i3]) * k, hy = from[i3 + 1] + (to[i3 + 1] - from[i3 + 1]) * k, hz = from[i3 + 2] + (to[i3 + 2] - from[i3 + 2]) * k;
+      const travel = Math.sin(k * Math.PI);
+      if (travel > 0.001) {   // travelling particles swirl instead of moving in straight lines
+        const s = travel * (1.2 + r1 * 2), qx = hx * 0.35 + r2 * 6, qy = hy * 0.35 + r2 * 6, qz = hz * 0.35 + r2 * 6;
+        hx += (Math.sin(qy * 0.9 + t6) + Math.sin(qz * 0.7 - t6 * 0.8)) * s;
+        hy += (Math.sin(qz * 0.8 + t6 * 1.1) + Math.sin(qx * 0.6 + t6)) * s;
+        hz += (Math.sin(qx * 0.7 - t6) + Math.sin(qy * 0.5 + t6 * 0.9)) * s;
+      }
+      hx += Math.sin(time * 0.7 + r2 * 6.28) * 0.05; hy += Math.cos(time * 0.6 + r3 * 6.28) * 0.05; hz += Math.sin(time * 0.5 + r1 * 6.28) * 0.05;
+
+      let ox = offset[i3], oy = offset[i3 + 1], oz = offset[i3 + 2];
+      let vx = velocity[i3], vy = velocity[i3 + 1], vz = velocity[i3 + 2];
+      if (speed > 0.5 && dt > 0) {
+        rel.set(hx + ox - origin.x, hy + oy - origin.y, hz + oz - origin.z);   // distance to the pointer's ray
+        const along = rel.dot(dir);
+        const px = rel.x - dir.x * along, py = rel.y - dir.y * along, pz = rel.z - dir.z * along;
+        const d2 = px * px + py * py + pz * pz;
+        if (d2 < RADIUS * RADIUS * 4) {
+          const fall = Math.exp(-d2 / (RADIUS * RADIUS)) * Math.min(1, speed / 12);
+          const inv = 1 / (Math.sqrt(d2) + 0.001);
+          const kick = (0.6 + r1 * 0.8) * fall;
+          vx += (swipe.x * SWIPE + px * inv * PUSH) * kick;
+          vy += (swipe.y * SWIPE + py * inv * PUSH) * kick;
+          vz += (swipe.z * SWIPE + pz * inv * PUSH) * kick;
+        }
+      }
+      const v2 = vx * vx + vy * vy + vz * vz;
+      if (v2 > MAX_SPEED * MAX_SPEED) { const c = MAX_SPEED / Math.sqrt(v2); vx *= c; vy *= c; vz *= c; }
+      vx += (-STIFFNESS * ox - DAMPING * vx) * dt; vy += (-STIFFNESS * oy - DAMPING * vy) * dt; vz += (-STIFFNESS * oz - DAMPING * vz) * dt;
+      ox += vx * dt; oy += vy * dt; oz += vz * dt;
+      offset[i3] = ox; offset[i3 + 1] = oy; offset[i3 + 2] = oz;
+      velocity[i3] = vx; velocity[i3 + 1] = vy; velocity[i3 + 2] = vz;
+      position[i3] = hx + ox; position[i3 + 1] = hy + oy; position[i3 + 2] = hz + oz;
+      dyn[i * 2] = k;
+      dyn[i * 2 + 1] = Math.min(1, Math.sqrt(vx * vx + vy * vy + vz * vz) / 6);
+    }
+    positionAttr.needsUpdate = true;
+    dynAttr.needsUpdate = true;
+    uniforms.uSeg.value = seg;
+    uniforms.uTime.value = time;
     updaters.forEach((fn) => fn(time));
     if (composer) composer.render(); else renderer.render(scene, camera);
   }
@@ -181,19 +312,65 @@ export function immersive({ formations, keyframes, palette = ['#FFD66B', '#FFD66
   window.addEventListener('scroll', readScroll, { passive: true });
   resize();
   readScroll();
-  if (reducedMotion) frame(0);
-  else renderer.setAnimationLoop(() => frame(clock.getElapsedTime()));
+  if (reducedMotion) frame(0, 0);
+  else {
+    let last = 0;
+    renderer.setAnimationLoop(() => {
+      const time = clock.getElapsedTime();
+      frame(time, Math.min(1 / 30, time - last));
+      last = time;
+    });
+  }
   return {
-    // swap a formation later (for example after data loads or the reader picks another player)
+    // swap a formation later (for example after the reader picks another player)
     setFormation(index, formation) {
       const { out, outTags } = resample(formation);
-      const attr = geometry.getAttribute(['aA', 'aB', 'aC'][index]);
-      attr.array.set(out);
-      attr.needsUpdate = true;
-      const tags = geometry.getAttribute('aTag');
-      outTags.forEach((t, i) => { tags.array[i * 3 + index] = t; });
-      tags.needsUpdate = true;
-      if (reducedMotion) frame(0);
+      home[index].set(out);
+      outTags.forEach((t, i) => { tag[i * 3 + index] = t; });
+      tagAttr.needsUpdate = true;
+      if (reducedMotion) frame(0, 0);
+    },
+  };
+}
+
+/* The next stop: a card at the very bottom of the page. Keep scrolling (wheel or touch) at the bottom
+   and its ring fills; full, the camera flies to the next page. Clicking it does the same. */
+function nextStop(next, onDepart) {
+  const page = document.querySelector('.page') || document.body;
+  const card = document.createElement('a');
+  card.className = 'next-stop liquid';
+  card.href = next.href;
+  card.innerHTML = `<svg class="next-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19"/><circle class="fill" cx="22" cy="22" r="19" pathLength="1"/></svg>
+    <span><small>${onDepart ? 'Keep scrolling to fly to' : 'Next stop'}</small><strong>${next.label}</strong></span>`;
+  page.append(card);
+  if (!onDepart) return null;
+  card.addEventListener('click', (e) => { e.preventDefault(); card.classList.add('is-going'); onDepart(next.href); });
+  const NEED = 900;
+  let charge = 0, lastInput = 0, touchY = null;
+  const atBottom = () => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
+  const feed = (amount) => {
+    charge = Math.min(NEED, charge + amount);
+    lastInput = performance.now();
+    if (charge >= NEED && !card.classList.contains('is-going')) { card.classList.add('is-going'); onDepart(next.href); }
+  };
+  window.addEventListener('wheel', (e) => { if (atBottom() && e.deltaY > 0) feed(e.deltaY * (e.deltaMode === 1 ? 33 : 1)); }, { passive: true });
+  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (touchY === null || !atBottom()) return;
+    const d = touchY - e.touches[0].clientY;
+    if (d > 0) { feed(d * 2.2); touchY = e.touches[0].clientY; }
+  }, { passive: true });
+  const ring = card.querySelector('.fill');
+  let lastPull = performance.now();
+  return {
+    pull() {
+      const now = performance.now();
+      if (now - lastInput > 450 && !card.classList.contains('is-going')) charge *= Math.pow(0.9, (now - lastPull) / 16.7);   // eases back in about a second
+      lastPull = now;
+      const pull = charge / NEED;
+      ring.style.strokeDashoffset = String(1 - pull);
+      card.style.setProperty('--pull', pull.toFixed(3));
+      return pull;
     },
   };
 }
@@ -262,7 +439,7 @@ export function columnsFormation(values, { center = [0, 2, 0], width = 18, scale
   return { points: new Float32Array(pts), tags: new Float32Array(tags) };
 }
 
-// A football: points on a sphere with the classic pentagon pattern denser.
+// A football: points on a sphere, denser along the seams.
 export function sphereFormation({ center = [0, 3, 0], radius = 3.4 } = {}) {
   const pts = [];
   const total = 9000, golden = Math.PI * (3 - Math.sqrt(5));
@@ -275,19 +452,19 @@ export function sphereFormation({ center = [0, 3, 0], radius = 3.4 } = {}) {
   return new Float32Array(pts);
 }
 
-// Dust over the pitch and up into the stands: where everything settles at the end of a page.
-export function fieldFormation({ centerZ = -12 } = {}) {
+// Dust over the pitch and up into the stands, around this page's spot.
+export function fieldFormation() {
   const pts = new Float32Array(30000);
   for (let i = 0; i < pts.length; i += 3) {
     const onPitch = Math.random() < 0.7;
-    pts[i] = (Math.random() - 0.5) * (onPitch ? 36 : 70);
+    pts[i] = (Math.random() - 0.5) * (onPitch ? 30 : 56);
     pts[i + 1] = onPitch ? -0.9 + Math.random() * 0.3 : Math.random() * 12;
-    pts[i + 2] = centerZ + (Math.random() - 0.5) * (onPitch ? 60 : 90);
+    pts[i + 2] = (Math.random() - 0.5) * (onPitch ? 40 : 60) - 8;
   }
   return pts;
 }
 
-// A slow spiral galaxy above the centre circle.
+// A slow spiral galaxy above the pitch.
 export function galaxyFormation({ center = [0, 3, -4], radius = 9, arms = 3 } = {}) {
   const pts = [];
   for (let i = 0; i < 12000; i++) {

@@ -74,3 +74,24 @@ The parts map onto the player model (`research/player_v2.py`, `Player.published`
 rating after his last match, minutes bonus, national-team points, goal and assist points,
 minus the absence discount. `pipeline/rate.py` (development branch) stores the total today;
 exporting the parts and these shapes is the next step there.
+
+## The living scene (`scene.js`)
+
+Behind every page: the night stadium and about 9,000 particles (4,500 on phones).
+
+- **Formations.** Each page passes three shapes (its data) and scroll keyframes; the
+  particles morph between them, staggered, swirling while they travel. Keyframes can be a
+  scroll fraction or a selector (`'#stage-rating'`: when that element is centred on screen),
+  and can set `shift` (0 centres the scene; the default keeps it right of hero text).
+- **Stages.** Near-empty `.stage` sections give a formation room to play in the open, with
+  one caption line: the player's rating, the club's squad columns, compare's ratings and
+  seasons, the matchday's biggest climb.
+- **Physics.** Each particle is sprung to its place in the shape. A pointer swipe kicks the
+  particles near its path (along the swipe and outward); they drift back over a few seconds.
+- **The tour.** Every page has a spot in the stadium (`STATIONS`). Keep scrolling at the
+  bottom of a page and the next-stop card's ring fills; the camera flies to the next page's
+  spot and opens it there. Order: this week, rankings, leagues, compare, how it works;
+  a player leads to his club, a club to its league.
+- **Liquid glass.** Panels, the header and controls: a refraction filter (Chromium; a plain
+  blur elsewhere), a bright edge, and a highlight that follows the pointer.
+- Bloom on larger screens; reduced motion gets still frames and no automatic flights.

@@ -21,7 +21,14 @@ const NAV = [
 export function shell() {
   const here = location.pathname.split('/').pop() || 'index.html';
   const header = document.querySelector('[data-shell="header"]');
-  header.className = 'site-header';
+  header.className = 'site-header liquid';
+  document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="liquid-refraction" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise"/>
+      <feGaussianBlur in="noise" stdDeviation="2" result="soft"/>
+      <feDisplacementMap in="SourceGraphic" in2="soft" scale="34" xChannelSelector="R" yChannelSelector="G"/>
+    </filter></svg>`);
+  wireLight();
   header.innerHTML = `
     <a class="logo" href="index.html">OpenElo</a>
     <nav aria-label="Main">${NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
@@ -62,6 +69,21 @@ export function shell() {
     footer.querySelector('.waitlist-status').textContent = `You're on the list. We'll email ${form.email.value} when the market opens in ${form.country.value}.`;
     form.reset();
   });
+}
+
+/* Liquid glass catches the light where the pointer is. */
+function wireLight() {
+  let lit = null;
+  document.addEventListener('pointermove', (event) => {
+    const el = event.target.closest?.('.glass-panel, .liquid');
+    if (lit && lit !== el) lit.style.setProperty('--lit', '0.55');
+    lit = el;
+    if (!el) return;
+    const box = el.getBoundingClientRect();
+    el.style.setProperty('--mx', `${event.clientX - box.left}px`);
+    el.style.setProperty('--my', `${event.clientY - box.top}px`);
+    el.style.setProperty('--lit', '1');
+  }, { passive: true });
 }
 
 function wireSearch(header) {
