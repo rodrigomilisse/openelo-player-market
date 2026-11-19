@@ -1,5 +1,6 @@
 // Player page: the rating as an equation, his season against his club's, what a move would do.
-import { THREE, COLOR, createStage, addStadium, addRibbon, glowSprite, scrollTracker, pointerTracker, smoothstep, reducedMotion } from '../design/stadium.js';
+import { immersive, curveFormation, sphereFormation, fieldFormation } from './scene.js';
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 import { getPlayer, getClubs } from './api.js';
 import { shell, field, param, number, signed, direction, shortDate, longDate, escape, clubUrl, playerUrl, lineChart, notFound } from './site.js';
 
@@ -249,45 +250,24 @@ function wireShare(p) {
   });
 }
 
-/* Behind the hero: the night stadium, his rating as a gold ribbon, his club's as a silver one. */
+/* Behind the page: his season against his club's in particles (gold and silver) beside the hero, which
+   gather into a football mid-page and settle over the pitch at the end. The camera flies with them. */
 function buildScene(p) {
-  const canvas = document.getElementById('scene');
-  let stage;
-  try {
-    // shiftRight keeps the season in the open right half, clear of the hero text.
-    stage = createStage(canvas, { shiftRight: 0.2, fog: 0.018 });
-  } catch {
-    canvas.remove();   // no WebGL: the page works without the scene
-    return;
-  }
-  const STEP = 1.1;
-  const ratings = p.history.map((d) => d.rating);
-  const clubs = p.history.map((d) => d.clubRating);
-  const lo = Math.min(...clubs, ...ratings) - 40;
-  const hi = Math.max(...ratings, ...clubs) + 40;
-  const toY = (v) => -0.6 + ((v - lo) / (hi - lo)) * 6.5;
-  const length = (ratings.length - 1) * STEP;
-  addStadium(stage, { centerZ: -length / 2, length: length + 10, crowd: 7000 });
-  const gold = addRibbon(stage.scene, ratings, { toY, step: STEP, color: COLOR.elo, core: COLOR.eloCore, wiggle: 0.5, radius: 0.07 });
-  const club = addRibbon(stage.scene, clubs, { toY, step: STEP, x: -3.2, color: 0xA9BBD0, core: 0xE4ECF5, wiggle: 0.5, radius: 0.035, curtain: false });
-  const halo = glowSprite([255, 214, 107], 3.2);
-  halo.position.copy(gold.points[gold.points.length - 1]);
-  stage.scene.add(halo);
-  const scroll = scrollTracker(0.06);
-  const pointer = pointerTracker(0.05);
-  const narrow = () => window.innerWidth <= 860;
-  stage.start((time) => {
-    const progress = reducedMotion ? 0 : scroll.step();
-    const mouse = reducedMotion ? { x: 0, y: 0 } : pointer.step();
-    // Standing just past today, low, looking back at August: the season climbs towards the viewer
-    // and ends in the glow of today's rating. Scrolling pulls the camera back a little.
-    const drift = smoothstep(0, 0.5, progress);
-    stage.camera.position.set(5.5 + mouse.x * 1.5, 3 - mouse.y * 0.8, -length - 12 - drift * 6);
-    stage.camera.lookAt(0, toY((lo + hi) / 2) + 2, -length * 0.3 - drift * 6);
-    // The ribbons belong to the hero: they fade as the reader moves on to the details.
-    const fade = 1 - 0.8 * smoothstep(0.06, 0.22, progress);
-    gold.setOpacity(fade * (narrow() ? 0.4 : 1));
-    club.setOpacity(fade * (narrow() ? 0.35 : 0.9));
-    halo.material.opacity = fade * (0.75 + Math.sin(time * 2.2) * 0.2);
+  immersive({
+    formations: [
+      curveFormation([{ values: p.history.map((d) => d.rating), weight: 1.5 }, { values: p.history.map((d) => d.clubRating), weight: 0.8, alt: true }],
+        { from: [-3.5, -0.3, 3], to: [8.5, -0.3, -7], height: 6.2 }),
+      sphereFormation({ center: [0, 3, -2], radius: 3.2 }),
+      fieldFormation(),
+    ],
+    palette: ['#FFD66B', '#E4ECF5', '#7FA7D8'],
+    keyframes: [
+      { at: 0, morph: 0, pos: [-1.5, 3.2, 21], look: [-1.2, 2.6, -2] },
+      { at: 0.12, morph: 0, pos: [1.5, 3.8, 18], look: [-0.8, 2.6, -2] },
+      { at: 0.38, morph: 1, pos: [2, 3.5, 15], look: [0, 3, -2] },
+      { at: 0.55, morph: 1, pos: [-2.5, 4, 14], look: [0, 3, -2] },
+      { at: 0.8, morph: 2, pos: [0, 10, 26], look: [0, 0, -12] },
+      { at: 1, morph: 2, pos: [-7, 6, 16], look: [0, 1, -22] },
+    ],
   });
 }

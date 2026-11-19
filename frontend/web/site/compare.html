@@ -40,8 +40,10 @@
     .pickers { grid-template-columns: minmax(0, 1fr) } .pickers .vs { text-align: center }
     .duel li { grid-template-columns: 3.2em minmax(0, 1fr) 3.2em; } .duel .label { grid-column: 1 / -1; grid-row: 1 } }
 </style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
+<canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
   <header data-shell="header"></header>
@@ -64,6 +66,7 @@
 </div>
 <script type="module">
   import { getRankings, getPlayer } from './api.js';
+  import { immersive, curveFormation, mergeFormations, textFormation, fieldFormation } from './scene.js';
   import { shell, field, param, number, signed, longDate, escape, playerUrl, clubUrl, lineChart } from './site.js';
   shell();
   const { players } = await getRankings();
@@ -80,10 +83,26 @@
     history.replaceState(null, '', `?a=${a}&b=${b}`); draw();
   });
   form.addEventListener('submit', (e) => e.preventDefault());
+  let stage = null;
   await draw();
 
   async function draw() {
     const [pa, pb] = await Promise.all([getPlayer(a), getPlayer(b)]);
+    const numbers = mergeFormations([
+      { formation: await textFormation(number.format(pa.rating), { center: [-4.2, 3, 0], width: 7 }), tag: 0 },
+      { formation: await textFormation(number.format(pb.rating), { center: [4.2, 3, 0], width: 7 }), tag: 1 }]);
+    const seasons = curveFormation([{ values: pa.history.map((h) => h.rating) }, { values: pb.history.map((h) => h.rating), alt: true }], { from: [-8, 0, 3], to: [8, 0, -6] });
+    if (!stage) stage = immersive({
+      formations: [numbers, seasons, fieldFormation()],
+      palette: ['#FFD66B', '#FFD66B', '#7FA7D8'], alt: '#8FD3FF', shiftRight: 0,
+      keyframes: [
+        { at: 0, morph: 0, pos: [0, 3, 20], look: [0, 3, 0] },
+        { at: 0.35, morph: 1, pos: [3, 4.5, 16], look: [0, 2.6, -1] },
+        { at: 0.7, morph: 1, pos: [-3, 4, 15], look: [0, 2.6, -1] },
+        { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -12] },
+      ],
+    });
+    else { stage.setFormation(0, numbers); stage.setFormation(1, seasons); }
     document.title = `${pa.name} vs ${pb.name} | OpenElo`;
     const diff = pa.rating - pb.rating;
     const gaps = pa.parts.map((part, i) => ({ label: part.key === 'club' ? 'Club rating' : part.label, key: part.key, a: part.value, b: pb.parts[i].value, d: part.value - pb.parts[i].value }));

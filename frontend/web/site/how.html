@@ -30,8 +30,10 @@
   .faq summary { cursor: pointer; font-weight: 600 }
   .faq p { margin: 8px 0 0; color: var(--muted) }
 </style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
+<canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
   <header data-shell="header"></header>
@@ -78,9 +80,19 @@
   <div data-shell="footer"></div>
 </div>
 <script type="module">
+  import { immersive, galaxyFormation, fieldFormation } from './scene.js';
   import { getPlayer } from './api.js';
   import { shell, field, number, signed, escape, playerUrl } from './site.js';
   shell();
+  immersive({
+    formations: [galaxyFormation(), galaxyFormation({ center: [0, 2, -8], radius: 12 }), fieldFormation()],
+    palette: ['#FFD66B', '#A9BBD0', '#7FA7D8'], shiftRight: 0.15,
+    keyframes: [
+      { at: 0, morph: 0, pos: [0, 7, 18], look: [0, 2, -4] },
+      { at: 0.5, morph: 1, pos: [6, 9, 16], look: [0, 1, -8] },
+      { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -14] },
+    ],
+  });
   const p = await getPlayer('tiago-mendonca');
   field('worked').innerHTML = p.parts.map((part, i) => `${i ? `<span class="op">${part.value < 0 ? '−' : '+'}</span>` : ''}<span class="${part.key === 'club' ? 'club' : part.value < 0 ? 'minus' : ''}">${number.format(Math.abs(part.value))}</span>`).join('')
     + `<span class="op">=</span><span class="total">${number.format(p.rating)}</span>`;

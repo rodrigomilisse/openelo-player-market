@@ -21,8 +21,10 @@
   .league-head p { margin: 0; color: var(--muted) }
   .diff { font-size: 14px; margin-left: 6px }
 </style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
+<canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
   <header data-shell="header"></header>
@@ -38,9 +40,19 @@
   <div data-shell="footer"></div>
 </div>
 <script type="module">
+  import { immersive, galaxyFormation, fieldFormation } from './scene.js';
   import { getLeagues } from './api.js';
   import { shell, field, number, signed, direction, escape, clubUrl } from './site.js';
   shell();
+  immersive({
+    formations: [galaxyFormation(), galaxyFormation({ center: [0, 2, -8], radius: 12 }), fieldFormation()],
+    palette: ['#FFD66B', '#A9BBD0', '#7FA7D8'], shiftRight: 0.15,
+    keyframes: [
+      { at: 0, morph: 0, pos: [0, 7, 18], look: [0, 2, -4] },
+      { at: 0.5, morph: 1, pos: [6, 9, 16], look: [0, 1, -8] },
+      { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -14] },
+    ],
+  });
   const { leagues } = await getLeagues();
   const lo = Math.min(...leagues.map((l) => l.rating)) - 60, hi = Math.max(...leagues.map((l) => l.rating));
   field('strength').innerHTML = leagues.map((l, i) => `<li><span class="muted">${i + 1}</span><a href="#${l.id}">${escape(l.name)}<small class="muted"> ${escape(l.country)}</small></a>

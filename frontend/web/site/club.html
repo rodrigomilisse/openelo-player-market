@@ -48,8 +48,10 @@
     .carry li { grid-template-columns: minmax(0, 1fr) 3.2em 3.6em; gap: 4px 10px }
     .carry .track { grid-column: 1 / -1; grid-row: 2 } }
 </style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
+<canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
   <header data-shell="header"></header>
@@ -84,11 +86,28 @@
 </div>
 <script type="module">
   import { getClub } from './api.js';
+  import { immersive, textFormation, columnsFormation, fieldFormation } from './scene.js';
   import { shell, field, param, number, signed, direction, shortDate, longDate, escape, playerUrl, clubUrl, lineChart, notFound } from './site.js';
   shell();
   const c = await getClub((param('id') || 'vale-do-sado-fc').replace(/[^a-z0-9-]/g, ''));
   if (!c) notFound('club');
   else {
+    immersive({
+      formations: [
+        await textFormation(number.format(c.rating), { center: [0, 3, 0], width: 12 }),
+        columnsFormation(c.squad.slice().sort((a, b) => b.gap - a.gap).map((p) => p.gap), { center: [0, 2.2, -1], width: 16, scale: 0.014 }),
+        fieldFormation(),
+      ],
+      palette: ['#A9BBD0', '#FFD66B', '#7FA7D8'], alt: '#6E8299',
+      keyframes: [
+        { at: 0, morph: 0, pos: [-1, 3, 20], look: [-1.5, 3, 0] },
+        { at: 0.1, morph: 0, pos: [1, 3.4, 19], look: [-1, 3, 0] },
+        { at: 0.32, morph: 1, pos: [0, 4.5, 17], look: [0, 2, -1] },
+        { at: 0.6, morph: 1, pos: [-4, 3.5, 14], look: [0, 2, -1] },
+        { at: 0.85, morph: 2, pos: [0, 10, 26], look: [0, 0, -12] },
+        { at: 1, morph: 2, pos: [6, 6, 16], look: [0, 1, -22] },
+      ],
+    });
     document.title = `${c.name}: ${number.format(c.rating)} OpenElo`;
     field('identity').innerHTML = `<a href="leagues.html#${c.league.id}">${escape(c.league.name)}</a>, ratings as of ${longDate(c.asOf)}`;
     field('name').textContent = c.name;
