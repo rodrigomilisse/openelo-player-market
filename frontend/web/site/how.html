@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How OpenElo works</title>
 <meta name="description" content="How OpenElo rates players from match results and minutes played, and how anyone can check it.">
@@ -18,7 +19,7 @@
   .steps > li::before { content: counter(step); font-family: var(--display); font-weight: 900; font-style: italic; font-size: 46px; line-height: 0.9; color: var(--elo) }
   .steps h3 { font-size: 28px }
   .steps p { margin: 6px 0 0; color: var(--muted) }
-  .steps code, .prose code { font-size: 0.95em; color: var(--ink); background: rgba(150, 190, 235, 0.1); padding: 1px 6px; border-radius: 4px }
+  .steps code, .prose code { font-size: 0.95em; color: var(--ink); background: rgba(var(--grid-rgb), 0.1); padding: 1px 6px; border-radius: 4px }
   .worked { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; font-family: var(--display); font-weight: 800; font-size: clamp(26px, 3vw, 40px) }
   .worked .op { color: var(--muted); font-weight: 500 }
   .worked .club { color: var(--club) }

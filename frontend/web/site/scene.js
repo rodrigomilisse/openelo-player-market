@@ -34,7 +34,7 @@ const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[
 
 const VERTEX = /* glsl */`
   attribute vec4 aRand; attribute vec3 aTag; attribute vec2 aDyn;
-  uniform float uSeg; uniform float uTime; uniform float uPixelRatio; uniform float uDim;
+  uniform float uSeg; uniform float uTime; uniform float uPixelRatio; uniform float uDim; uniform float uLight;
   uniform vec3 uColorA; uniform vec3 uColorB; uniform vec3 uColorC; uniform vec3 uSpark; uniform vec3 uAlt;
   varying vec3 vColor; varying float vAlpha;
   void main() {
@@ -46,6 +46,9 @@ const VERTEX = /* glsl */`
     vec3 base = uSeg < 1.0 ? mix(cA, cB, aDyn.x) : mix(cB, cC, aDyn.x);
     vColor = mix(base, uSpark, max(step(0.94, aRand.w) * 0.8, speed * 0.55));
     vAlpha = (0.6 + 0.22 * sin(uTime * (0.8 + aRand.w) + aRand.z * 12.0) + 0.3 * speed) * uDim;
+    // daylight: no glow to read against a pale sky, so the particles turn to ink in the same hues
+    vColor = mix(vColor, vColor * vec3(0.3, 0.34, 0.42), uLight);
+    vAlpha = mix(vAlpha, min(1.0, vAlpha * 1.15 + 0.08), uLight);
   }`;
 const FRAGMENT = /* glsl */`
   varying vec3 vColor; varying float vAlpha;
@@ -78,8 +81,8 @@ function createWorld({ count } = {}) {
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, small() ? 1.5 : 2));
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x060B14);
-  scene.fog = new THREE.FogExp2(0x060B14, 0.014);
+  scene.background = new THREE.Color(0x0B1626);
+  scene.fog = new THREE.FogExp2(0x0B1626, 0.014);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
   const updaters = [];
   addStadium({ scene, camera, renderer, onFrame: (fn) => updaters.push(fn) }, { centerZ: -12, length: 64, crowd: small() ? 5000 : 9000 });
@@ -101,20 +104,40 @@ function createWorld({ count } = {}) {
   geometry.setAttribute('aDyn', dynAttr);
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
   const uniforms = {
-    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() }, uDim: { value: 1 },
+    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() }, uDim: { value: 1 }, uLight: { value: 0 },
     uColorA: { value: new THREE.Color() }, uColorB: { value: new THREE.Color() }, uColorC: { value: new THREE.Color() },
     uSpark: { value: new THREE.Color() }, uAlt: { value: new THREE.Color() },
   };
-  scene.add(new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  const particles = new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  scene.add(new THREE.Points(geometry, particles));
 
-  let composer = null;
+  let composer = null, bloom = null;
   if (!small()) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.45, 0.32));
+    composer.addPass(bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.45, 0.32));
     composer.addPass(new OutputPass());
   }
+  // Night or day. Day: pale sky and haze, ink particles blended normally (adding light to white shows nothing),
+  // no bloom; the stadium's glowing crowd and floodlights fade into the daylight on their own.
+  const applyTheme = () => {
+    const light = document.documentElement.dataset.theme === 'light';
+    const sky = light ? 0xE6EAF0 : 0x0B1626;
+    scene.background.set(sky); scene.fog.color.set(sky); scene.fog.density = light ? 0.011 : 0.014;
+    particles.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; particles.needsUpdate = true;
+    uniforms.uLight.value = light ? 1 : 0;
+    if (bloom) bloom.enabled = !light;
+    scene.traverse((o) => {   // the stadium's grid and pitch lines: dark ink on a pale sky is far too heavy
+      if (!o.isLine) return;
+      const m = o.material;
+      m.userData.night ??= { opacity: m.opacity, transparent: m.transparent };
+      m.transparent = true; m.opacity = light ? m.userData.night.opacity * 0.18 : m.userData.night.opacity;
+      m.needsUpdate = true;
+    });
+  };
+  applyTheme();
+  window.addEventListener('themechange', applyTheme);
 
   // what the current page sets
   let station = [0, 0, 0], shiftRight = 0.2, keys = [], next = null;

@@ -69,7 +69,7 @@
 .match-title .score { font-family: var(--display); font-weight: 800; font-size: 20px; margin-right: 6px }
 .match-note { color: var(--muted); font-size: 15px; margin-left: 8px }
 .minutes { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted) }
-.minutes-bar { height: 4px; border-radius: 2px; background: rgba(150, 190, 235, 0.14); overflow: hidden }
+.minutes-bar { height: 4px; border-radius: 2px; background: rgba(var(--grid-rgb), 0.14); overflow: hidden }
 .minutes-bar i { display: block; height: 100%; background: var(--club) }
 .match[data-out] .match-title { color: var(--muted) }
 .change { justify-self: end; font-family: var(--display); font-weight: 800; font-size: 24px }

@@ -44,6 +44,7 @@ export function shell() {
     <nav aria-label="Main" class="nav-explore">${NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
     <nav aria-label="Market" class="nav-market">${MARKET_NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
     <div class="header-end">
+      <button class="theme-toggle" type="button" data-theme-toggle></button>
       <div class="search" role="search">
         <label class="visually-hidden" for="site-search">Find a player or club</label>
         <input id="site-search" type="search" placeholder="Find a player or club" autocomplete="off">
@@ -58,6 +59,7 @@ export function shell() {
     header.after(note);
   }
   wireSearch(header);
+  wireTheme(header);
   const footer = document.querySelector('[data-shell="footer"]');
   footer.innerHTML = `
     <section id="waitlist" class="waitlist" aria-labelledby="waitlist-title">
@@ -80,6 +82,26 @@ export function shell() {
     footer.querySelector('.waitlist-status').textContent = `You're on the list. We'll email ${form.email.value} when the market opens in ${form.country.value}.`;
     form.reset();
   });
+}
+
+/* Light or dark: the system's choice until the reader picks one; the scene listens for 'themechange'. */
+const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
+const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>';
+export const theme = () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+function wireTheme(header) {
+  const btn = header.querySelector('[data-theme-toggle]');
+  const show = () => { const light = theme() === 'light'; btn.innerHTML = light ? MOON : SUN; btn.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode'); };
+  const set = (t, save) => {
+    document.documentElement.dataset.theme = t;
+    if (save) { try { localStorage.setItem('openelo-theme', t); } catch { /* storage blocked */ } }
+    show(); window.dispatchEvent(new CustomEvent('themechange', { detail: t }));
+  };
+  btn.addEventListener('click', () => set(theme() === 'light' ? 'dark' : 'light', true));
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+    let saved = null; try { saved = localStorage.getItem('openelo-theme'); } catch { /* */ }
+    if (!saved) set(e.matches ? 'light' : 'dark', false);
+  });
+  show();
 }
 
 /* Liquid glass catches the light where the pointer is. */

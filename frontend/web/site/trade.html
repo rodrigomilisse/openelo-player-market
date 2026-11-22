@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trade | OpenElo</title>
 <meta name="description" content="Buy or sell shares in a player. Play-money preview.">
@@ -29,17 +30,17 @@
   .ticket label { display: block; color: var(--muted); font-size: 14px; margin: 16px 0 6px }
   .ticket .field { width: 100%; font-size: 20px; font-family: var(--display); font-weight: 700 }
   .quick { display: flex; gap: 6px; margin-top: 8px }
-  .quick button { flex: 1; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); border-radius: 999px; padding: 5px 0; cursor: pointer; color: var(--muted) }
+  .quick button { flex: 1; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); border-radius: 999px; padding: 5px 0; cursor: pointer; color: var(--muted) }
   .breakdown { margin: 16px 0 0; display: grid; gap: 6px; font-size: 15px }
   .breakdown div { display: flex; justify-content: space-between; gap: 12px }
   .breakdown dt { color: var(--muted) }
   .breakdown dd { margin: 0; font-variant-numeric: tabular-nums }
-  .breakdown .total { padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-weight: 700 }
+  .breakdown .total { padding-top: 8px; border-top: 1px solid var(--line); font-weight: 700 }
   .ticket-note { margin: 10px 0 0; color: var(--muted); font-size: 14px }
   /* slide to confirm */
-  .slide { position: relative; margin-top: 18px; height: 54px; border-radius: 999px; background: rgba(6, 11, 20, 0.45); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); overflow: hidden }
+  .slide { position: relative; margin-top: 18px; height: 54px; border-radius: 999px; background: rgba(var(--well), 0.45); box-shadow: inset 0 1px 3px rgba(var(--shade), calc(0.5 * var(--shade-k))); overflow: hidden }
   .slide input { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; cursor: grab; z-index: 2 }
-  .slide input::-webkit-slider-thumb { -webkit-appearance: none; width: 54px; height: 54px; border-radius: 50%; background: var(--elo); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) }
+  .slide input::-webkit-slider-thumb { -webkit-appearance: none; width: 54px; height: 54px; border-radius: 50%; background: var(--elo); box-shadow: 0 4px 14px rgba(var(--shade), calc(0.4 * var(--shade-k))) }
   .slide input::-moz-range-thumb { width: 54px; height: 54px; border: 0; border-radius: 50%; background: var(--elo) }
   .slide input:disabled { cursor: not-allowed }
   .slide input:disabled::-webkit-slider-thumb { background: rgba(255, 255, 255, 0.2) }
