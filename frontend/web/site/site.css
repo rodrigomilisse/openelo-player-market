@@ -25,30 +25,23 @@
   --gutter: clamp(16px, 4vw, 56px);
   --plate: 0px;
 }
-/* day match under an overcast sky: grey-white, ink particles, darker gold so it reads as text */
+/* light: a grey dusk rather than night. Lighter, never white: the glow still reads and the gold stays gold. */
 :root[data-theme="light"] {
-  color-scheme: light;
-  --night: #E6EAF0;
-  --ink: #0F1B2B;
-  --ink-rgb: 15, 27, 43;
-  --muted: #526378;
-  --elo: #9A6700;
-  --club: #66798E;
-  --rival: #0B74AD;
-  --up: #1B62C2;
-  --down: #BF520A;
-  --glass: rgba(255, 255, 255, 0.6);
-  --row: rgba(15, 27, 43, 0.03);
-  --row-alt: rgba(15, 27, 43, 0.06);
-  --well: 255, 255, 255;
-  --pane: 250, 251, 253;
-  --shade: 24, 38, 60;  --shade-k: 0.32;
-  --line: rgba(15, 27, 43, 0.14);
-  --grid-rgb: 40, 70, 110;
+  color-scheme: dark;
+  --night: #4B5666;
+  --ink: #F4F7FA;
+  --ink-rgb: 244, 247, 250;
+  --muted: #CBD4DE;
+  --club: #D3DCE6;
+  --glass: rgba(90, 102, 118, 0.55);
+  --row: rgba(255, 255, 255, 0.04);
+  --row-alt: rgba(255, 255, 255, 0.08);
+  --well: 38, 46, 58;
+  --pane: 70, 81, 96;
+  --shade: 20, 26, 36;  --shade-k: 0.55;
+  --line: rgba(255, 255, 255, 0.2);
+  --grid-rgb: 220, 230, 242;
 }
-:root[data-theme="light"] .glass-panel, :root[data-theme="light"] .liquid, :root[data-theme="light"] .table-wrap { outline: 1px solid rgba(15, 27, 43, 0.08); outline-offset: -1px }
-:root[data-theme="light"] .header-cta, :root[data-theme="light"] .button-gold { color: #fff }
-:root[data-theme="light"] .chart-svg .line-player, :root[data-theme="light"] .chart-svg .line-rival { filter: none }
 .theme-toggle { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line); background: rgba(var(--well), 0.35); cursor: pointer; color: var(--muted); padding: 0 }
 .theme-toggle:hover { color: var(--ink) }
 .theme-toggle svg { width: 18px; height: 18px }
