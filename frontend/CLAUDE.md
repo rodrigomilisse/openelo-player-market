@@ -6,6 +6,10 @@ real-time Three.js night stadium behind liquid-glass UI, aiming at Awwwards WebG
 what to load, what the owner has already decided, and how to check your work. It summarises;
 where a linked source says more, the source wins.
 
+The general playbook (skills, stack choice, techniques, the owner's taste, the quality floor,
+a starter page and a screenshot script) is the portable skill in
+`.claude/skills/immersive-web/`. Load it first. This file adds what is specific to OpenElo.
+
 ## 1. Where things live
 
 The frontend is not on `master` yet. If `frontend/web/` is missing from your checkout, run
@@ -171,6 +175,10 @@ dusk light theme; the lifted dark navy.
 3. Look at the screenshots yourself and critique them against section 4. Then remove one
    thing that doesn't earn its place.
 4. Send the owner the screenshots. Deployment is covered in `docs/deploy-site.md`.
+
+`.claude/skills/immersive-web/scripts/screenshot.cjs` does step 2 in one command. Run it
+with `THEME_KEY=openelo-theme` and the base URL `http://localhost:8000/site/`. In mock mode
+it reports the expected 404 for `data/meta.json`.
 
 **In a Claude Code cloud session**, the network policy blocks jsDelivr (the proxy answers
 `CONNECT` with 403), so the scene can't load Three.js. Google Fonts and npm are allowed.
