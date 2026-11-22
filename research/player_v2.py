@@ -77,6 +77,13 @@ class Variant:
     goal_scale: float = 100.0
     assist_scale: float = 100.0
     big_game: bool = False
+    absence_mode: str = "capped"      # capped (the old bounded discount) | linear | log: uncapped, grows with every missed club match
+    absence_scale: float = 2.0        # linear: points per missed match; log: points × ln(1 + missed / absence_tau)
+    absence_tau: float = 10.0
+    absence_recovery: float = 3.0     # missed matches forgiven per match played (× his share)
+    absence_window: int = 150         # window mode: club matches counted
+    absence_half_life: float = 100.0  # decay mode: matches until a miss counts half
+    absence_bench: float = 0.0        # weight of a match he was listed for but did not play
     output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
     match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
@@ -388,6 +395,7 @@ class Player:
         self.offset = 0.0
         self.offset_variance = OFFSET_PRIOR_VARIANCE
         self.discount = 0.0
+        self.missed = 0.0
         self.window = deque(maxlen=variant.window)
         self.output_window = deque(maxlen=variant.window)
         self.weights = deque(maxlen=variant.window)
@@ -441,7 +449,22 @@ class Player:
                 self.offset += (share - usual) * row.swing
         else:
             self.level += share * row.swing + share * LEVEL_RATE * (row.rating - self.level)
-        if self.v.absence:
+        if self.v.absence and self.v.absence_mode in ("window", "decay"):
+            flag = 0.0 if share > 0 else (1.0 if not listed else self.v.absence_bench)
+            if self.v.absence_mode == "window":
+                if not hasattr(self, "miss_window"):
+                    self.miss_window = deque(maxlen=self.v.absence_window)
+                self.miss_window.append(flag)
+            else:
+                self.missed = self.missed * 0.5 ** (1.0 / self.v.absence_half_life) + flag
+        elif self.v.absence and self.v.absence_mode != "capped":
+            if share > 0:
+                self.missed = max(0.0, self.missed - self.v.absence_recovery * share)
+            elif not listed:
+                self.missed += 1.0
+            else:
+                self.missed += self.v.absence_bench
+        elif self.v.absence:
             self.absence_step(row, listed, share)
         if listed or not self.v.squad_window:
             self.window.append(share)
@@ -477,6 +500,13 @@ class Player:
         if self.v.selection:
             pass
 
+    def uncapped_discount(self) -> float:
+        if self.v.absence_mode == "window":
+            return self.v.absence_scale * sum(getattr(self, "miss_window", ()))
+        if self.v.absence_mode in ("linear", "decay"):
+            return self.v.absence_scale * self.missed
+        return self.v.absence_scale * math.log1p(self.missed / self.v.absence_tau)
+
     def absence_step(self, row, listed: bool, share: float) -> None:
         if share > 0:
             self.discount *= 0.5 ** share
@@ -495,7 +525,9 @@ class Player:
 
     def published(self, day: int, context: Context) -> float:
         rating = self.rating()
-        if self.v.absence:
+        if self.v.absence and self.v.absence_mode != "capped":
+            rating = max(REPLACEMENT, rating - self.uncapped_discount())
+        elif self.v.absence:
             listed = self.last_listed if self.last_listed is not None else day
             if day - listed > RETIRED_AFTER_DAYS:
                 over = day - listed - RETIRED_AFTER_DAYS
@@ -640,6 +672,8 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
         if schedule is None:
             continue
         end = last
+        if variant.absence_mode != "capped" and (team, first, last) == stints(listings)[-1]:
+            end = int(schedule.day.max())      # matches he missed since his last appearance still count
         timeline.append(schedule[(schedule.day >= first) & (schedule.day <= end)])
     if not timeline:
         return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])

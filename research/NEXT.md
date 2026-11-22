@@ -131,6 +131,17 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner
   is not keen on it.
+- **Absence, uncapped (2026-11-22, owner rule: not playing always costs, no cap, a longer absence
+  costs more).** The old discount was capped at 120 and, because the timeline stopped at a player's
+  last squad appearance, did nothing for a player still injured (Musiala and Havertz showed 0).
+  Missed club matches are now counted up to the snapshot (`absence_mode`). Held-out rank
+  correlation (goal 226 / assist 113, club 0.7, goal term per club match): capped 0.454; linear
+  2 per missed match with recovery 3 per match played 0.489, recovery 1 0.495, 0.5 0.499, 0.25
+  0.501; log (40 / 80 / 120) 0.484 / 0.472 / 0.456 (linear is better than log); window of the last
+  150 club matches × 2 points 0.496; fading with half-life 100 × 2 0.489; a listed-but-unused match
+  counting as missed (weight 0.5 / 1) makes no difference. Counting minutes over all club
+  matches instead of squad matches (indirect) is much worse: 0.396. Simplest to state, and the
+  choice: **each club match missed in the last 150 costs 2 points** (`absence_mode="window"`).
 - Goal and assist weights tuned (club weight 0.7): fit rank correlation rises with both
   weights (0.518 at 158/68 → 0.526 at 300/226) while held-out peaks lower (0.458 at
   226/68, 0.457 at 226/113, 0.446 at 300/226); the surface is flat. Recommended 226 / 113
