@@ -84,6 +84,7 @@ class Variant:
     absence_window: int = 150         # window mode: club matches counted
     absence_half_life: float = 100.0  # decay mode: matches until a miss counts half
     absence_bench: float = 0.0        # weight of a match he was listed for but did not play
+    minutes_half_life: float = 0.0    # >0: share is a recency-weighted average over all club matches (missed = 0), halving every N matches
     minutes_strength: bool = False    # credit each match at the strength of the club where it was earned
     strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
     strength_r0: float = 2000.0
@@ -670,6 +671,10 @@ class Player:
             squad = 1.0  # a keeper is measured against playing every match: the first choice gets 0
         if self.v.selection and (self.v.big_game or self.v.match_importance) and self.window:
             share = float(np.dot(self.window, self.weights) / sum(self.weights))
+        elif self.v.selection and self.v.minutes_half_life > 0 and self.window:
+            arr = np.fromiter(self.window, float)
+            w = 0.5 ** ((len(arr) - 1 - np.arange(len(arr))) / self.v.minutes_half_life)
+            share = float(arr @ w / w.sum())
         elif self.v.selection:
             share = np.mean(self.window) if self.window else squad
         else:
