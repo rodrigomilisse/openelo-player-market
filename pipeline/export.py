@@ -71,6 +71,7 @@ def write(path: Path, data) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", required=True, help="directory for the JSON files (the site's data/ folder)")
+    parser.add_argument("--site-url", help="e.g. https://openelo.com: also write sitemap.xml next to the data folder")
     args = parser.parse_args()
     out = Path(args.out)
 
@@ -312,6 +313,12 @@ def main() -> None:
     write(out / "search.json", [{"kind": "player", "id": d["id"], "name": d["name"], "detail": d["club"]["name"], "rating": d["rating"]} for d in ranked]
           + [{"kind": "club", "id": team_id[t], "name": team_name.get(t), "detail": club_ref(t)["league"]["name"], "rating": round(club_now[t])} for t in clubs_ranked])
     write(out / "meta.json", {"asOf": as_of, "formula": FORMULA, "players": len(ranked), "clubs": len(clubs_ranked)})
+    if args.site_url:
+        base = args.site_url.rstrip("/")
+        urls = [f"{base}/{p}" for p in ("index.html", "rankings.html", "leagues.html", "compare.html", "how.html", "about.html")]
+        urls += [f"{base}/player.html?id={d['id']}" for d in ranked] + [f"{base}/club.html?id={team_id[t]}" for t in clubs_ranked]
+        (out.parent / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "".join(f"  <url><loc>{u.replace('&', '&amp;')}</loc><lastmod>{as_of}</lastmod></url>\n" for u in urls) + "</urlset>\n")
     print(f"exported {len(ranked)} players, {len(clubs_ranked)} clubs, {len(lgs)} leagues as of {as_of} to {out}")
 
 
