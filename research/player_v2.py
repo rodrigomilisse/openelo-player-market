@@ -90,6 +90,8 @@ class Variant:
     goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
     goal_d: float = 400.0
     goal_r0: float = 2000.0
+    goal_comp_power: float = 1.0      # competition factor for the goal term: importance ** power
+    importance_power: float = 1.0     # competition weight in the minutes window: importance ** power
     output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
     match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
@@ -443,7 +445,7 @@ class Player:
                 if "opp" in kinds:
                     f *= 2.0 ** ((row.opp_rating - self.v.goal_r0) / self.v.goal_d)
                 if "comp" in kinds:
-                    f *= getattr(row, "importance", 1.0)
+                    f *= getattr(row, "importance", 1.0) ** self.v.goal_comp_power
             self.g_factors.append(f)
             self.team_window.append((goals * f, assists * f) if listed else (0.0, 0.0))
         if listed and self.v.output != "none":
@@ -494,7 +496,7 @@ class Player:
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
             weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
             if self.v.match_importance:
-                weight *= getattr(row, "importance", 1.0)
+                weight *= getattr(row, "importance", 1.0) ** self.v.importance_power
             self.weights.append(weight)
         if share > 0:
             self.last_played = row.day
