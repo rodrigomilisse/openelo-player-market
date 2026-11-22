@@ -14,9 +14,14 @@ export const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 export const field = (name, root = document) => root.querySelector(`[data-field="${name}"]`);
 export const param = (name) => new URLSearchParams(location.search).get(name);
 
+// Two modes on one site: Explore (the ratings, loud) and Market (your money, quiet). Each has its own nav.
 const NAV = [
   ['index.html', 'This week'], ['rankings.html', 'Rankings'], ['leagues.html', 'Leagues'],
-  ['compare.html', 'Compare'], ['how.html', 'How it works'], ['market.html', 'Market'],
+  ['compare.html', 'Compare'], ['how.html', 'How it works'],
+];
+const MARKET_NAV = [
+  ['portfolio.html', 'Portfolio'], ['market.html', 'Browse'], ['dividends.html', 'Dividends'],
+  ['watchlist.html', 'Watchlist'], ['activity.html', 'Activity'],
 ];
 
 export function shell() {
@@ -35,7 +40,9 @@ export function shell() {
   wireLight();
   header.innerHTML = `
     <a class="logo" href="index.html">OpenElo</a>
-    <nav aria-label="Main">${NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+    <div class="mode-switch" role="group" aria-label="Mode"><a href="index.html" data-mode="explore">Explore</a><a href="portfolio.html" data-mode="market">Market</a></div>
+    <nav aria-label="Main" class="nav-explore">${NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+    <nav aria-label="Market" class="nav-market">${MARKET_NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
     <div class="header-end">
       <div class="search" role="search">
         <label class="visually-hidden" for="site-search">Find a player or club</label>

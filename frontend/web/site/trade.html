@@ -68,7 +68,7 @@
 </style>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
-<body>
+<body class="mode-market">
 <canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
@@ -103,7 +103,7 @@
 
       <div class="side-stack">
         <section class="glass-panel ticket" aria-labelledby="ticket-title">
-          <h2 id="ticket-title">Back him</h2>
+          <div class="section-head"><h2 id="ticket-title">Back him</h2><button class="button watch-btn" type="button" data-field="watch" aria-pressed="false">☆ Watch</button></div>
           <div class="seg" role="radiogroup" aria-label="Buy or sell" data-field="side">
             <button type="button" role="radio" aria-checked="true" data-side="buy">Buy</button>
             <button type="button" role="radio" aria-checked="false" data-side="sell">Sell</button>
@@ -131,20 +131,15 @@
   <div data-shell="footer"></div>
 </div>
 <script type="module">
-  import { immersive, fieldFormation } from './scene.js';
-  import { getPlayer, getBook, getQuote, wallet, saveWallet, FEES } from './api.js';
+  import { getPlayer, getBook, getQuote, wallet, recordTrade, toggleWatch, getProjection, FEES } from './api.js';
+  import { boxScene } from './market-ui.js';
   import { shell, field, param, number, signed, escape, longDate, shortDate, lineChart, notFound, playerUrl, clubUrl } from './site.js';
   shell();
   const id = (param('id') || 'tiago-mendonca').replace(/[^a-z0-9-]/g, '');
   const [p, b] = await Promise.all([getPlayer(id), getBook(id)]);
   if (!p) notFound('player');
   else {
-    immersive({
-      formations: [fieldFormation(), fieldFormation(), fieldFormation()],
-      palette: ['#5AA9FF', '#5AA9FF', '#7FA7D8'], dim: 0.25, shiftRight: 0,
-      keyframes: [{ at: 0, morph: 0, pos: [0, 8, 24], look: [0, 1, -8] }, { at: 1, morph: 0, pos: [-3, 9, 22], look: [0, 1, -10] }],
-      next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` },
-    });
+    boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });
     const cr = (v) => v.toFixed(2);
     document.title = `Trade ${p.name} | OpenElo`;
     field('who').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}, ${p.age}`;
@@ -182,10 +177,23 @@
     const slider = field('slider');
     let current = null;
     const position = () => {
-      const w = wallet(), shares = w.holdings[p.id] || 0;
-      field('position').innerHTML = shares ? `You hold <strong>${shares}</strong> shares, worth ${cr(shares * b.price)} credits, paying ${cr(shares * b.payoutDay)} a day. Credits to spend: ${cr(w.credits)}.`
+      const w = wallet(), pos = w.positions[p.id] || { shares: 0, cost: 0 }, shares = pos.shares;
+      const gain = shares * b.price - pos.cost;
+      field('position').innerHTML = shares ? `You hold <strong>${shares}</strong> shares, worth ${cr(shares * b.price)} credits${pos.cost ? ` (${gain >= 0 ? 'up' : 'down'} ${cr(Math.abs(gain))} on the ${cr(pos.cost)} you paid)` : ''}${pos.dividends ? `, and they've paid you ${cr(pos.dividends)} so far` : ''}. Credits to spend: ${cr(w.credits)}.`
         : `You don't hold ${escape(p.shortName)} yet. Credits to spend: <strong>${cr(w.credits)}</strong>.`;
       return { w, shares };
+    };
+    const watchBtn = field('watch');
+    const showWatch = () => { const on = wallet().watch.includes(p.id); watchBtn.setAttribute('aria-pressed', String(on)); watchBtn.textContent = on ? '★ Watching' : '☆ Watch'; };
+    watchBtn.addEventListener('click', () => { toggleWatch(p.id); showWatch(); });
+    showWatch();
+    // what an order does to your next payout, if ratings stay as they are
+    const payoutEffect = async (w, q) => {
+      const before = await getProjection(w.positions);
+      const pos = { ...(w.positions[p.id] || { shares: 0, cost: 0 }) };
+      pos.shares += q.side === 'buy' ? q.shares : -q.shares;
+      const after = await getProjection({ ...w.positions, [p.id]: pos });
+      return after.next - before.next;
     };
     const update = async () => {
       const { w, shares } = position();
@@ -203,13 +211,14 @@
         const minted = current.shares - fans;
         if (fans) rows.push(['From fans selling', `${fans} shares`]);
         if (minted) rows.push(['New shares', `${minted} shares`]);
-        rows.push(['Average price', cr(current.average)], [`Fees (${FEES.taker * 100}% / ${FEES.mint * 100}% new)`, cr(current.fees)], ['Adds to your payouts', `${cr(current.payoutDay)} a day`]);
+        rows.push(['Average price', cr(current.average)], [`Fees (${FEES.taker * 100}% / ${FEES.mint * 100}% new)`, cr(current.fees)], ['Adds to your next payout', `+${cr(await payoutEffect(w, current))}`]);
         rows.push(['You pay', `${cr(current.spent)} for ${current.shares} shares`, 'total']);
         ok = current.spent <= w.credits + 1e-9;
         if (!ok) rows.push(['', `That's more than your ${cr(w.credits)} credits.`]);
       } else {
         rows.push(['To fans buying', `${current.shares} shares`], ['Average price', cr(current.average)], [`Fee (${FEES.taker * 100}%)`, cr(current.fees)]);
         if (current.unsold) rows.push(['Not sold (no buyers left)', `${current.unsold} shares`]);
+        if (current.shares <= shares) rows.push(['Takes from your next payout', `−${cr(-(await payoutEffect(w, current)))}`]);
         rows.push(['You receive', cr(current.received), 'total']);
         ok = current.shares <= shares;
         if (!ok) rows.push(['', `You hold ${shares} shares.`]);
@@ -224,7 +233,7 @@
       side = btn.dataset.side;
       field('side').querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === btn)));
       field('amount-label').textContent = side === 'buy' ? 'Credits to spend' : 'Shares to sell';
-      amount.value = side === 'buy' ? 100 : Math.max(1, wallet().holdings[p.id] || 1);
+      amount.value = side === 'buy' ? 100 : Math.max(1, wallet().positions[p.id]?.shares || 1);
       update();
     });
     field('quick').addEventListener('click', (e) => { const btn = e.target.closest('[data-v]'); if (btn) { amount.value = btn.dataset.v; update(); } });
@@ -232,16 +241,8 @@
     slider.addEventListener('input', () => { field('slide').style.setProperty('--slid', `${slider.value}%`); });
     slider.addEventListener('change', () => {
       if (+slider.value >= 96 && current && !slider.disabled) {
-        const w = wallet();
-        if (side === 'buy') {
-          w.credits = Math.round((w.credits - current.spent) * 100) / 100;
-          w.holdings[p.id] = (w.holdings[p.id] || 0) + current.shares;
-        } else {
-          w.credits = Math.round((w.credits + current.received) * 100) / 100;
-          w.holdings[p.id] = (w.holdings[p.id] || 0) - current.shares;
-        }
-        w.history.push({ at: Date.now(), id: p.id, side, shares: current.shares, credits: side === 'buy' ? -current.spent : current.received });
-        saveWallet(w);
+        recordTrade(p.id, p.name, current);
+        boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });   // your squad below changes
         const done = field('done');
         done.textContent = side === 'buy' ? `Bought ${current.shares} shares of ${p.name}.` : `Sold ${current.shares} shares of ${p.name}.`;
         done.classList.remove('flash'); void done.offsetWidth; done.classList.add('flash');
@@ -251,7 +252,7 @@
       update();
     });
     update();
-    document.querySelector('main').addEventListener('pageshow-again', update);   // coming back after trading elsewhere
+    document.querySelector('main').addEventListener('pageshow-again', () => { showWatch(); update(); boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } }); });   // coming back after trading elsewhere
   }
 </script>
 </body>

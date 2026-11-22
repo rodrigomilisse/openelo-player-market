@@ -24,7 +24,9 @@ const clamp01 = (t) => Math.min(1, Math.max(0, t));
 export const STATIONS = {
   'index.html': [0, 0, -12], 'rankings.html': [0, 0, -40], 'leagues.html': [22, 0, -18],
   'compare.html': [0, 0, 16], 'how.html': [-22, 0, -18], 'player.html': [10, 0, 2], 'club.html': [-10, 0, 2],
-  'market.html': [0, 0, 6], 'trade.html': [4, 0, 6],
+  // Market mode: every page is the directors' box, high in the main stand over the halfway line.
+  'portfolio.html': [0, 0, -8], 'market.html': [0, 0, -8], 'trade.html': [0, 0, -8],
+  'dividends.html': [0, 0, -8], 'watchlist.html': [0, 0, -8], 'activity.html': [0, 0, -8],
 };
 const pageOf = (href) => (new URL(href, location.href).pathname.split('/').pop() || 'index.html');
 // The pose every page is approached from: in front of its spot, looking at it.
@@ -493,3 +495,45 @@ export function mergeFormations(parts) {
   for (const x of list) { points.set(x.points, o); tags.fill(x.tag, o / 3, o / 3 + x.points.length / 3); o += x.points.length; }
   return { points, tags };
 }
+
+// The pitch's markings in dust: touchlines, halfway line, centre circle, boxes. Coordinates relative to the centre spot.
+export function pitchLines({ length = 40, width = 26 } = {}) {
+  const pts = [];
+  const seg = (x0, z0, x1, z1, n) => { for (let i = 0; i < n; i++) { const t = Math.random(); pts.push(x0 + (x1 - x0) * t + (Math.random() - 0.5) * 0.08, -0.85, z0 + (z1 - z0) * t + (Math.random() - 0.5) * 0.08); } };
+  const L = length / 2, W = width / 2;
+  seg(-W, -L, W, -L, 500); seg(-W, L, W, L, 500); seg(-W, -L, -W, L, 900); seg(W, -L, W, L, 900); seg(-W, 0, W, 0, 500);
+  for (let i = 0; i < 700; i++) { const a = Math.random() * Math.PI * 2; pts.push(Math.cos(a) * 4.4, -0.85, Math.sin(a) * 4.4); }
+  for (const s of [-1, 1]) { seg(-8, s * L, -8, s * (L - 6.5), 160); seg(8, s * L, 8, s * (L - 6.5), 160); seg(-8, s * (L - 6.5), 8, s * (L - 6.5), 300); }
+  return new Float32Array(pts);
+}
+
+/* Your squad on the pitch: one cluster of light per player you hold, at his position (keeper at the near
+   goal, forwards up front), sized by your shares. `brightness` (0..1) marks the bigger payers with the alt
+   colour tag. With nothing held, only the markings: an empty pitch. */
+export function squadFormation(holdings, { length = 40 } = {}) {
+  const lines = { Goalkeeper: 0.42, Defender: 0.25, Midfielder: 0.02, Forward: -0.2 };
+  const byLine = {};
+  holdings.forEach((h) => (byLine[h.position] ||= []).push(h));
+  const parts = [{ formation: pitchLines({ length }), tag: 1 }];
+  const most = Math.max(1, ...holdings.map((h) => h.shares));
+  for (const [line, list] of Object.entries(byLine)) {
+    list.forEach((h, k) => {
+      const x = (k - (list.length - 1) / 2) * Math.min(5.5, 22 / list.length);
+      const z = (lines[line] ?? 0) * length;
+      const r = 0.35 + Math.sqrt(h.shares / most) * 1.3;
+      const pts = new Float32Array(Math.round(400 + 2200 * Math.sqrt(h.shares / most)) * 3);
+      for (let i = 0; i < pts.length; i += 3) {
+        const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, d = r * Math.cbrt(Math.random());
+        pts[i] = x + Math.sqrt(1 - u * u) * Math.cos(a) * d; pts[i + 1] = 0.6 + r + u * d; pts[i + 2] = z + Math.sqrt(1 - u * u) * Math.sin(a) * d;
+      }
+      parts.push({ formation: pts, tag: h.brightness > 0.5 ? 0 : 0.6 });
+    });
+  }
+  return mergeFormations(parts);
+}
+
+/* The camera in the directors' box: high in the side stand, looking down across the pitch. */
+export const BOX = [
+  { at: 0, morph: 0, pos: [27, 15, 4], look: [0, -1, -2], shift: 0 },
+  { at: 1, morph: 0, pos: [25, 16, -4], look: [0, -1, -4], shift: 0 },
+];

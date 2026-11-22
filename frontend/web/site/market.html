@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market | OpenElo</title>
+<title>Browse players | OpenElo</title>
 <meta name="description" content="Back players with shares that pay out by their OpenElo rating. Play-money preview.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,7 +28,7 @@
 </style>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
-<body>
+<body class="mode-market">
 <canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
@@ -36,20 +36,15 @@
   <main>
     <section class="market-head" aria-labelledby="market-title">
       <div>
-        <h1 id="market-title">Market</h1>
+        <h1 id="market-title">Browse players</h1>
         <p class="lede">Shares in players pay out every day by their OpenElo rating. Prices are set by fans trading with each other.</p>
-        <p class="preview-note"><strong>Play money.</strong> A preview with 1,000 practice credits kept in this browser. Prices, payouts and fees are illustrative.</p>
+        <p class="preview-note"><strong>Play money.</strong> Practice credits kept in this browser. Prices, payouts and fees are illustrative.</p>
       </div>
       <dl class="purse liquid" data-field="purse"></dl>
     </section>
 
-    <section class="glass-panel" aria-labelledby="holdings-title">
-      <h2 id="holdings-title">Your players</h2>
-      <div data-field="holdings"></div>
-    </section>
-
     <section aria-labelledby="all-title">
-      <h2 id="all-title">All players</h2>
+      <h2 id="all-title" class="visually-hidden">All players</h2>
       <form class="filters" data-field="filters" role="search" aria-label="Filter the market">
         <label class="visually-hidden" for="m-name">Name or club</label>
         <input class="field" id="m-name" name="name" type="search" placeholder="Find a player or club" autocomplete="off">
@@ -72,40 +67,19 @@
   <div data-shell="footer"></div>
 </div>
 <script type="module">
-  import { immersive, fieldFormation, galaxyFormation } from './scene.js';
-  import { getMarket, wallet } from './api.js';
+  import { getMarket } from './api.js';
   import { shell, field, number, escape, direction } from './site.js';
+  import { boxScene, portfolio, cr, signedCr, spark, tradeUrl } from './market-ui.js';
   shell();
-  immersive({
-    formations: [fieldFormation(), galaxyFormation({ center: [0, 2, -10], radius: 14 }), fieldFormation()],
-    palette: ['#5AA9FF', '#FFD66B', '#7FA7D8'], dim: 0.45, shiftRight: 0,
-    keyframes: [{ at: 0, morph: 0, pos: [0, 9, 26], look: [0, 1, -8] }, { at: 1, morph: 1, pos: [4, 10, 24], look: [0, 1, -10] }],
-    next: { href: 'index.html', label: 'This week' },
-  });
-  const cr = (v) => `${v.toFixed(2)}`;
-  const signedCr = (v) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${Math.abs(v).toFixed(2)}` : '0.00');
-  const spark = (values) => {
-    const lo = Math.min(...values), hi = Math.max(...values), w = 100, h = 26;
-    const d = values.map((v, i) => `${i ? 'L' : 'M'}${(i / (values.length - 1)) * w},${h - 3 - ((v - lo) / (hi - lo || 1)) * (h - 6)}`).join('');
-    return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="var(--up)" stroke-width="1.6"/></svg>`;
-  };
   const { players } = await getMarket();
-  const byId = new Map(players.map((p) => [p.id, p]));
-  const main = document.querySelector('main');
-  const purse = () => {
-  const w = wallet();
-  const held = Object.entries(w.holdings).filter(([, n]) => n > 0).map(([id, shares]) => ({ p: byId.get(id), shares })).filter((x) => x.p);
-  const value = held.reduce((s, x) => s + x.shares * x.p.price, 0);
-  const daily = held.reduce((s, x) => s + x.shares * x.p.payoutDay, 0);
-  field('purse').innerHTML = [[cr(w.credits), 'Credits to spend'], [cr(value), 'Your shares are worth'], [cr(daily), 'Payouts a day']]
-    .map(([v, l]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join('');
-  field('holdings').innerHTML = held.length
-    ? `<div class="table-wrap"><table><thead><tr><th>Player</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Value</th><th class="num">Pays a day</th></tr></thead><tbody>${held.map(({ p, shares }) =>
-      `<tr><td><a href="trade.html?id=${p.id}">${escape(p.name)}</a><small>${escape(p.club)}</small></td><td class="num">${shares}</td><td class="num">${cr(p.price)}</td><td class="num">${cr(shares * p.price)}</td><td class="num pay">${cr(shares * p.payoutDay)}</td></tr>`).join('')}</tbody></table></div>`
-    : '<p class="holdings-empty">You don\'t hold any players yet. Pick one below to back him.</p>';
+  const purse = async () => {
+    boxScene({ next: { href: 'portfolio.html', label: 'Your portfolio' } });
+    const { w, rows, proj, value } = await portfolio();
+    field('purse').innerHTML = [[cr(w.credits), 'Credits to spend'], [cr(value), `In ${rows.length} player${rows.length === 1 ? '' : 's'}`], [cr(proj.next), 'Next payout']]
+      .map(([v, l]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join('');
   };
   purse();
-  main.addEventListener('pageshow-again', purse);   // coming back after a trade
+  document.querySelector('main').addEventListener('pageshow-again', purse);   // coming back after a trade
   const form = field('filters');
   let shown = 50;
   const draw = () => {
@@ -113,7 +87,7 @@
     const sorters = { rating: (a, b) => b.rating - a.rating, payout: (a, b) => b.payoutDay / b.price - a.payoutDay / a.price, rising: (a, b) => b.week / b.price - a.week / a.price, price: (a, b) => b.price - a.price };
     const list = players.filter((p) => !q || p.name.toLowerCase().includes(q) || p.club.toLowerCase().includes(q)).sort(sorters[form.sort.value]);
     field('rows').innerHTML = list.slice(0, shown).map((p) => `<tr>
-      <td><a href="trade.html?id=${p.id}">${escape(p.name)}</a><small>${escape(p.club)}</small></td>
+      <td><a href="${tradeUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.club)}</small></td>
       <td class="num"><span class="e">${number.format(p.rating)}</span></td>
       <td class="num"><span class="price">${cr(p.price)}</span></td>
       <td class="num ${direction(p.week)}">${signedCr(p.week)}</td>

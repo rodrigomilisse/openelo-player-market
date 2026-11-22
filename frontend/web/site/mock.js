@@ -349,27 +349,69 @@ export function search(query, limit = 8) {
 }
 
 /* ---------- the market (play money preview) ----------
-   Prices come from the simulated price series. The order book, payouts and new-share price are
-   illustrative: placeholder fees from the pricing module (taker 5% on trades between fans, 10% on
-   new shares), a payout that follows the rating's weight 10^(rating/400). */
+   A mock of the money model in ADR-0019: one pool for the whole market, a fixed share of it paid out
+   each day, split by Elo weight 10^(rating/400) over every share held. Prices come from the simulated
+   price series; the order book and fees are illustrative (placeholder fees from the pricing module). */
 export const FEES = { taker: 0.05, mint: 0.10 };
+export const POOL = { balance: 182000, drain: 0.0035, inflowDay: 640 };   // credits; share paid per day; fees and new-share money per day
 const seeded = (id) => makeRandom([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7));
 const round2 = (v) => Math.round(v * 100) / 100;
+const weightOf = (rating) => 10 ** ((rating - 2000) / 400);
+
+let heldCache = null;
+function held() {   // how many shares fans hold in each player, and the total Elo weight held
+  if (heldCache) return heldCache;
+  const w = getWorld();
+  const shares = new Map();
+  let total = 0;
+  for (const p of w.players) {
+    const r = seeded(`${p.id}-held`);
+    const n = Math.round((15 + r() * 300) * 10 ** ((p.rating - 1800) / 500));
+    shares.set(p.id, n);
+    total += n * weightOf(p.rating);
+  }
+  heldCache = { shares, totalWeight: total };
+  return heldCache;
+}
+const dailyPayout = () => POOL.balance * POOL.drain;
+export const payoutPerShare = (rating, extraWeight = 0) => round2(dailyPayout() * weightOf(rating) / (held().totalWeight + extraWeight) * 100) / 100;
 
 function marketOf(p) {
   const prices = p.price.map((x) => x.price);
   const price = prices[prices.length - 1];
   const r = seeded(p.id);
-  const payoutDay = round2(0.004 * 10 ** ((p.rating - 1800) / 400));
+  const h = held().shares.get(p.id);
   return { price, week: round2(price - prices[Math.max(0, prices.length - 2)]), season: round2(price - prices[0]),
-    newShare: round2(price * (1.06 + r() * 0.06)), payoutDay, holders: Math.round(20 + r() * 400 * 10 ** ((p.rating - 1800) / 500)),
-    spark: prices.slice(-12) };
+    newShare: round2(price * (1.06 + r() * 0.06)), payoutDay: payoutPerShare(p.rating), heldShares: h, holders: Math.max(3, Math.round(h / (4 + r() * 8))),
+    spark: prices.slice(-12), weight: weightOf(p.rating) };
 }
 
 export function market() {
   const w = getWorld();
   return { asOf: w.asOf, mock: true, players: w.ranked.map((p) => ({ id: p.id, name: p.name, club: p.club.name, clubId: p.club.id,
     league: p.club.league.name, position: p.position, rating: p.rating, ...marketOf(p) })) };
+}
+
+/* The pool and the next payout. `extraWeight` is the reader's own holdings' weight, added to everyone's. */
+export function pool(extraWeight = 0) {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return { ...POOL, payoutToday: round2(dailyPayout()), totalWeight: held().totalWeight + extraWeight, nextPayoutAt: next, mock: true };
+}
+
+/* If ratings stay as they are: each position's next payout. The range is what one typical match
+   (about ±14 rating points) would do to it. */
+export function projection(positions) {
+  const w = getWorld();
+  const rows = Object.entries(positions).filter(([, x]) => x.shares > 0).map(([id, x]) => ({ p: w.players.find((q) => q.id === id), ...x })).filter((x) => x.p);
+  const mine = rows.reduce((s, x) => s + x.shares * weightOf(x.p.rating), 0);
+  const total = held().totalWeight + mine;
+  const per = (rating) => dailyPayout() * weightOf(rating) / total;
+  const out = rows.map((x) => ({ id: x.p.id, name: x.p.name, club: x.p.club.name, position: x.p.position, rating: x.p.rating, shares: x.shares,
+    next: round2(x.shares * per(x.p.rating)), low: round2(x.shares * per(x.p.rating - 14)), high: round2(x.shares * per(x.p.rating + 14)),
+    weightShare: x.shares * weightOf(x.p.rating) / total }));
+  return { rows: out, next: round2(out.reduce((s, r) => s + r.next, 0)), low: round2(out.reduce((s, r) => s + r.low, 0)), high: round2(out.reduce((s, r) => s + r.high, 0)),
+    weightShare: mine / total, myWeight: mine };
 }
 
 export function book(id) {
@@ -420,5 +462,5 @@ export function quote(id, side, amount) {
     fills.push({ from: 'fans', shares: n, price: bid.price });
     got += n * bid.price * (1 - FEES.taker); fees += n * bid.price * FEES.taker; left -= n; sold += n;
   }
-  return { side, shares: sold, unsold: left, received: round2(got), fees: round2(fees), average: sold ? round2(got / sold) : 0, fills };
+  return { side, shares: sold, unsold: left, received: round2(got), fees: round2(fees), average: sold ? round2(got / sold) : 0, fills, payoutDay: round2(sold * b.payoutDay) };
 }

@@ -205,3 +205,31 @@ main.is-arriving { opacity: 0; transition: none }
 .stage-caption { margin: 0; text-align: center; font-size: clamp(18px, 1.7vw, 22px); color: var(--muted); max-width: 48ch; text-wrap: balance }
 .stage-caption strong { color: var(--ink); font-weight: 600 }
 .stage-caption .gold { font-weight: 700 }
+
+/* ---------- modes: Explore and Market share the header; the body class picks the nav ---------- */
+.mode-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(6, 11, 20, 0.5); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5) }
+.mode-switch a { padding: 4px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px }
+body:not(.mode-market) .mode-switch [data-mode="explore"], body.mode-market .mode-switch [data-mode="market"] { background: rgba(255, 255, 255, 0.12); color: var(--ink) }
+.site-header nav.nav-market { display: none }
+body.mode-market .site-header nav.nav-explore { display: none }
+body.mode-market .site-header nav.nav-market { display: flex }
+body.mode-market .header-cta { display: none }
+/* the directors' box: you watch from behind glass, high in the main stand */
+body.mode-market::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(115deg, transparent 18%, rgba(190, 215, 255, 0.045) 24%, transparent 31%, transparent 62%, rgba(190, 215, 255, 0.03) 67%, transparent 72%),
+    linear-gradient(180deg, rgba(6, 11, 20, 0) 60%, rgba(6, 11, 20, 0.35)) }
+body.mode-market h1 { font-style: normal }
+.money { font-family: var(--display); font-weight: 800; font-variant-numeric: tabular-nums }
+.gain { color: var(--up) } .loss { color: var(--down) }
+.kpis { display: flex; flex-wrap: wrap; gap: 14px 32px; margin: 0; padding: 18px 22px; border-radius: 20px }
+.kpis div { display: flex; flex-direction: column }
+.kpis dt { order: 2; color: var(--muted); font-size: 14px }
+.kpis dd { order: 1; margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(26px, 3vw, 36px); line-height: 1; font-variant-numeric: tabular-nums }
+.mhead { padding-block: clamp(18px, 3.5vw, 40px) 0; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px 32px }
+.mhead h1 { font-size: clamp(40px, 5vw, 76px) }
+.empty { color: var(--muted); margin: 12px 0 0 }
+.empty a { color: var(--elo) }
+.range-bar { position: relative; height: 8px; min-width: 120px; border-radius: 4px; background: rgba(255, 255, 255, 0.06) }
+.range-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: rgba(255, 214, 107, 0.35) }
+.range-bar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--elo) }
+.watch-btn[aria-pressed="true"] { color: var(--elo) }
