@@ -131,6 +131,12 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner
   is not keen on it.
+- **Pending owner decision** (2026-11-22): goal value 70/30 of the measured 226 Elo per goal
+  per match (goals 158, assists 68) and club weight 0.7 (`team_weight`). Rank correlation
+  fit / held-out 0.512 / 0.442 → 0.518 / 0.457, C7 A / B 0.720 / 0.901 → 0.739 / 0.914;
+  Haaland 21st → 8th of the 70-player sample. On-pitch goal difference (`onpitch.py`,
+  `onpitch_scale`) tested and rejected: held-out 0.442 → 0.439 / 0.430 / 0.400 at scale
+  100 / 200 / 400.
 - Match weights **adopted** (2026-11-22): continental matches ×2, domestic cups and super
   cups ×0.5, Club World Cup ×1 (`candidate.current_team_constants()`). Reason: top clubs
   like PSG underperform the model domestically (0.844 expected, 0.809 actual) and
