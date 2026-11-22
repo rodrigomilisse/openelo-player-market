@@ -52,12 +52,11 @@ export function shell() {
       </div>
       <a class="header-cta" href="#waitlist">Join the waitlist</a>
     </div>`;
-  if (isMock) {
-    const note = document.createElement('p');
-    note.className = 'mock-note';
-    note.innerHTML = '<strong>Mock data.</strong> Every player, club and number here is fictional, generated to build the site.';
-    header.after(note);
-  }
+  const note = document.createElement('p');
+  note.className = 'mock-note';
+  note.innerHTML = isMock ? '<strong>Mock data.</strong> Every player, club and number here is fictional, generated to build the site.'
+    : '<strong>Beta.</strong> Real ratings from real results, still provisional while the formula is tested. Market prices are simulated.';
+  header.after(note);
   wireSearch(header);
   wireTheme(header);
   const footer = document.querySelector('[data-shell="footer"]');

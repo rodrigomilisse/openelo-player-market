@@ -99,9 +99,9 @@
     field('count').textContent = `${number.format(list.length)} ${list.length === 1 ? 'player' : 'players'}`;
     field('rows').innerHTML = list.length ? list.slice(0, shown).map((p) => `<tr>
       <td class="num muted">${p.rank}</td>
-      <td><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation)}</small></td>
+      <td><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation || '')}</small></td>
       <td><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
-      <td class="muted">${p.position}</td><td class="num">${p.age}</td>
+      <td class="muted">${p.position}</td><td class="num">${p.age ?? '–'}</td>
       <td class="num"><span class="e">${number.format(p.rating)}</span></td>
       <td class="num ${direction(p.week)}">${signed(p.week)}</td><td class="num ${direction(p.season)}">${signed(p.season)}</td></tr>`).join('')
       : '<tr><td colspan="8" class="empty">No players match these filters. Clear a filter to see more.</td></tr>';

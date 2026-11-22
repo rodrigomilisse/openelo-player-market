@@ -348,6 +348,12 @@ export function search(query, limit = 8) {
   return [...clubs_, ...players].slice(0, limit);
 }
 
+/* The market can run over the real ratings: api.js hands it a world built from the published rankings
+   (prices still simulated). Until then it uses the mock world. */
+let marketWorld = null;
+export function useMarketWorld(w) { marketWorld = w; heldCache = null; }
+const getMarketWorld = () => marketWorld || getWorld();
+
 /* ---------- the market (play money preview) ----------
    A mock of the money model in ADR-0019: one pool for the whole market, a fixed share of it paid out
    each day, split by Elo weight 10^(rating/400) over every share held. Prices come from the simulated
@@ -361,7 +367,7 @@ const weightOf = (rating) => 10 ** ((rating - 2000) / 400);
 let heldCache = null;
 function held() {   // how many shares fans hold in each player, and the total Elo weight held
   if (heldCache) return heldCache;
-  const w = getWorld();
+  const w = getMarketWorld();
   const shares = new Map();
   let total = 0;
   for (const p of w.players) {
@@ -387,7 +393,7 @@ function marketOf(p) {
 }
 
 export function market() {
-  const w = getWorld();
+  const w = getMarketWorld();
   return { asOf: w.asOf, mock: true, players: w.ranked.map((p) => ({ id: p.id, name: p.name, club: p.club.name, clubId: p.club.id,
     league: p.club.league.name, position: p.position, rating: p.rating, ...marketOf(p) })) };
 }
@@ -402,7 +408,7 @@ export function pool(extraWeight = 0) {
 /* If ratings stay as they are: each position's next payout. The range is what one typical match
    (about ±14 rating points) would do to it. */
 export function projection(positions) {
-  const w = getWorld();
+  const w = getMarketWorld();
   const rows = Object.entries(positions).filter(([, x]) => x.shares > 0).map(([id, x]) => ({ p: w.players.find((q) => q.id === id), ...x })).filter((x) => x.p);
   const mine = rows.reduce((s, x) => s + x.shares * weightOf(x.p.rating), 0);
   const total = held().totalWeight + mine;
@@ -415,7 +421,7 @@ export function projection(positions) {
 }
 
 export function book(id) {
-  const w = getWorld();
+  const w = getMarketWorld();
   const p = w.players.find((x) => x.id === id);
   if (!p) return null;
   const m = marketOf(p);

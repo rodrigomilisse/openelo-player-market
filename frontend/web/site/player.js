@@ -19,7 +19,7 @@ function render(p) {
   document.title = `${p.name}: ${number.format(p.rating)} OpenElo`;
   field('surname').textContent = p.shortName;
   fitSurname();
-  field('identity').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}, ${p.age}, ${escape(p.nation)}`;
+  field('identity').innerHTML = [`<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>`, p.position.toLowerCase(), p.age, p.nation && escape(p.nation)].filter(Boolean).join(', ');
   field('name').textContent = p.name;
   field('legend-player').textContent = p.shortName;
   field('legend-club').textContent = p.club.name;

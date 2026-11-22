@@ -78,7 +78,8 @@
   const byName = new Map(players.map((p) => [`${p.name} (${p.club})`, p.id]));
   document.getElementById('all-players').innerHTML = [...byName.keys()].map((n) => `<option value="${escape(n)}">`).join('');
   const label = (id) => { const p = players.find((x) => x.id === id); return p ? `${p.name} (${p.club})` : ''; };
-  let a = param('a') || 'tiago-mendonca';
+  let a = param('a');
+  if (!players.some((p) => p.id === a)) a = players.find((p) => p.id === 'tiago-mendonca')?.id || players[0].id;   // the mock's featured player, or the top-rated one
   let b = param('b');
   if (!b) { const i = players.findIndex((p) => p.id === a); b = players[Math.max(0, i - 1)]?.id === a ? players[i + 1].id : players[Math.max(0, i - 1)].id; }
   form.a.value = label(a); form.b.value = label(b);
@@ -116,7 +117,7 @@
     const leader = diff >= 0 ? pa : pb, other = diff >= 0 ? pb : pa;
     const why = { club: `the stronger club (${main.d > 0 === diff >= 0 ? leader.club.name : other.club.name})`, selection: 'starting more often', goals: 'goals and assists', national: 'national-team selection', absence: 'missing fewer matches' }[main.key];
     const side = (p, cls) => `<div class="side ${cls}"><a class="who" href="${playerUrl(p.id)}">${escape(p.name)}</a>
-      <p class="meta"><a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}, ${p.age}</p>
+      <p class="meta"><a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}${p.age ? `, ${p.age}` : ''}</p>
       <p class="big">${number.format(p.rating)}</p><p class="meta">#${number.format(p.rank.world)} in the world, ${signed(p.change.season)} this season</p></div>`;
     const span = Math.max(...gaps.filter((g) => g.key !== 'club').flatMap((g) => [Math.abs(g.a), Math.abs(g.b)]), 30);
     const clubSpan = Math.max(pa.club.rating, pb.club.rating);

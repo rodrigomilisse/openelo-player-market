@@ -82,7 +82,7 @@
 </div>
 <script type="module">
   import { immersive, galaxyFormation, fieldFormation } from './scene.js';
-  import { getPlayer } from './api.js';
+  import { getRankings, getPlayer } from './api.js';
   import { shell, field, number, signed, escape, playerUrl } from './site.js';
   shell();
   immersive({
@@ -94,7 +94,7 @@
       { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -14] },
     ],
   });
-  const p = await getPlayer('tiago-mendonca');
+  const p = (await getPlayer('tiago-mendonca')) || (await getPlayer((await getRankings()).players[0].id));   // the worked example: the mock's featured player, or the top-rated one
   field('worked').innerHTML = p.parts.map((part, i) => `${i ? `<span class="op">${part.value < 0 ? '−' : '+'}</span>` : ''}<span class="${part.key === 'club' ? 'club' : part.value < 0 ? 'minus' : ''}">${number.format(Math.abs(part.value))}</span>`).join('')
     + `<span class="op">=</span><span class="total">${number.format(p.rating)}</span>`;
   field('worked-note').innerHTML = `${p.parts.map((x) => escape(x.label)).join(', ')}. That is <a class="gold" href="${playerUrl(p.id)}">${escape(p.name)}</a>, today.`;

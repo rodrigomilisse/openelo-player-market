@@ -1,22 +1,57 @@
-// The site's only data access. Every function returns the read-API shape (README.md).
-// Today everything comes from the mock world; when the rating service publishes real
-// data, each function fetches it instead and the pages do not change.
+// The site's only data access. Every function returns the read-API shape (README.md "Data contract").
+// Real ratings when the site has a data/ folder (pipeline/export.py writes it); the mock world otherwise.
+// The market is a play-money preview either way: over real ratings its prices are still simulated.
 import * as mock from './mock.js';
 
-export const getPlayer = async (id) => mock.player(id);
-export const getClub = async (id) => mock.club(id);
-export const getRankings = async () => mock.rankings();
-export const getClubs = async () => mock.clubs();
-export const getLeagues = async () => mock.leagues();
-export const getWeek = async () => mock.week();
-export const search = async (query) => mock.search(query);
+const fetchJson = (path) => fetch(`data/${path}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const meta = await fetchJson('meta.json');
+const cache = new Map();
+const get = (path) => { if (!cache.has(path)) cache.set(path, fetchJson(path)); return cache.get(path); };
+
+/* A simulated share price from a rating series, the same shape as the mock's (until the market exists). */
+function simulatedPrice(id, ratings, dates) {
+  let h = [...id].reduce((x, c) => (x * 31 + c.charCodeAt(0)) | 0, 7);
+  const rnd = () => ((h = (h * 1103515245 + 12345) | 0) >>> 0) / 4294967296;
+  let price = Math.exp((ratings[0] - 1650) / 160);
+  return ratings.map((r, i) => {
+    const fair = Math.exp((r - 1650) / 160);
+    price = price + (fair - price) * 0.35 + (rnd() - 0.5) * 0.04 * fair;
+    return { date: dates[i], price: Math.round(Math.max(0.05, price) * 100) / 100 };
+  });
+}
+const withPrice = (p) => p && { ...p, price: p.price || simulatedPrice(p.id, p.history.map((x) => x.rating), p.history.map((x) => x.date)) };
+
+if (meta) {   // the market preview runs over the real players
+  const r = await get('rankings.json');
+  const players = r.players.map((p) => {
+    const ratings = [p.rating - p.season, p.rating - p.week, p.rating];
+    return { id: p.id, name: p.name, rating: p.rating, position: p.position, club: { id: p.clubId, name: p.club, league: { name: p.league } },
+      price: simulatedPrice(p.id, [...Array(9).fill(ratings[0]).map((x, i) => x + (ratings[1] - x) * i / 9), ratings[1], ratings[2]], Array(11).fill(r.asOf)) };
+  });
+  mock.useMarketWorld({ players, ranked: players, asOf: r.asOf });
+}
+
+export const isMock = !meta;
+export const getPlayer = async (id) => (meta ? withPrice(await get(`players/${id}.json`)) : mock.player(id));
+export const getClub = async (id) => (meta ? get(`clubs/${id}.json`) : mock.club(id));
+export const getRankings = async () => (meta ? get('rankings.json') : mock.rankings());
+export const getClubs = async () => (meta ? get('clubs.json') : mock.clubs());
+export const getLeagues = async () => (meta ? get('leagues.json') : mock.leagues());
+export const getWeek = async () => (meta ? get('week.json') : mock.week());
+export async function search(query, limit = 8) {
+  if (!meta) return mock.search(query, limit);
+  const q = mock.slug(query);
+  if (!q) return [];
+  const all = await get('search.json');
+  const hits = all.filter((x) => x.id.includes(q));
+  return [...hits.filter((x) => x.kind === 'club').slice(0, 4), ...hits.filter((x) => x.kind === 'player')].slice(0, limit);
+}
 export const getMarket = async () => mock.market();
 export const getBook = async (id) => mock.book(id);
 export const getQuote = async (id, side, amount) => mock.quote(id, side, amount);
 export const getPool = async (extraWeight) => mock.pool(extraWeight);
 export const getProjection = async (positions) => mock.projection(positions);
 export const FEES = mock.FEES;
-export const isMock = true;
 
 /* The play-money account lives in this browser only (FEATURES.md: accounts, wallet, positions).
    { credits, positions: { id: { shares, cost } }, watch: [ids], history: [{ at, kind, ... }], dividends } */

@@ -143,7 +143,7 @@
     boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });
     const cr = (v) => v.toFixed(2);
     document.title = `Trade ${p.name} | OpenElo`;
-    field('who').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}, ${p.age}`;
+    field('who').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}${p.age ? `, ${p.age}` : ''}`;
     field('name').textContent = p.name;
     const prices = p.price.map((x) => x.price);
     const seasonPct = Math.round((b.price / prices[0] - 1) * 100);
