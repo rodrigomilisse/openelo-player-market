@@ -131,6 +131,12 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner
   is not keen on it.
+- Match weights **adopted** (2026-11-22): continental matches ×2, domestic cups and super
+  cups ×0.5, Club World Cup ×1 (`candidate.current_team_constants()`). Reason: top clubs
+  like PSG underperform the model domestically (0.844 expected, 0.809 actual) and
+  outperform it in Europe (0.595 expected, 0.706 actual); European matches are the only
+  direct evidence between leagues. Log loss: all matches −0.0003 (ns), European −0.0086
+  (−0.0112 to −0.0057), domestic cups −0.0001 (ns). PSG 1,968 → 2,038 (3rd).
 - Rotation shift **adopted** (2026-11-22): `lineup_shift=100` (a team fielding fewer of its
   usual eleven is expected to do worse in that match). Barely moves the top of the table
   (PSG 1,975 → 1,968).

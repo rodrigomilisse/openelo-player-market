@@ -30,6 +30,20 @@ def team_constants() -> te.TeamConstants:
     return te.TeamConstants(**fitted)
 
 
+def current_team_constants() -> te.TeamConstants:
+    """The team model as currently decided (research/NEXT.md): the fitted constants
+    with process noise 3, the rotation shift, continental matches ×2 and domestic
+    cups and super cups ×0.5."""
+    base = team_constants()
+    weights = dict(base.stage_weights)
+    for stage in weights:
+        if stage.startswith("continental"):
+            weights[stage] = 2.0
+        elif stage in ("cup_early", "cup_late", "super_cup"):
+            weights[stage] = 0.5
+    return base.with_(process_noise=3, lineup_shift=100, stage_weights=weights)
+
+
 def top_league_inputs() -> pe.PlayerInputs:
     """Player inputs for clubs of the top 10 leagues only (all their club matches);
     team Elo still uses every match."""
