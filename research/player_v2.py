@@ -77,6 +77,8 @@ class Variant:
     goal_scale: float = 100.0
     assist_scale: float = 100.0
     big_game: bool = False
+    team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
+    team_anchor: float = 1600.0
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -407,7 +409,7 @@ class Player:
             self.apply_decay(row.day)
         usual = np.mean(self.window) if self.window else share
         if self.v.direct:
-            self.level = row.rating + row.swing
+            self.level = self.v.team_anchor + self.v.team_weight * (row.rating + row.swing - self.v.team_anchor)
         elif self.v.split:
             self.level += row.swing + LEVEL_RATE * share * (row.rating - self.level)
             if self.v.weighted:
