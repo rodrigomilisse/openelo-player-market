@@ -210,6 +210,29 @@ LEAGUE_REFERENCE_CLUBS = 17
 LINEUP_REGULARITY: dict[tuple[int, int], float] = {}   # (game, team) -> share of usual starters fielded
 
 
+def lineup_regularity(window: int = 30, minimum: int = 10) -> dict[tuple[int, int], float]:
+    """(game, team) -> share of the team's usual eleven that started: the usual eleven
+    are the 11 players with the most starts in the team's previous `window` club
+    matches with line-ups; scored once the team has `minimum` such matches."""
+    from collections import Counter, deque
+    games = store.query("SELECT game_id, date FROM game WHERE national = 0").set_index("game_id").date
+    starts = store.query("SELECT game_id, team_id, player_id FROM lineup WHERE starter = 1")
+    starts = starts[starts.game_id.isin(games.index)].assign(date=lambda f: f.game_id.map(games))
+    result = {}
+    for team, rows in starts.sort_values(["date", "game_id"]).groupby("team_id"):
+        recent, counts = deque(), Counter()
+        for game, players in rows.groupby("game_id", sort=False).player_id:
+            players = set(players)
+            if len(recent) >= minimum:
+                usual = {p for p, _ in counts.most_common(11)}
+                result[(int(game), int(team))] = len(players & usual) / min(11, len(players))
+            recent.append(players)
+            counts.update(players)
+            if len(recent) > window:
+                counts.subtract(recent.popleft())
+    return result
+
+
 def share_with_leagues(prediction: "Prediction", league_of: dict, seeder: "Seeder", states: dict,
                        constants: TeamConstants) -> None:
     """After a European match between clubs of different leagues, the other clubs
@@ -242,6 +265,8 @@ def run(matches: list[Match], constants: TeamConstants, burn_in_seed: bool = Tru
     """Forward filter over every match, in processing order."""
     states: dict[int, TeamState] = {}
     league_of: dict[int, str] = {}
+    if (constants.lineup_shift or constants.lineup_power) and not LINEUP_REGULARITY:
+        LINEUP_REGULARITY.update(lineup_regularity())
     seeder = Seeder(constants)
     predictions = []
     for day in days_of(matches):
