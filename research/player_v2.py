@@ -77,6 +77,7 @@ class Variant:
     goal_scale: float = 100.0
     assist_scale: float = 100.0
     big_game: bool = False
+    output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
     match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
     team_anchor: float = 1600.0
@@ -414,6 +415,10 @@ class Player:
               onpitch=None) -> None:
         if listed and self.v.onpitch_scale and onpitch is not None:
             self.onpitch_window.append(onpitch)
+        if self.v.output != "none" and self.v.output_per_team_match:
+            if not hasattr(self, "team_window"):
+                self.team_window = deque(maxlen=self.v.output_per_team_match)
+            self.team_window.append((goals, assists) if listed else (0.0, 0.0))
         if listed and self.v.output != "none":
             importance = getattr(row, "importance", 1.0) if self.v.match_importance else 1.0
             self.output_window.append((minutes * importance, goals * importance, assists * importance))
@@ -521,6 +526,10 @@ class Player:
         position's average rate (analysis only: position is not meant for the rating)."""
         if self.v.output == "none" or not self.output_window:
             return 0.0
+        if self.v.output_per_team_match and self.v.output == "weighted" and getattr(self, "team_window", None):
+            goals = sum(g for g, _ in self.team_window)
+            assists = sum(a for _, a in self.team_window)
+            return (self.v.goal_scale * goals + self.v.assist_scale * assists) / (len(self.team_window) + self.v.output_prior)
         minutes = sum(m for m, _, _ in self.output_window)
         per_90 = minutes / 90 + self.v.output_prior
         if self.v.output == "weighted":
