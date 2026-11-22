@@ -12,7 +12,7 @@ the mechanics (fees, drain, pool, issuance) are placeholders to be replaced by t
 - [ ] **Order book per player** (`getBook`): bids, asks, last price, new-share price.
 - [ ] **Quotes** (`getQuote(id, side, amount)`): fills from fans, then new shares on the curve; fees; average price.
 - [ ] **Order execution** (`recordTrade`): atomic fill, balance and position update, fee accounting. Today it trusts the quote.
-- [ ] **Limit orders / open orders.** Not built: only market orders exist.
+- [ ] **Limit orders / open orders.** Front built (trade page and portfolio, kept in the browser, filled against the mock book). Needs a real matching engine.
 - [ ] **Price history** per player (trade chart, sparklines, "this week", "season").
 - [ ] **Holders count** per player.
 - [ ] **Market list** (`getMarket`) with search and sort server-side once it's large.
@@ -29,7 +29,7 @@ the mechanics (fees, drain, pool, issuance) are placeholders to be replaced by t
 - [ ] **Projection range**: today ±14 rating points as "one typical match". Better: from the player's next fixture and his rating volatility.
 - [ ] **Payout history** per user (Dividends, Activity). `simulatePayout()` fakes one; remove it when payouts are real.
 - [ ] **Payout schedule**: daily at UTC midnight assumed (countdown). Decide the real cadence.
-- [ ] **Share term / expiry** (3-year term recommended in the money-model notes). Not shown anywhere yet: positions need an expiry date and the UI a "matures on" column.
+- [ ] **Share term / expiry** (3-year term, `SHARE_TERM_YEARS` in `api.js`). Front shows "Matures" per position from the first buy; the real rule needs per-lot terms and what happens at maturity.
 
 ## Lists and feed
 - [ ] **Watchlist** persistence (`toggleWatch`).

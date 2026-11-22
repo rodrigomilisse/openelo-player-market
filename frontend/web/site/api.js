@@ -56,7 +56,8 @@ export const FEES = mock.FEES;
 /* The play-money account lives in this browser only (FEATURES.md: accounts, wallet, positions).
    { credits, positions: { id: { shares, cost } }, watch: [ids], history: [{ at, kind, ... }], dividends } */
 const WALLET_KEY = 'openelo-play-wallet';
-const fresh = () => ({ credits: 1000, positions: {}, watch: [], history: [], dividends: 0 });
+const fresh = () => ({ credits: 1000, positions: {}, watch: [], history: [], dividends: 0, orders: [] });
+export const SHARE_TERM_YEARS = 3;   // shares mature after this (money-model notes); placeholder until the rules are set
 export function wallet() {
   try {
     const w = JSON.parse(localStorage.getItem(WALLET_KEY) || 'null');
@@ -75,6 +76,7 @@ export function saveWallet(w) { try { localStorage.setItem(WALLET_KEY, JSON.stri
 export function recordTrade(id, name, quote) {
   const w = wallet();
   const pos = w.positions[id] || { shares: 0, cost: 0 };
+  if (quote.side === 'buy' && !pos.shares) pos.opened = Date.now();   // the term runs from the first buy (FEATURES.md: per-lot terms)
   if (quote.side === 'buy') {
     w.credits = Math.round((w.credits - quote.spent) * 100) / 100;
     pos.shares += quote.shares; pos.cost = Math.round((pos.cost + quote.spent) * 100) / 100;
@@ -107,4 +109,38 @@ export function simulatePayout() {
   w.history.unshift({ at: Date.now(), kind: 'dividend', credits: pr.next, rows: pr.rows.map((r) => ({ id: r.id, name: r.name, credits: r.next })) });
   saveWallet(w);
   return { paid: pr.next, rows: pr.rows };
+}
+
+/* Limit orders (preview): kept in the wallet, filled when the book reaches the price.
+   { id, playerId, name, side, shares, limit, at } */
+export function placeOrder(order) {
+  const w = wallet();
+  w.orders = [...(w.orders || []), { ...order, id: `o${Date.now().toString(36)}`, at: Date.now() }];
+  saveWallet(w);
+  return checkOrders();
+}
+export function cancelOrder(orderId) {
+  const w = wallet();
+  w.orders = (w.orders || []).filter((o) => o.id !== orderId);
+  saveWallet(w);
+}
+/* Fill whatever can fill now: a buy when someone sells at or under its limit, a sale when someone buys at or over. */
+export function checkOrders() {
+  const filled = [];
+  for (const o of wallet().orders || []) {
+    const b = mock.book(o.playerId);
+    if (!b) continue;
+    const w = wallet();
+    const best = o.side === 'buy' ? b.asks[0]?.price : b.bids[0]?.price;
+    if (best == null || (o.side === 'buy' ? best > o.limit : best < o.limit)) continue;
+    const gross = o.shares * best;
+    const fees = Math.round(gross * mock.FEES.taker * 100) / 100;
+    if (o.side === 'buy' && gross + fees > w.credits) continue;
+    if (o.side === 'sell' && (w.positions[o.playerId]?.shares || 0) < o.shares) continue;
+    cancelOrder(o.id);
+    recordTrade(o.playerId, o.name, o.side === 'buy' ? { side: 'buy', shares: o.shares, spent: Math.round((gross + fees) * 100) / 100 }
+      : { side: 'sell', shares: o.shares, received: Math.round((gross - fees) * 100) / 100 });
+    filled.push({ ...o, price: best });
+  }
+  return filled;
 }

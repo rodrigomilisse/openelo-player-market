@@ -6,6 +6,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trade | OpenElo</title>
 <meta name="description" content="Buy or sell shares in a player. Play-money preview.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Trade | OpenElo">
+<meta property="og:description" content="Buy or sell shares in a player. Play-money preview.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
@@ -65,6 +72,13 @@
   .why a { color: var(--elo) }
   .position { margin-top: 10px; color: var(--muted) }
   .position strong { color: var(--ink) }
+  .limit { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px }
+  .limit summary { cursor: pointer; color: var(--muted); font-weight: 600 }
+  .limit-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-top: 10px }
+  .limit-row label { margin: 0 }
+  .limit-row .field { font-size: 17px }
+  .orders { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px }
+  .orders li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px }
   @media (max-width: 960px) { .desk { grid-template-columns: minmax(0, 1fr) } }
 </style>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
@@ -117,6 +131,16 @@
             <input type="range" min="0" max="100" value="0" aria-label="Slide to confirm the order" data-field="slider"></div>
           <p class="done" role="status" data-field="done"></p>
           <p class="position" data-field="position"></p>
+          <details class="limit" data-field="limit">
+            <summary>Or wait for a price (limit order)</summary>
+            <div class="limit-row">
+              <label>Shares<input class="field" type="number" min="1" step="1" value="10" data-field="limit-shares"></label>
+              <label>At most / at least<input class="field" type="number" min="0.01" step="0.01" data-field="limit-price"></label>
+              <button class="button" type="button" data-field="limit-place">Place</button>
+            </div>
+            <p class="ticket-note" data-field="limit-note"></p>
+            <ul class="orders" data-field="orders"></ul>
+          </details>
         </section>
         <section class="glass-panel book" aria-labelledby="book-title">
           <h2 id="book-title">Order book</h2>
@@ -132,7 +156,7 @@
   <div data-shell="footer"></div>
 </div>
 <script type="module">
-  import { getPlayer, getBook, getQuote, wallet, recordTrade, toggleWatch, getProjection, FEES } from './api.js';
+  import { getPlayer, getBook, getQuote, wallet, recordTrade, toggleWatch, getProjection, placeOrder, cancelOrder, checkOrders, FEES } from './api.js';
   import { boxScene } from './market-ui.js';
   import { shell, field, param, number, signed, escape, longDate, shortDate, lineChart, notFound, playerUrl, clubUrl } from './site.js';
   shell();
@@ -252,6 +276,29 @@
       field('slide').style.setProperty('--slid', '0%');
       update();
     });
+    // limit orders: wait for a price instead of taking the book now
+    const limitPrice = field('limit-price');
+    const drawOrders = () => {
+      const mine = (wallet().orders || []).filter((o) => o.playerId === p.id);
+      field('orders').innerHTML = mine.map((o) => `<li><span>${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.shares} at ${o.side === 'buy' ? 'most' : 'least'} ${cr(o.limit)}</span>
+        <button class="button" type="button" data-cancel="${o.id}">Cancel</button></li>`).join('');
+      field('limit-note').textContent = side === 'buy' ? `Buys when a fan sells at or under your price (best offer now ${b.asks[0] ? cr(b.asks[0].price) : '–'}).`
+        : `Sells when a fan bids at or over your price (best bid now ${b.bids[0] ? cr(b.bids[0].price) : '–'}).`;
+      if (!limitPrice.value) limitPrice.value = cr(b.price * (side === 'buy' ? 0.97 : 1.03));
+    };
+    field('limit-place').addEventListener('click', () => {
+      const shares = Math.floor(+field('limit-shares').value), limit = +limitPrice.value;
+      if (!(shares > 0 && limit > 0)) return;
+      const filled = placeOrder({ playerId: p.id, name: p.name, side, shares, limit });
+      const done = field('done');
+      done.textContent = filled.length ? `Filled at once: ${side === 'buy' ? 'bought' : 'sold'} ${shares} at ${cr(filled[0].price)}.` : `Order placed: ${side} ${shares} at ${cr(limit)}. It fills when the book gets there.`;
+      done.classList.remove('flash'); void done.offsetWidth; done.classList.add('flash');
+      drawOrders(); update();
+    });
+    field('orders').addEventListener('click', (e) => { const btn = e.target.closest('[data-cancel]'); if (btn) { cancelOrder(btn.dataset.cancel); drawOrders(); } });
+    field('side').addEventListener('click', () => { limitPrice.value = ''; drawOrders(); });
+    checkOrders();
+    drawOrders();
     update();
     document.querySelector('main').addEventListener('pageshow-again', () => { showWatch(); update(); boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } }); });   // coming back after trading elsewhere
   }

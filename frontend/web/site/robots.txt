@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+# Sitemap: https://YOUR-DOMAIN/sitemap.xml   (written by pipeline/export.py --site-url once the domain is set)

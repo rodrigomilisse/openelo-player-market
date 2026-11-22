@@ -6,6 +6,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Portfolio | OpenElo</title>
 <meta name="description" content="Your players, what they are worth, and what they will pay next. Play-money preview.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Portfolio | OpenElo">
+<meta property="og:description" content="Your players, what they are worth, and what they will pay next. Play-money preview.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
@@ -20,6 +27,10 @@
   .payout .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px }
   .paid { min-height: 1.4em; color: var(--elo); font-weight: 600 }
   td small { display: block; color: var(--muted) }
+  .steps { margin: 14px 0 0; padding-left: 1.2em; display: grid; gap: 8px; color: var(--muted); max-width: 75ch }
+  .steps strong { color: var(--ink) }
+  .orders { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px }
+  .orders li { display: flex; justify-content: space-between; align-items: center; gap: 12px }
   @media (max-width: 760px) { .payout { grid-template-columns: 1fr } }
 </style>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
@@ -36,6 +47,15 @@
         <p class="preview-note"><strong>Play money.</strong> 1,000 practice credits kept in this browser. Prices, payouts and fees are illustrative.</p>
       </div>
       <dl class="kpis liquid" data-field="kpis"></dl>
+    </section>
+
+    <section class="glass-panel intro" aria-labelledby="intro-title" data-field="intro" hidden>
+      <div class="section-head"><h2 id="intro-title">How the market works</h2><button class="button" type="button" data-field="intro-close">Got it</button></div>
+      <ol class="steps">
+        <li><strong>Back a player.</strong> Buy shares from fans selling, or new shares at the new-share price.</li>
+        <li><strong>Get paid every day.</strong> One pool pays the whole market, split by each player's rating. The higher his OpenElo, the more each share earns.</li>
+        <li><strong>Sell any time</strong> to fans who want him, at whatever price they'll pay. Shares mature after ${SHARE_TERM_YEARS} years.</li>
+      </ol>
     </section>
 
     <section class="glass-panel payout" aria-labelledby="next-title">
@@ -59,17 +79,33 @@
       <div class="section-head"><h2 id="pos-title">Your players</h2><a class="button" href="market.html">Find players</a></div>
       <div data-field="positions"></div>
     </section>
+
+    <section class="glass-panel" aria-labelledby="orders-title" data-field="orders-panel" hidden>
+      <h2 id="orders-title">Open orders</h2>
+      <ul class="orders" data-field="orders"></ul>
+    </section>
   </main>
   <div data-shell="footer"></div>
 </div>
 <script type="module">
   import { shell, field, escape, number } from './site.js';
-  import { getPool, simulatePayout } from './api.js';
+  import { getPool, simulatePayout, checkOrders, cancelOrder, wallet as account, SHARE_TERM_YEARS } from './api.js';
   import { boxScene, portfolio, cr, signedCr, tone, tradeUrl, countdown } from './market-ui.js';
   shell();
   const pool = await getPool();
+  // first visit: the three steps, until dismissed
+  let seen = false; try { seen = !!localStorage.getItem('openelo-market-intro'); } catch { /* storage blocked */ }
+  const intro = field('intro');
+  intro.innerHTML = intro.innerHTML.replace('${SHARE_TERM_YEARS}', SHARE_TERM_YEARS);
+  intro.hidden = seen;
+  field('intro-close').addEventListener('click', () => { intro.hidden = true; try { localStorage.setItem('openelo-market-intro', '1'); } catch { /* */ } });
+  const matures = (r) => r.opened ? new Date(r.opened + SHARE_TERM_YEARS * 365.25 * 864e5).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '–';
   countdown(field('clock'), pool.nextPayoutAt);
   const draw = async () => {
+    checkOrders();
+    const orders = account().orders || [];
+    field('orders-panel').hidden = !orders.length;
+    field('orders').innerHTML = orders.map((o) => `<li><span>${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.shares} <a href="${tradeUrl(o.playerId)}">${escape(o.name)}</a> at ${o.side === 'buy' ? 'most' : 'least'} ${cr(o.limit)}</span><button class="button" type="button" data-cancel="${o.id}">Cancel</button></li>`).join('');
     boxScene();
     const { w, rows, proj, value, cost, gain } = await portfolio();
     const total = w.credits + value;
@@ -84,11 +120,11 @@
     field('simulate').disabled = !rows.length;
     field('positions').innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th scope="col">Player</th><th class="num" scope="col">Shares</th>
       <th class="num" scope="col">Paid</th><th class="num" scope="col">Price now</th><th class="num" scope="col">Worth</th><th class="num" scope="col">Gain</th>
-      <th class="num" scope="col">Dividends so far</th><th class="num" scope="col">Next payout</th></tr></thead><tbody>${rows.map((r) => `<tr>
+      <th class="num" scope="col">Dividends so far</th><th class="num" scope="col">Next payout</th><th class="num" scope="col">Matures</th></tr></thead><tbody>${rows.map((r) => `<tr>
       <td><a href="${tradeUrl(r.id)}">${escape(r.p.name)}</a><small>${escape(r.p.club)} · ${number.format(r.p.rating)}</small></td>
       <td class="num">${number.format(r.shares)}</td><td class="num muted">${r.cost ? cr(r.cost / r.shares) : '–'}</td><td class="num">${cr(r.p.price)}</td>
       <td class="num money">${cr(r.value)}</td><td class="num ${tone(r.gain)}">${r.cost ? signedCr(r.gain) : '–'}</td>
-      <td class="num gold">${cr(r.dividends || 0)}</td><td class="num gold">${cr(r.proj?.next || 0)}</td></tr>`).join('')}</tbody></table></div>`
+      <td class="num gold">${cr(r.dividends || 0)}</td><td class="num gold">${cr(r.proj?.next || 0)}</td><td class="num muted">${matures(r)}</td></tr>`).join('')}</tbody></table></div>`
       : `<p class="empty">The pitch below is empty: you don't hold anyone yet. <a href="market.html">Browse players</a> and back your first one.</p>`;
   };
   await draw();
@@ -97,6 +133,7 @@
     field('paid').textContent = paid ? `Paid ${cr(paid)} credits across ${rows.length} player${rows.length === 1 ? '' : 's'}. (Preview: the real payout runs once a day.)` : '';
     await draw();
   });
+  field('orders').addEventListener('click', (e) => { const b = e.target.closest('[data-cancel]'); if (b) { cancelOrder(b.dataset.cancel); draw(); } });
   document.querySelector('main').addEventListener('pageshow-again', draw);
 </script>
 </body>

@@ -86,6 +86,7 @@ export async function go(href, { push = true } = {}) {
       immersive(kept.scene);
       kept.main.dispatchEvent(new CustomEvent('pageshow-again', { bubbles: false }));   // pages refresh anything personal, like a wallet
       if (url.hash) setTimeout(() => document.querySelector(url.hash)?.scrollIntoView(), 400);
+      window.dispatchEvent(new Event('openelo:navigate'));
       return;
     }
     prefetch(url.href);
@@ -114,6 +115,7 @@ export async function go(href, { push = true } = {}) {
       document.body.append(n);
     });
     if (url.hash) setTimeout(() => document.querySelector(url.hash)?.scrollIntoView(), 400);
+    window.dispatchEvent(new Event('openelo:navigate'));
   } catch {
     location.href = url.href;   // anything unexpected: fall back to a normal page load
   } finally {

@@ -1,6 +1,7 @@
 // Shared shell for every page: header with search, mock-data note, waitlist footer, formatters, chart.
 import { search, isMock } from './api.js';
 import { install } from './router.js';
+import { CONFIG } from './config.js';
 
 export const number = new Intl.NumberFormat('en-GB');
 export const signed = (v) => (v > 0 ? `+${number.format(v)}` : v < 0 ? `−${number.format(-v)}` : '0');
@@ -73,15 +74,45 @@ export function shell() {
       </form>
       <p class="waitlist-status" role="status"></p>
     </section>
-    <footer class="site-footer"><p>OpenElo rates players from public match results and minutes played. Ratings are not a valuation, a transfer fee or an offer of anything.</p></footer>`;
-  // No backend yet: the form confirms locally. Wire it to the waitlist endpoint when it exists.
-  footer.querySelector('form').addEventListener('submit', (event) => {
+    <footer class="site-footer"><p>OpenElo rates players from public match results and minutes played. Ratings are not a valuation, a transfer fee or an offer of anything.</p>
+      <nav class="footer-links" aria-label="About OpenElo"><a href="about.html">About</a><a href="how.html">How it works</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></nav></footer>`;
+  // The waitlist posts to CONFIG.waitlistUrl when it is set; without it the form only confirms locally.
+  footer.querySelector('form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    footer.querySelector('.waitlist-status').textContent = `You're on the list. We'll email ${form.email.value} when the market opens in ${form.country.value}.`;
+    const form = event.currentTarget, status = footer.querySelector('.waitlist-status');
+    const entry = { email: form.email.value, country: form.country.value, page: location.pathname };
+    if (CONFIG.waitlistUrl) {
+      status.textContent = 'Adding you…';
+      try {
+        const r = await fetch(CONFIG.waitlistUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(entry) });
+        if (!r.ok) throw new Error(String(r.status));
+      } catch {
+        status.textContent = "That didn't go through. Please try again in a moment.";
+        return;
+      }
+    }
+    track('waitlist', { country: entry.country });
+    status.textContent = `You're on the list. We'll email ${entry.email} when the market opens in ${entry.country}.`;
     form.reset();
   });
+  const contact = () => { if (CONFIG.contactEmail) document.querySelectorAll('a[href^="mailto:hello@openelo.example"]').forEach((a) => { a.href = `mailto:${CONFIG.contactEmail}`; a.textContent = CONFIG.contactEmail; }); };
+  contact();
+  window.addEventListener('openelo:navigate', contact);
+  loadAnalytics();
 }
+
+/* Analytics: off unless CONFIG.analytics names a provider. Page changes without reload are counted too. */
+let analyticsOn = false;
+function loadAnalytics() {
+  const domain = CONFIG.analytics?.plausibleDomain;
+  if (!domain || analyticsOn) return;
+  analyticsOn = true;
+  window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments); };
+  document.head.append(Object.assign(document.createElement('script'), { defer: true, src: 'https://plausible.io/js/script.manual.js', dataset: { domain } }));
+  window.plausible('pageview');
+  window.addEventListener('openelo:navigate', () => window.plausible('pageview'));
+}
+export function track(event, props) { if (analyticsOn) window.plausible(event, { props }); }
 
 /* Light or dark: the system's choice until the reader picks one; the scene listens for 'themechange'. */
 const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
