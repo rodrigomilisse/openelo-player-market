@@ -38,18 +38,27 @@ function render(p) {
   wireShare(p);
 }
 
-/* The surname fills the nameplate's height (desktop) without running off it. */
+/* The surname fills the nameplate's height (desktop), and the plate's width follows the name:
+   a short surname gets a wider plate and bigger letters, a long one a narrower plate. */
 function fitSurname() {
   const el = field('surname');
   const fit = () => {
+    if (!el.isConnected) return;   // the page is kept alive while another one shows
     el.style.fontSize = '';
+    document.body.style.removeProperty('--plate');
     if (window.innerWidth <= 860) return;
-    const size = parseFloat(getComputedStyle(el).fontSize);
-    const room = el.parentElement.getBoundingClientRect().height * 0.94;
-    el.style.fontSize = `${Math.min(size, size * (room / el.offsetHeight))}px`;   // vertical text: its length is its height
+    el.style.fontSize = '100px';
+    const per100 = el.offsetHeight;   // vertical text: its length is its height
+    if (!per100) return;
+    let font = 100 * (window.innerHeight * 0.94) / per100;
+    const plate = Math.min(Math.max(132, font / 0.92), window.innerWidth * 0.26);
+    font = Math.min(font, plate * 0.92);
+    el.style.fontSize = `${font}px`;
+    document.body.style.setProperty('--plate', `${Math.round(plate)}px`);
   };
   document.fonts.ready.then(fit);
   window.addEventListener('resize', fit);
+  document.querySelector('main').addEventListener('pageshow-again', fit);
 }
 
 function partValue(part, i) { return i === 0 ? number.format(part.value) : signed(part.value); }

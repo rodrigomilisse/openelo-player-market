@@ -44,7 +44,7 @@ function saveCurrent() {
   const main = document.querySelector('main');
   if (!main) return;
   views.set(keyOf(location), {
-    main, plate: document.querySelector('.nameplate'), title: document.title, bodyClass: document.body.className,
+    main, plate: document.querySelector('.nameplate'), title: document.title, bodyClass: document.body.className, bodyStyle: document.body.getAttribute('style') || '',
     styles: [...document.querySelectorAll('[data-page-style]')].map((n) => n.textContent), scene: currentScene, scrollY: window.scrollY,
   });
 }
@@ -55,11 +55,12 @@ function setNav(url) {
   });
 }
 
-function swapIn({ main, plate, styles, title, bodyClass }) {
+function swapIn({ main, plate, styles, title, bodyClass, bodyStyle = '' }) {
   document.title = title;
   document.querySelectorAll('[data-page-style]').forEach((n) => n.remove());
   styles.forEach((text) => { const c = document.createElement('style'); c.textContent = text; c.dataset.pageStyle = ''; document.head.append(c); });
   document.body.className = bodyClass;
+  document.body.setAttribute('style', bodyStyle);   // page-set variables, like the player page's plate width
   document.querySelector('.nameplate')?.remove();
   if (plate) document.querySelector('.page').before(plate);
   document.querySelector('.next-stop')?.remove();
