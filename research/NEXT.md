@@ -131,6 +131,19 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner
   is not keen on it.
+- **One playing-time term instead of two (2026-11-22).** Minutes bonus over his last N *club*
+  matches (a missed match is 0, no separate absence discount), at club 0.7, goal 226 / assist 113,
+  goal term per club match. Held-out rank correlation: two terms (squad-match minutes at 400 +
+  window 150 × 2 absence) 0.496; one term over 150 club matches at scale 800 **0.507**, at 1000
+  0.504 / 120 matches 0.478 / 200 matches 0.508 (scale 1000 0.509). With the old 50-match window
+  it was 0.396: the window has to be long. So the single term is simpler and no worse.
+- **Credit at the strength of the club where it was earned** (`minutes_strength`, owner design:
+  the club he is at supplies the transfer adjustment; minutes count at the strength of where
+  they were earned, so a regular at a smaller club or on loan does not get a top club's "picked
+  every game" credit after moving). Each match counts (share − that club's reference share) ×
+  2^((that club's rating − 2000) / D). Held-out 0.507 → 0.487 (D 800), 0.490 (D 400, scale 1000);
+  C7 A 0.710 → 0.743 / 0.749; fit unchanged. Moves: Guéhi −59, Semenyo −23, Cherki −13 (from
+  smaller clubs); Díaz +79, Olise +66, Madueke +17 (minutes at strong sides).
 - **Absence, uncapped (2026-11-22, owner rule: not playing always costs, no cap, a longer absence
   costs more).** The old discount was capped at 120 and, because the timeline stopped at a player's
   last squad appearance, did nothing for a player still injured (Musiala and Havertz showed 0).

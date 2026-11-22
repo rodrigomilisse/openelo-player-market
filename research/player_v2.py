@@ -84,6 +84,9 @@ class Variant:
     absence_window: int = 150         # window mode: club matches counted
     absence_half_life: float = 100.0  # decay mode: matches until a miss counts half
     absence_bench: float = 0.0        # weight of a match he was listed for but did not play
+    minutes_strength: bool = False    # credit each match at the strength of the club where it was earned
+    strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
+    strength_r0: float = 2000.0
     output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
     match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
@@ -398,6 +401,7 @@ class Player:
         self.missed = 0.0
         self.window = deque(maxlen=variant.window)
         self.output_window = deque(maxlen=variant.window)
+        self.q_window = deque(maxlen=variant.window)
         self.weights = deque(maxlen=variant.window)
         self.onpitch_window = deque(maxlen=variant.window)
         self.team = None
@@ -420,7 +424,7 @@ class Player:
         return minutes_share if self.v.share_rule == "starter" else (self.v.sub_credit if played else 0.0)
 
     def match(self, row, listed: bool, minutes: float, started=None, goals: float = 0.0, assists: float = 0.0,
-              onpitch=None) -> None:
+              onpitch=None, ref=None) -> None:
         if listed and self.v.onpitch_scale and onpitch is not None:
             self.onpitch_window.append(onpitch)
         if self.v.output != "none" and self.v.output_per_team_match:
@@ -468,6 +472,8 @@ class Player:
             self.absence_step(row, listed, share)
         if listed or not self.v.squad_window:
             self.window.append(share)
+            if self.v.minutes_strength and ref is not None:
+                self.q_window.append((share - ref) * 2.0 ** ((row.rating - self.v.strength_r0) / self.v.strength_d))
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
             weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
             if self.v.match_importance:
@@ -638,6 +644,8 @@ class Player:
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
             return 0.0
+        if self.v.minutes_strength:
+            return self.v.bonus_scale * float(np.mean(self.q_window)) if self.q_window else 0.0
         squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)
         if self.v.gk_reference and getattr(self, "keeper", False):
             squad = 1.0  # a keeper is measured against playing every match: the first choice gets 0
@@ -693,7 +701,11 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
             key = (int(row.game_id), int(row.team_id))
             is_listed = key in listed
             minutes, started, goals, assists, onp = listed.get(key, (0.0, 0, 0.0, 0.0, None))
-            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started), goals, assists, onp)
+            ref = None
+            if variant.minutes_strength:
+                ref = 1.0 if (variant.gk_reference and state.keeper) else \
+                    context.squad_mean_at(int(row.team_id), int(row.day), variant.squad_top, variant.share_rule, variant.sub_credit)
+            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started), goals, assists, onp, ref)
             own_shares.append((row.day, min(minutes, row.length) / row.length, row.team_id))
         if state.level is None:
             continue
