@@ -1,11 +1,10 @@
 /* OpenElo public site: shared tokens and components (night-stadium language, rating in gold). */
 :root {
   color-scheme: dark;
-  /* night match: deep navy rather than black, so the stadium and the glass read as surfaces */
-  --night: #0B1626;
+  --night: #060B14;
   --ink: #E4ECF5;
   --ink-rgb: 228, 236, 245;
-  --muted: #9FB1C6;
+  --muted: #93A6BC;
   --elo: #FFD66B;
   --club: #A9BBD0;
   --rival: #8FD3FF;
@@ -13,9 +12,10 @@
   --down: #FF9A4D;
   --glass: rgba(14, 26, 44, 0.62);
   --well: 6, 11, 20;          /* sunken controls */
-  --pane: 12, 22, 38;         /* the tint inside glass */
+  --pane: 7, 13, 24;          /* the tint inside glass */
+  --pane-2: 10, 19, 33;       /* search results, tables */
   --shade: 0, 0, 0;  --shade-k: 1;
-  --line: rgba(255, 255, 255, 0.13);
+  --line: rgba(255, 255, 255, 0.12);
   --grid-rgb: 150, 190, 235;
   --glass-edge: rgba(var(--grid-rgb), 0.16);
   --row: rgba(255, 255, 255, 0.025);
@@ -42,6 +42,7 @@
   --row-alt: rgba(15, 27, 43, 0.06);
   --well: 255, 255, 255;
   --pane: 250, 251, 253;
+  --pane-2: 250, 251, 253;
   --shade: 24, 38, 60;  --shade-k: 0.32;
   --line: rgba(15, 27, 43, 0.14);
   --grid-rgb: 40, 70, 110;
@@ -82,7 +83,7 @@ button, input, select { font: inherit; color: inherit }
 .search input { width: clamp(150px, 16vw, 230px); background: rgba(var(--well), 0.4); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
   box-shadow: inset 0 1px 3px rgba(var(--shade), calc(0.5 * var(--shade-k))) }
 .search-results { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: min(320px, 86vw); list-style: none; margin: 0; padding: 6px;
-  background: rgba(var(--pane), 0.72); border: 1px solid var(--line); border-radius: 18px; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 18px 40px rgba(var(--shade), calc(0.45 * var(--shade-k)));
+  background: rgba(var(--pane-2), 0.72); border: 1px solid var(--line); border-radius: 18px; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 18px 40px rgba(var(--shade), calc(0.45 * var(--shade-k)));
   -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6) }
 .search-results:empty { display: none }
 .search-results a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 10px; border-radius: 8px; text-decoration: none }
@@ -186,11 +187,11 @@ select, .field { background: rgba(var(--well), 0.4); border: 1px solid var(--lin
 .mover small { grid-column: 1; color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .mover .e { grid-row: 1 / 3; grid-column: 2; align-self: center; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--elo) }
 .mover .c { grid-row: 1 / 3; grid-column: 3; align-self: center; font-family: var(--display); font-weight: 800; font-size: 22px; min-width: 2.6em; text-align: right }
-.table-wrap { overflow-x: auto; margin-top: 16px; border-radius: 20px; border: 1px solid var(--line); background: rgba(var(--pane), 0.35);
+.table-wrap { overflow-x: auto; margin-top: 16px; border-radius: 20px; border: 1px solid var(--line); background: rgba(var(--pane-2), 0.35);
   -webkit-backdrop-filter: blur(14px) saturate(1.6); backdrop-filter: blur(14px) saturate(1.6); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 24px 60px rgba(var(--shade), calc(0.35 * var(--shade-k))) }
 table { width: 100%; border-collapse: collapse; font-size: 16px }
 th, td { padding: 9px 12px; text-align: left; white-space: nowrap }
-thead th { position: sticky; top: 0; background: rgba(var(--pane), 0.82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--muted); font-weight: 600; font-size: 14px }
+thead th { position: sticky; top: 0; background: rgba(var(--pane-2), 0.82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--muted); font-weight: 600; font-size: 14px }
 thead th button { all: unset; cursor: pointer }
 thead th button:focus-visible { outline: 2px solid var(--elo) }
 thead th[aria-sort] { color: var(--ink) }

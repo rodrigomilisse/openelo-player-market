@@ -81,8 +81,8 @@ function createWorld({ count } = {}) {
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, small() ? 1.5 : 2));
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0B1626);
-  scene.fog = new THREE.FogExp2(0x0B1626, 0.014);
+  scene.background = new THREE.Color(0x060B14);
+  scene.fog = new THREE.FogExp2(0x060B14, 0.014);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
   const updaters = [];
   addStadium({ scene, camera, renderer, onFrame: (fn) => updaters.push(fn) }, { centerZ: -12, length: 64, crowd: small() ? 5000 : 9000 });
@@ -123,7 +123,7 @@ function createWorld({ count } = {}) {
   // no bloom; the stadium's glowing crowd and floodlights fade into the daylight on their own.
   const applyTheme = () => {
     const light = document.documentElement.dataset.theme === 'light';
-    const sky = light ? 0xE6EAF0 : 0x0B1626;
+    const sky = light ? 0xE6EAF0 : 0x060B14;
     scene.background.set(sky); scene.fog.color.set(sky); scene.fog.density = light ? 0.011 : 0.014;
     particles.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; particles.needsUpdate = true;
     uniforms.uLight.value = light ? 1 : 0;
