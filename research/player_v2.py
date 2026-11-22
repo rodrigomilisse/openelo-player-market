@@ -77,6 +77,7 @@ class Variant:
     goal_scale: float = 100.0
     assist_scale: float = 100.0
     big_game: bool = False
+    match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
     team_anchor: float = 1600.0
     onpitch_scale: float = 0.0     # on-pitch goal difference relative to the team's, per 90
@@ -102,6 +103,7 @@ class Context:
     team's squad mean share over the trailing 365 days."""
 
     def __init__(self, team_constants: te.TeamConstants):
+        self.stage_weights = dict(team_constants.stage_weights)
         matches = te.load_matches()
         predictions, _ = te.run(matches, team_constants)
         appearances = store.appearances()
@@ -115,9 +117,9 @@ class Context:
             for team, rating, swing, sign, own in ((m.home, p.home_rating, p.home_swing, 1, expected),
                                                    (m.away, p.away_rating, p.away_swing, -1, 1 - expected)):
                 rows.append((m.game_id, team, m.day, rating, swing, sign * surprise, spread, lengths.get(m.game_id, 90), own,
-                             sign * m.goal_difference))
+                             sign * m.goal_difference, team_constants.stage_weights.get(m.stage, 1.0)))
         self.team_matches = pd.DataFrame(rows, columns=["game_id", "team_id", "day", "rating", "swing", "surprise",
-                                                        "spread", "length", "expected", "team_gd"]).sort_values(["day", "game_id"])
+                                                        "spread", "length", "expected", "team_gd", "importance"]).sort_values(["day", "game_id"])
         self.by_team = {t: g.reset_index(drop=True) for t, g in self.team_matches.groupby("team_id")}
         self.length = dict(zip(self.team_matches.game_id, self.team_matches.length))
         self.day = dict(zip(self.team_matches.game_id, self.team_matches.day))
@@ -413,7 +415,8 @@ class Player:
         if listed and self.v.onpitch_scale and onpitch is not None:
             self.onpitch_window.append(onpitch)
         if listed and self.v.output != "none":
-            self.output_window.append((minutes, goals, assists))
+            importance = getattr(row, "importance", 1.0) if self.v.match_importance else 1.0
+            self.output_window.append((minutes * importance, goals * importance, assists * importance))
         share = self.share_of(min(minutes, row.length) / row.length, started, minutes > 0)
         if self.level is None:
             self.level = row.rating - DEBUTANT_OFFSET
@@ -438,7 +441,10 @@ class Player:
         if listed or not self.v.squad_window:
             self.window.append(share)
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
-            self.weights.append(2.0 * (1.0 - row.expected) if self.v.big_game else 1.0)
+            weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
+            if self.v.match_importance:
+                weight *= getattr(row, "importance", 1.0)
+            self.weights.append(weight)
         if share > 0:
             self.last_played = row.day
         if listed:
@@ -594,7 +600,7 @@ class Player:
         squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)
         if self.v.gk_reference and getattr(self, "keeper", False):
             squad = 1.0  # a keeper is measured against playing every match: the first choice gets 0
-        if self.v.selection and self.v.big_game and self.window:
+        if self.v.selection and (self.v.big_game or self.v.match_importance) and self.window:
             share = float(np.dot(self.window, self.weights) / sum(self.weights))
         elif self.v.selection:
             share = np.mean(self.window) if self.window else squad

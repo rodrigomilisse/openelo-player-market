@@ -131,6 +131,11 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   Rank correlation fit / held-out 0.489 / 0.423 → 0.501 / 0.430; Kane +55 over B.
   Kept because it is arguably measurement rather than judgement, though the owner
   is not keen on it.
+- Goal and assist weights tuned (club weight 0.7): fit rank correlation rises with both
+  weights (0.518 at 158/68 → 0.526 at 300/226) while held-out peaks lower (0.458 at
+  226/68, 0.457 at 226/113, 0.446 at 300/226); the surface is flat. Recommended 226 / 113
+  (a goal = its measured team value, an assist half). Match importance in the minutes and
+  goal windows (`match_importance`) is worse in every combination (fit −0.004 to −0.008).
 - **Pending owner decision** (2026-11-22): goal value 70/30 of the measured 226 Elo per goal
   per match (goals 158, assists 68) and club weight 0.7 (`team_weight`). Rank correlation
   fit / held-out 0.512 / 0.442 → 0.518 / 0.457, C7 A / B 0.720 / 0.901 → 0.739 / 0.914;
