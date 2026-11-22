@@ -83,6 +83,7 @@ export async function go(href, { push = true } = {}) {
       currentScene = kept.scene;
       const { immersive } = await import('./scene.js');
       immersive(kept.scene);
+      kept.main.dispatchEvent(new CustomEvent('pageshow-again', { bubbles: false }));   // pages refresh anything personal, like a wallet
       if (url.hash) setTimeout(() => document.querySelector(url.hash)?.scrollIntoView(), 400);
       return;
     }

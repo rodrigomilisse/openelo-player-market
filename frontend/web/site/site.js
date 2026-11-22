@@ -16,7 +16,7 @@ export const param = (name) => new URLSearchParams(location.search).get(name);
 
 const NAV = [
   ['index.html', 'This week'], ['rankings.html', 'Rankings'], ['leagues.html', 'Leagues'],
-  ['compare.html', 'Compare'], ['how.html', 'How it works'],
+  ['compare.html', 'Compare'], ['how.html', 'How it works'], ['market.html', 'Market'],
 ];
 
 export function shell() {

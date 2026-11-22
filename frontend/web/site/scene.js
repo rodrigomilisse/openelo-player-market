@@ -24,6 +24,7 @@ const clamp01 = (t) => Math.min(1, Math.max(0, t));
 export const STATIONS = {
   'index.html': [0, 0, -12], 'rankings.html': [0, 0, -40], 'leagues.html': [22, 0, -18],
   'compare.html': [0, 0, 16], 'how.html': [-22, 0, -18], 'player.html': [10, 0, 2], 'club.html': [-10, 0, 2],
+  'market.html': [0, 0, 6], 'trade.html': [4, 0, 6],
 };
 const pageOf = (href) => (new URL(href, location.href).pathname.split('/').pop() || 'index.html');
 // The pose every page is approached from: in front of its spot, looking at it.
@@ -31,7 +32,7 @@ const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[
 
 const VERTEX = /* glsl */`
   attribute vec4 aRand; attribute vec3 aTag; attribute vec2 aDyn;
-  uniform float uSeg; uniform float uTime; uniform float uPixelRatio;
+  uniform float uSeg; uniform float uTime; uniform float uPixelRatio; uniform float uDim;
   uniform vec3 uColorA; uniform vec3 uColorB; uniform vec3 uColorC; uniform vec3 uSpark; uniform vec3 uAlt;
   varying vec3 vColor; varying float vAlpha;
   void main() {
@@ -42,7 +43,7 @@ const VERTEX = /* glsl */`
     vec3 cA = mix(uColorA, uAlt, aTag.x), cB = mix(uColorB, uAlt, aTag.y), cC = mix(uColorC, uAlt, aTag.z);
     vec3 base = uSeg < 1.0 ? mix(cA, cB, aDyn.x) : mix(cB, cC, aDyn.x);
     vColor = mix(base, uSpark, max(step(0.94, aRand.w) * 0.8, speed * 0.55));
-    vAlpha = 0.6 + 0.22 * sin(uTime * (0.8 + aRand.w) + aRand.z * 12.0) + 0.3 * speed;
+    vAlpha = (0.6 + 0.22 * sin(uTime * (0.8 + aRand.w) + aRand.z * 12.0) + 0.3 * speed) * uDim;
   }`;
 const FRAGMENT = /* glsl */`
   varying vec3 vColor; varying float vAlpha;
@@ -98,7 +99,7 @@ function createWorld({ count } = {}) {
   geometry.setAttribute('aDyn', dynAttr);
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
   const uniforms = {
-    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() },
+    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() }, uDim: { value: 1 },
     uColorA: { value: new THREE.Color() }, uColorB: { value: new THREE.Color() }, uColorC: { value: new THREE.Color() },
     uSpark: { value: new THREE.Color() }, uAlt: { value: new THREE.Color() },
   };
@@ -286,7 +287,8 @@ function createWorld({ count } = {}) {
   const api = {
     started: false,
     // point the running scene at a page: its spot, shapes, colours, camera path and next stop
-    apply({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight: sr = 0.2, next: nx = null }, transition) {
+    apply({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight: sr = 0.2, next: nx = null, dim = 1 }, transition) {
+      uniforms.uDim.value = dim;
       station = STATIONS[pageOf(location.href)] || [0, 0, 0];
       shiftRight = sr;
       next = nx;

@@ -24,6 +24,7 @@ function render(p) {
   field('legend-player').textContent = p.shortName;
   field('legend-club').textContent = p.club.name;
   field('compare-link').href = `compare.html?a=${p.id}`;
+  field('trade-link').href = `trade.html?id=${p.id}`;
   field('formula').textContent = `Rated with ${p.formula}, as of ${longDate(p.asOf)}.`;
   renderEquation(p);
   field('stage-rating').innerHTML = `<span class="gold">${number.format(p.rating)}</span>: ${escape(p.club.name)}'s ${number.format(p.club.rating)}, plus <strong>${signed(p.rating - p.club.rating)}</strong> he adds himself.`;

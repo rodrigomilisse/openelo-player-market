@@ -347,3 +347,78 @@ export function search(query, limit = 8) {
   const clubs_ = w.clubRanked.filter((c) => c.id.includes(q)).slice(0, 4).map((c) => ({ kind: 'club', id: c.id, name: c.name, detail: c.league.name, rating: Math.round(c.rating) }));
   return [...clubs_, ...players].slice(0, limit);
 }
+
+/* ---------- the market (play money preview) ----------
+   Prices come from the simulated price series. The order book, payouts and new-share price are
+   illustrative: placeholder fees from the pricing module (taker 5% on trades between fans, 10% on
+   new shares), a payout that follows the rating's weight 10^(rating/400). */
+export const FEES = { taker: 0.05, mint: 0.10 };
+const seeded = (id) => makeRandom([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7));
+const round2 = (v) => Math.round(v * 100) / 100;
+
+function marketOf(p) {
+  const prices = p.price.map((x) => x.price);
+  const price = prices[prices.length - 1];
+  const r = seeded(p.id);
+  const payoutDay = round2(0.004 * 10 ** ((p.rating - 1800) / 400));
+  return { price, week: round2(price - prices[Math.max(0, prices.length - 2)]), season: round2(price - prices[0]),
+    newShare: round2(price * (1.06 + r() * 0.06)), payoutDay, holders: Math.round(20 + r() * 400 * 10 ** ((p.rating - 1800) / 500)),
+    spark: prices.slice(-12) };
+}
+
+export function market() {
+  const w = getWorld();
+  return { asOf: w.asOf, mock: true, players: w.ranked.map((p) => ({ id: p.id, name: p.name, club: p.club.name, clubId: p.club.id,
+    league: p.club.league.name, position: p.position, rating: p.rating, ...marketOf(p) })) };
+}
+
+export function book(id) {
+  const w = getWorld();
+  const p = w.players.find((x) => x.id === id);
+  if (!p) return null;
+  const m = marketOf(p);
+  const r = seeded(`${id}-book`);
+  const tick = m.price < 2 ? 0.01 : 0.02;
+  const asks = [], bids = [];
+  for (let k = 1; k <= 8; k++) {
+    const a = round2(m.price + tick * k * (1 + Math.floor(r() * 2)));
+    if (a < m.newShare) asks.push({ price: a, shares: Math.round(4 + r() * 60) });
+    bids.push({ price: round2(Math.max(0.01, m.price - tick * k * (1 + Math.floor(r() * 2)))), shares: Math.round(4 + r() * 60) });
+  }
+  return { ...m, asks: dedupe(asks).sort((a, b) => a.price - b.price), bids: dedupe(bids).sort((a, b) => b.price - a.price) };
+}
+const dedupe = (levels) => [...levels.reduce((map, l) => map.set(l.price, (map.get(l.price) || 0) + l.shares), new Map())].map(([price, shares]) => ({ price, shares }));
+
+/* What a buy of `credits` or a sale of `shares` would do right now: cheapest sellers first, then new
+   shares at the new-share price (which rises a little with each share); sales go to the highest buyers. */
+export function quote(id, side, amount) {
+  const b = book(id);
+  if (!b || !(amount > 0)) return null;
+  const fills = [];
+  if (side === 'buy') {
+    let left = amount, shares = 0, fees = 0;
+    for (const a of b.asks) {
+      const each = a.price * (1 + FEES.taker);
+      const n = Math.min(a.shares, Math.floor(left / each));
+      if (n <= 0) break;
+      fills.push({ from: 'fans', shares: n, price: a.price });
+      shares += n; left -= n * each; fees += n * a.price * FEES.taker;
+    }
+    let mintPrice = b.newShare, minted = 0;
+    while (left >= mintPrice * (1 + FEES.mint) && minted < 10000) {
+      left -= mintPrice * (1 + FEES.mint); fees += mintPrice * FEES.mint; minted += 1; mintPrice = round2(mintPrice * 1.002);
+    }
+    if (minted) fills.push({ from: 'new', shares: minted, price: round2((b.newShare + mintPrice) / 2) });
+    shares += minted;
+    const spent = round2(amount - left);
+    return { side, shares, spent, fees: round2(fees), average: shares ? round2(spent / shares) : 0, fills, payoutDay: round2(shares * b.payoutDay) };
+  }
+  let left = Math.floor(amount), got = 0, fees = 0, sold = 0;
+  for (const bid of b.bids) {
+    const n = Math.min(bid.shares, left);
+    if (n <= 0) break;
+    fills.push({ from: 'fans', shares: n, price: bid.price });
+    got += n * bid.price * (1 - FEES.taker); fees += n * bid.price * FEES.taker; left -= n; sold += n;
+  }
+  return { side, shares: sold, unsold: left, received: round2(got), fees: round2(fees), average: sold ? round2(got / sold) : 0, fills };
+}
