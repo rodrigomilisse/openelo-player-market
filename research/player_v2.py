@@ -89,6 +89,7 @@ class Variant:
     strength_r0: float = 2000.0
     goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
     goal_d: float = 400.0
+    goal_r0: float = 2000.0
     output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
     match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
@@ -404,6 +405,8 @@ class Player:
         self.window = deque(maxlen=variant.window)
         self.output_window = deque(maxlen=variant.window)
         self.q_window = deque(maxlen=variant.window)
+        self.f_window = deque(maxlen=variant.window)
+        self.g_factors = deque(maxlen=max(variant.output_per_team_match, 1))
         self.weights = deque(maxlen=variant.window)
         self.onpitch_window = deque(maxlen=variant.window)
         self.team = None
@@ -436,11 +439,12 @@ class Player:
             if self.v.goal_scaling:
                 kinds = self.v.goal_scaling.split("+")
                 if "club" in kinds:
-                    f *= 2.0 ** ((row.rating - 2000.0) / self.v.goal_d)
+                    f *= 2.0 ** ((row.rating - self.v.goal_r0) / self.v.goal_d)
                 if "opp" in kinds:
-                    f *= 2.0 ** ((row.opp_rating - 2000.0) / self.v.goal_d)
+                    f *= 2.0 ** ((row.opp_rating - self.v.goal_r0) / self.v.goal_d)
                 if "comp" in kinds:
                     f *= getattr(row, "importance", 1.0)
+            self.g_factors.append(f)
             self.team_window.append((goals * f, assists * f) if listed else (0.0, 0.0))
         if listed and self.v.output != "none":
             importance = getattr(row, "importance", 1.0) if self.v.match_importance else 1.0
@@ -484,7 +488,9 @@ class Player:
         if listed or not self.v.squad_window:
             self.window.append(share)
             if self.v.minutes_strength and ref is not None:
-                self.q_window.append((share - ref) * 2.0 ** ((row.rating - self.v.strength_r0) / self.v.strength_d))
+                factor = 2.0 ** ((row.rating - self.v.strength_r0) / self.v.strength_d)
+                self.f_window.append(factor)
+                self.q_window.append((share - ref) * factor)
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
             weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
             if self.v.match_importance:
