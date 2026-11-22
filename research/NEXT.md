@@ -144,6 +144,18 @@ For scale: everything the candidate team model gained over plain Elo was −0.00
   2^((that club's rating − 2000) / D). Held-out 0.507 → 0.487 (D 800), 0.490 (D 400, scale 1000);
   C7 A 0.710 → 0.743 / 0.749; fit unchanged. Moves: Guéhi −59, Semenyo −23, Cherki −13 (from
   smaller clubs); Díaz +79, Olise +66, Madueke +17 (minutes at strong sides).
+- **Goal term scaled (2026-11-22, `goal_scaling`), single-term candidate:** by his club's rating (D 400 / 800), by the
+  opposition's (D 400 / 800) and by competition weight (continental ×2, cups ×0.5) all land within noise of unscaled
+  (held-out 0.490 unscaled; 0.494 / 0.492 club, 0.490 / 0.491 opposition, 0.490 competition; competition lifts C7
+  A / B to 0.759 / 0.923). Not adopted.
+- **Why strength-scaling the minutes did not help (12-month rating change vs Transfermarkt, 157 tracked
+  players):** it does what it is meant to for movers to a stronger club (rank correlation 0.505 → 0.525, 286 pairs)
+  and a weaker one (0.360 → 0.370, 294 pairs), but is worse for lateral movers (0.477 → 0.438, 417 pairs) and
+  neutral for stayers (0.495 → 0.500). Rejected explanations: double counting with the team term (lowering the
+  club weight makes both versions worse) and bonus distortion (spread 275 → 282).
+- **Single-term candidate (150 club matches, D 400, scale 1000) against the owner's intended top order:** worse
+  than the two-term version on this sample: Kimmich 2nd and Tah 3rd (ever-present players are rewarded), Dembélé 18th,
+  Olise 5th; Spearman vs Transfermarkt 0.736 vs 0.762. Not adopted.
 - **Absence, uncapped (2026-11-22, owner rule: not playing always costs, no cap, a longer absence
   costs more).** The old discount was capped at 120 and, because the timeline stopped at a player's
   last squad appearance, did nothing for a player still injured (Musiala and Havertz showed 0).

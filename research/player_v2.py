@@ -87,6 +87,8 @@ class Variant:
     minutes_strength: bool = False    # credit each match at the strength of the club where it was earned
     strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
     strength_r0: float = 2000.0
+    goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
+    goal_d: float = 400.0
     output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
     match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
     team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
@@ -125,12 +127,12 @@ class Context:
             expected = te.expected_score(p.rating_difference)
             surprise = te.score_of(m.goal_difference) - expected
             spread = expected * (1 - expected)
-            for team, rating, swing, sign, own in ((m.home, p.home_rating, p.home_swing, 1, expected),
-                                                   (m.away, p.away_rating, p.away_swing, -1, 1 - expected)):
+            for team, rating, swing, sign, own, opp in ((m.home, p.home_rating, p.home_swing, 1, expected, p.away_rating),
+                                                        (m.away, p.away_rating, p.away_swing, -1, 1 - expected, p.home_rating)):
                 rows.append((m.game_id, team, m.day, rating, swing, sign * surprise, spread, lengths.get(m.game_id, 90), own,
-                             sign * m.goal_difference, team_constants.stage_weights.get(m.stage, 1.0)))
+                             sign * m.goal_difference, team_constants.stage_weights.get(m.stage, 1.0), opp))
         self.team_matches = pd.DataFrame(rows, columns=["game_id", "team_id", "day", "rating", "swing", "surprise",
-                                                        "spread", "length", "expected", "team_gd", "importance"]).sort_values(["day", "game_id"])
+                                                        "spread", "length", "expected", "team_gd", "importance", "opp_rating"]).sort_values(["day", "game_id"])
         self.by_team = {t: g.reset_index(drop=True) for t, g in self.team_matches.groupby("team_id")}
         self.length = dict(zip(self.team_matches.game_id, self.team_matches.length))
         self.day = dict(zip(self.team_matches.game_id, self.team_matches.day))
@@ -430,7 +432,16 @@ class Player:
         if self.v.output != "none" and self.v.output_per_team_match:
             if not hasattr(self, "team_window"):
                 self.team_window = deque(maxlen=self.v.output_per_team_match)
-            self.team_window.append((goals, assists) if listed else (0.0, 0.0))
+            f = 1.0
+            if self.v.goal_scaling:
+                kinds = self.v.goal_scaling.split("+")
+                if "club" in kinds:
+                    f *= 2.0 ** ((row.rating - 2000.0) / self.v.goal_d)
+                if "opp" in kinds:
+                    f *= 2.0 ** ((row.opp_rating - 2000.0) / self.v.goal_d)
+                if "comp" in kinds:
+                    f *= getattr(row, "importance", 1.0)
+            self.team_window.append((goals * f, assists * f) if listed else (0.0, 0.0))
         if listed and self.v.output != "none":
             importance = getattr(row, "importance", 1.0) if self.v.match_importance else 1.0
             self.output_window.append((minutes * importance, goals * importance, assists * importance))
