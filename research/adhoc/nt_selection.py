@@ -7,6 +7,7 @@ line-up (starter or bench). Rating = current club team rating + k x trust, for t
   share  starts / club league matches since he joined (raw share)
   rel    starts / the club's most-started player's starts (rotation divides out)
   rank   pecking order: rank 1-6 = 1, falling linearly to 0 at rank 20
+  imp    starts / matches in all club competitions, each match weighted by its importance
 Reports mean within-nation AUC and top-N precision, and how national coaches choose between a
 top-club fringe player and a mid-club regular. Also the Transfermarkt table with bands by our team
 rating and roles by pecking-order rank.
@@ -20,6 +21,7 @@ import store
 
 ctx = pickle.loads((store.RAW_DIR / "cache" / "context_current.pkl").read_bytes())
 tm = ctx.team_matches[["team_id", "day", "rating"]].sort_values("day")
+IMP = ctx.team_matches[["game_id", "team_id", "importance"]]
 import sqlite3; con = sqlite3.connect(store.RAW_DIR / "openelo_research.sqlite3")
 q = lambda s: pd.read_sql(s, con)
 games = q("SELECT g.game_id, g.date, g.national, g.competition_id, co.type FROM game g LEFT JOIN competition co USING(competition_id)")
@@ -47,8 +49,13 @@ def snapshot(snap, comps):
     last = club.sort_values("date").groupby("player_id").tail(1)[["player_id", "team_id"]]
     joined = club.groupby(["player_id", "team_id"]).date.min().rename("joined").reset_index()
     cur = last.merge(joined, on=["player_id", "team_id"])
+    allc = lineup[(lineup.national == 0) & (lineup.date < snap) & (lineup.date >= snap - pd.Timedelta(days=365))]
+    allc = allc.merge(IMP, on=["game_id", "team_id"], how="left").fillna({"importance": 1.0})
     rows = []
     for team, sq in cur.groupby("team_id"):
+        ta = allc[allc.team_id == team]
+        tgi = ta[["game_id", "date", "importance"]].drop_duplicates("game_id")
+        sti = (ta.starter * ta.importance).groupby(ta.player_id).sum()
         tg = club[club.team_id == team][["game_id", "date"]].drop_duplicates()
         st = club[club.team_id == team].groupby("player_id").starter.sum()
         ranks = st.rank(ascending=False, method="min")
@@ -56,8 +63,9 @@ def snapshot(snap, comps):
             n = int((tg.date >= j).sum())
             if n < 5:
                 continue
-            rows.append((p, team, st.get(p, 0) / n, st.get(p, 0) / st.max(), ranks.get(p, 99)))
-    c = pd.DataFrame(rows, columns=["player_id", "team_id", "share", "rel", "rank"])
+            wi = tgi[tgi.date >= j].importance.sum()
+            rows.append((p, team, st.get(p, 0) / n, st.get(p, 0) / st.max(), ranks.get(p, 99), sti.get(p, 0) / wi if wi else 0))
+    c = pd.DataFrame(rows, columns=["player_id", "team_id", "share", "rel", "rank", "imp"])
     c["rank_t"] = np.clip((20 - c["rank"]) / 14, 0, 1)
     c["club"] = [team_rating(t, snap) for t in c.team_id]
     c = c.merge(players, on="player_id")
@@ -100,12 +108,12 @@ for label, (snap, comps) in SNAPS.items():
     print(f"\n=== {label}: {c.citizenship.nunique()} nations, {len(c)} candidates, {int(c.selected.sum())} selected")
     print("mean within-nation AUC / top-N precision")
     print(f"  club rating only        {evaluate(c, c.club)[0]:.3f} / {evaluate(c, c.club)[1]:.3f}")
-    for t in ("share", "rel", "rank_t"):
+    for t in ("share", "rel", "rank_t", "imp"):
         print(f"  trust only ({t:6})     {evaluate(c, c[t])[0]:.3f} / {evaluate(c, c[t])[1]:.3f}")
     tv = c.value_eur.fillna(0)
     print(f"  Transfermarkt value     {evaluate(c, tv)[0]:.3f} / {evaluate(c, tv)[1]:.3f}")
     print("  club + k x trust   k:  " + "  ".join(f"{k:>11}" for k in KS))
-    for t in ("share", "rel", "rank_t"):
+    for t in ("share", "rel", "rank_t", "imp"):
         print(f"    {t:6}              " + "  ".join("{:.3f}/{:.3f}".format(*evaluate(c, c.club + k * c[t])) for k in KS))
     # top-club fringe vs mid-club regular, same nation
     order = c.drop_duplicates("team_id").sort_values("club", ascending=False).team_id.tolist()
