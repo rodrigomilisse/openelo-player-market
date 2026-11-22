@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How OpenElo works</title>
+<meta name="description" content="How OpenElo rates players from match results and minutes played, and how anyone can check it.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="How OpenElo works">
+<meta property="og:description" content="How OpenElo rates players from match results and minutes played, and how anyone can check it.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .prose { max-width: 70ch }
+  .prose p { margin: 12px 0 0 }
+  .prose a { color: var(--elo) }
+  .steps { list-style: none; counter-reset: step; margin: 22px 0 0; padding: 0; display: grid; gap: 22px; max-width: 76ch }
+  .steps > li { counter-increment: step; display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: 16px }
+  .steps > li::before { content: counter(step); font-family: var(--display); font-weight: 900; font-style: italic; font-size: 46px; line-height: 0.9; color: var(--elo) }
+  .steps h3 { font-size: 28px }
+  .steps p { margin: 6px 0 0; color: var(--muted) }
+  .steps code, .prose code { font-size: 0.95em; color: var(--ink); background: rgba(var(--grid-rgb), 0.1); padding: 1px 6px; border-radius: 4px }
+  .worked { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; font-family: var(--display); font-weight: 800; font-size: clamp(26px, 3vw, 40px) }
+  .worked .op { color: var(--muted); font-weight: 500 }
+  .worked .club { color: var(--club) }
+  .worked .minus { color: var(--down) }
+  .worked .total { color: var(--elo); font-style: italic; font-size: 1.4em }
+  .worked-note { color: var(--muted); margin: 8px 0 0 }
+  .faq { display: grid; gap: 10px; margin-top: 16px; max-width: 76ch }
+  .faq details { background: var(--row-alt); border-radius: 10px; padding: 12px 16px }
+  .faq summary { cursor: pointer; font-weight: 600 }
+  .faq p { margin: 8px 0 0; color: var(--muted) }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="page-head">
+      <h1>How it works</h1>
+      <p class="lede">OpenElo rates teams from their results, then every player from his team's rating and what he adds himself. It uses nothing but match results and minutes played, and anyone can recompute it.</p>
+    </section>
+
+    <section aria-labelledby="steps-title">
+      <h2 id="steps-title">From results to a player's number</h2>
+      <ol class="steps">
+        <li><div><h3>Rate the teams</h3><p>After every match both teams' ratings move by how surprising the result was: beating a stronger side earns more than beating a weaker one, and a bigger margin counts a little more. Clubs from different leagues meet in European competitions, which puts every league on one scale.</p></div></li>
+        <li><div><h3>Start each player from his club</h3><p>A player's rating begins with his club's current rating. Move to a stronger club and that part rises the moment he plays for it.</p></div></li>
+        <li><div><h3>Add how often he plays</h3><p>Over his last 50 matchday squads: a start counts as a full match, a substitute appearance as his minutes, an unused substitute as nothing. Compared with his club's 16 most-used players, each share point is worth 4 rating points (<code>400 × (his share − the club's)</code>). Goalkeepers are measured against playing every match.</p></div></li>
+        <li><div><h3>Add goals and assists</h3><p>100 points per goal or assist per 90 minutes, over the same squads, with 5 scoreless matches added so a few lucky minutes can't carry it.</p></div></li>
+        <li><div><h3>Add national-team selection</h3><p>Being picked by a strong national team adds points; not being picked never takes any away.</p></div></li>
+        <li><div><h3>Subtract recent absence</h3><p>Each match missed while at the club costs a little, up to a cap, and it comes back as he plays again. A player out of every squad for most of a year slides towards a replacement level.</p></div></li>
+      </ol>
+    </section>
+
+    <section class="glass-panel" aria-labelledby="worked-title">
+      <h2 id="worked-title">One player, worked through</h2>
+      <p class="worked" data-field="worked"></p>
+      <p class="worked-note" data-field="worked-note"></p>
+    </section>
+
+    <section class="prose" aria-labelledby="open-title">
+      <h2 id="open-title">Check it yourself</h2>
+      <p>The formula, its constants and the code that computes it are public, in the <a href="https://github.com/rodrigomilisse/openelo-player-market">openelo-player-market repository</a>. Every published rating carries the version of the formula that produced it. A version is never changed after it is published: improvements arrive as a new version, announced in advance.</p>
+      <p>What OpenElo never uses: scouts' opinions, fan votes, transfer fees, market values, betting odds or trading on this site.</p>
+    </section>
+
+    <section aria-labelledby="faq-title">
+      <h2 id="faq-title">Questions</h2>
+      <div class="faq">
+        <details><summary>Why is a squad player rated far below his team-mates?</summary><p>Because he rarely starts. The selection part compares how often he plays with his club's regulars; a player who mostly sits on the bench can be 200 points or more below the club.</p></details>
+        <details><summary>Why did my player drop when he was injured?</summary><p>Missed matches cost a little each, and his club may have lost without him. Both recover as he plays again.</p></details>
+        <details><summary>Two players always play together. How are they told apart?</summary><p>Only by what separates them: one missing a match, a different role for their country, a transfer. If nothing ever separates them, their ratings move together, and that is the honest answer.</p></details>
+        <details><summary>Is a rating a valuation?</summary><p>No. It measures how a player's teams do and how much he plays, scores and gets picked. It is not a transfer fee or a market value.</p></details>
+      </div>
+    </section>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { immersive, galaxyFormation, fieldFormation } from './scene.js';
+  import { getRankings, getPlayer } from './api.js';
+  import { shell, field, number, signed, escape, playerUrl } from './site.js';
+  shell();
+  immersive({
+    formations: [galaxyFormation(), galaxyFormation({ center: [0, 2, -8], radius: 12 }), fieldFormation()],
+    palette: ['#FFD66B', '#A9BBD0', '#7FA7D8'], shiftRight: 0.15, next: { href: 'index.html', label: 'This week' },
+    keyframes: [
+      { at: 0, morph: 0, pos: [0, 7, 18], look: [0, 2, -4] },
+      { at: 0.5, morph: 1, pos: [6, 9, 16], look: [0, 1, -8] },
+      { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -14] },
+    ],
+  });
+  const p = (await getPlayer('tiago-mendonca')) || (await getPlayer((await getRankings()).players[0].id));   // the worked example: the mock's featured player, or the top-rated one
+  field('worked').innerHTML = p.parts.map((part, i) => `${i ? `<span class="op">${part.value < 0 ? '−' : '+'}</span>` : ''}<span class="${part.key === 'club' ? 'club' : part.value < 0 ? 'minus' : ''}">${number.format(Math.abs(part.value))}</span>`).join('')
+    + `<span class="op">=</span><span class="total">${number.format(p.rating)}</span>`;
+  field('worked-note').innerHTML = `${p.parts.map((x) => escape(x.label)).join(', ')}. That is <a class="gold" href="${playerUrl(p.id)}">${escape(p.name)}</a>, today.`;
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare players | OpenElo</title>
+<meta name="description" content="Two players' OpenElo ratings side by side, part by part.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Compare players | OpenElo">
+<meta property="og:description" content="Two players' OpenElo ratings side by side, part by part.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .stage-caption .a { color: var(--elo); font-weight: 700 } .stage-caption .b { color: var(--rival); font-weight: 700 }
+  .pickers { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; margin-top: 22px }
+  .pickers .vs { font-family: var(--display); font-weight: 800; font-style: italic; font-size: 28px; color: var(--muted) }
+  .pickers input { width: 100% }
+  .faceoff { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(16px, 3vw, 40px); margin-top: clamp(24px, 4vw, 48px) }
+  .side { display: grid; gap: 6px; align-content: start }
+  .side.b { text-align: right; justify-items: end }
+  .side .who { font-family: var(--display); font-weight: 900; font-style: italic; text-transform: uppercase; font-size: clamp(36px, 4.6vw, 70px); line-height: 0.86; text-decoration: none }
+  .side .who:hover { opacity: 0.85 }
+  .side .meta, .side .big { margin: 0 }
+  .side .meta { color: var(--muted) }
+  .side .big { font-family: var(--display); font-weight: 900; font-style: italic; font-size: clamp(64px, 8vw, 120px); line-height: 0.8 }
+  .side.a .big { color: var(--elo); text-shadow: 0 0 34px rgba(255, 214, 107, 0.3) }
+  .side.b .big { color: var(--rival); text-shadow: 0 0 34px rgba(143, 211, 255, 0.25) }
+  .verdict { margin: 22px 0 0; font-size: clamp(19px, 1.8vw, 23px); max-width: 64ch }
+  .verdict strong { font-weight: 700 }
+  /* part by part: bars meet in the middle */
+  .duel { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px }
+  .duel li { display: grid; grid-template-columns: 4em minmax(0, 1fr) 9em minmax(0, 1fr) 4em; gap: 12px; align-items: center }
+  .duel .v { font-family: var(--display); font-weight: 800; font-size: 22px }
+  .duel .v.b { text-align: right }
+  .duel .label { text-align: center; color: var(--muted); font-size: 15px }
+  .duel .lane { height: 12px; position: relative; background: rgba(var(--grid-rgb), 0.08); border-radius: 3px }
+  .duel .lane i { position: absolute; top: 0; bottom: 0; border-radius: 3px }
+  .duel .lane.a i { right: 0; background: var(--elo) }
+  .duel .lane.b i { left: 0; background: var(--rival) }
+  .duel .lane i.neg { opacity: 0.35 }
+  @media (max-width: 860px) {
+    .pickers { grid-template-columns: minmax(0, 1fr) } .pickers .vs { text-align: center }
+    .duel li { grid-template-columns: 3.2em minmax(0, 1fr) 3.2em; } .duel .label { grid-column: 1 / -1; grid-row: 1 } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="page-head">
+      <h1>Compare</h1>
+      <p class="lede">Two players, the same formula. See where each one's rating comes from.</p>
+    </section>
+    <form class="pickers" data-field="pickers" aria-label="Choose two players">
+      <label class="visually-hidden" for="pick-a">First player</label>
+      <input class="field" id="pick-a" name="a" list="all-players" autocomplete="off" placeholder="First player">
+      <span class="vs" aria-hidden="true">vs</span>
+      <label class="visually-hidden" for="pick-b">Second player</label>
+      <input class="field" id="pick-b" name="b" list="all-players" autocomplete="off" placeholder="Second player">
+      <datalist id="all-players"></datalist>
+    </form>
+    <section class="stage" id="stage-numbers" aria-label="Their ratings"><p class="stage-caption" data-field="caption-numbers"></p></section>
+    <section class="stage" id="stage-seasons" aria-label="Their seasons"><p class="stage-caption" data-field="caption-seasons"></p></section>
+    <div id="compare-details" data-field="result"></div>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { getRankings, getPlayer } from './api.js';
+  import { immersive, curveFormation, mergeFormations, textFormation, fieldFormation } from './scene.js';
+  import { shell, field, param, number, signed, longDate, escape, playerUrl, clubUrl, lineChart } from './site.js';
+  shell();
+  const { players } = await getRankings();
+  const form = field('pickers');
+  const byName = new Map(players.map((p) => [`${p.name} (${p.club})`, p.id]));
+  document.getElementById('all-players').innerHTML = [...byName.keys()].map((n) => `<option value="${escape(n)}">`).join('');
+  const label = (id) => { const p = players.find((x) => x.id === id); return p ? `${p.name} (${p.club})` : ''; };
+  let a = param('a');
+  if (!players.some((p) => p.id === a)) a = players.find((p) => p.id === 'tiago-mendonca')?.id || players[0].id;   // the mock's featured player, or the top-rated one
+  let b = param('b');
+  if (!b) { const i = players.findIndex((p) => p.id === a); b = players[Math.max(0, i - 1)]?.id === a ? players[i + 1].id : players[Math.max(0, i - 1)].id; }
+  form.a.value = label(a); form.b.value = label(b);
+  form.addEventListener('change', () => {
+    a = byName.get(form.a.value) || a; b = byName.get(form.b.value) || b;
+    history.replaceState(null, '', `?a=${a}&b=${b}`); draw();
+  });
+  form.addEventListener('submit', (e) => e.preventDefault());
+  let stage = null;
+  await draw();
+
+  async function draw() {
+    const [pa, pb] = await Promise.all([getPlayer(a), getPlayer(b)]);
+    const numbers = mergeFormations([
+      { formation: await textFormation(number.format(pa.rating), { center: [-4.2, 3, 0], width: 7, edge: 3, depth: 0.3 }), tag: 0 },
+      { formation: await textFormation(number.format(pb.rating), { center: [4.2, 3, 0], width: 7, edge: 3, depth: 0.3 }), tag: 1 }]);
+    const seasons = curveFormation([{ values: pa.history.map((h) => h.rating) }, { values: pb.history.map((h) => h.rating), alt: true }], { from: [-8, 0, 3], to: [8, 0, -6] });
+    if (!stage) stage = immersive({
+      formations: [numbers, seasons, fieldFormation()],
+      palette: ['#FFD66B', '#FFD66B', '#7FA7D8'], alt: '#8FD3FF', shiftRight: 0,
+      next: { href: 'how.html', label: 'How it works' },
+      keyframes: [
+        { at: 0, morph: 0, pos: [0, 7.5, 22], look: [0, 5.6, 0] },
+        { at: '#stage-numbers', morph: 0, pos: [0, 3.2, 18], look: [0, 1.6, 0] },
+        { at: '#stage-seasons', morph: 1, pos: [1.5, 4.2, 15.5], look: [0, 2.4, -1] },
+        { at: '#compare-details', morph: 1, pos: [-3, 5, 18], look: [0, 3, -2] },
+        { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -12] },
+      ],
+    });
+    else { stage.setFormation(0, numbers); stage.setFormation(1, seasons); }
+    document.title = `${pa.name} vs ${pb.name} | OpenElo`;
+    const diff = pa.rating - pb.rating;
+    const gaps = pa.parts.map((part, i) => ({ label: part.key === 'club' ? 'Club rating' : part.label, key: part.key, a: part.value, b: pb.parts[i].value, d: part.value - pb.parts[i].value }));
+    const main = gaps.slice().sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
+    const leader = diff >= 0 ? pa : pb, other = diff >= 0 ? pb : pa;
+    const why = { club: `the stronger club (${main.d > 0 === diff >= 0 ? leader.club.name : other.club.name})`, selection: 'starting more often', goals: 'goals and assists', national: 'national-team selection', absence: 'missing fewer matches' }[main.key];
+    const side = (p, cls) => `<div class="side ${cls}"><a class="who" href="${playerUrl(p.id)}">${escape(p.name)}</a>
+      <p class="meta"><a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}${p.age ? `, ${p.age}` : ''}</p>
+      <p class="big">${number.format(p.rating)}</p><p class="meta">#${number.format(p.rank.world)} in the world, ${signed(p.change.season)} this season</p></div>`;
+    const span = Math.max(...gaps.filter((g) => g.key !== 'club').flatMap((g) => [Math.abs(g.a), Math.abs(g.b)]), 30);
+    const clubSpan = Math.max(pa.club.rating, pb.club.rating);
+    // club ratings are large numbers: scale that row from 200 below the weaker club, so the difference shows
+    const clubFloor = Math.min(pa.club.rating, pb.club.rating) - 200;
+    const lane = (v, cls, key) => `<span class="lane ${cls}"><i class="${v < 0 ? 'neg' : ''}" style="width:${key === 'club' ? ((v - clubFloor) / (clubSpan - clubFloor)) * 100 : (Math.abs(v) / span) * 100}%"></i></span>`;
+    field('caption-numbers').innerHTML = `<span class="a">${escape(pa.name)}</span> ${number.format(pa.rating)}, <span class="b">${escape(pb.name)}</span> ${number.format(pb.rating)}. Scroll to see how they got here.`;
+    field('caption-seasons').innerHTML = `Their seasons: <span class="a">${escape(pa.shortName)}</span> ${signed(pa.change.season)}, <span class="b">${escape(pb.shortName)}</span> ${signed(pb.change.season)}.`;
+    field('result').innerHTML = `
+      <div class="faceoff">${side(pa, 'a')}${side(pb, 'b')}</div>
+      <p class="verdict">${diff === 0 ? `<strong>Dead level</strong> on ${number.format(pa.rating)}.` : `<strong>${escape(leader.name)}</strong> is rated <strong>${Math.abs(diff)}</strong> higher, mostly from ${escape(why)} (${signed(Math.abs(main.d))}).`}</p>
+      <section class="glass-panel" style="margin-top:28px" aria-labelledby="duel-title"><h2 id="duel-title">Part by part</h2>
+        <ol class="duel">${gaps.map((g) => `<li><span class="v gold">${g.key === 'club' ? number.format(g.a) : signed(g.a)}</span>${lane(g.a, 'a', g.key)}
+          <span class="label">${escape(g.label)}</span>${lane(g.b, 'b', g.key)}<span class="v b" style="color:var(--rival)">${g.key === 'club' ? number.format(g.b) : signed(g.b)}</span></li>`).join('')}</ol></section>
+      <section class="glass-panel" style="margin-top:28px" aria-labelledby="duel-season"><div class="section-head"><h2 id="duel-season">Their seasons</h2>
+        <p class="legend"><span><i class="swatch swatch-player"></i>${escape(pa.shortName)}</span><span><i class="swatch swatch-rival"></i>${escape(pb.shortName)}</span></p></div>
+        <figure class="chart"><svg class="chart-svg" data-field="duel-chart" role="img" aria-label="Both ratings over the season"></svg><div class="chart-readout" data-field="duel-readout" aria-live="polite"></div></figure></section>`;
+    lineChart(field('duel-chart'), field('duel-readout'), {
+      dates: pa.history.map((h) => h.date),
+      series: [{ label: pa.name, cls: 'line-player', values: pa.history.map((h) => h.rating), color: '#FFD66B' },
+               { label: pb.name, cls: 'line-rival', values: pb.history.map((h) => h.rating), color: '#8FD3FF' }],
+      idle: 'Point at the chart to compare any matchday.',
+      read: (i) => `<strong>${longDate(pa.history[i].date)}</strong>: ${escape(pa.shortName)} <span class="gold">${number.format(pa.history[i].rating)}</span>, ${escape(pb.shortName)} <span style="color:var(--rival)">${number.format(pb.history[i].rating)}</span>.`,
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<title>OpenElo Trading Floor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="design.css">
+<style>
+/* Layout: one-screen terminal. Watchlist left, book and ticket right, the week's price meeting the order book as a 3D depth wall in the middle */
+html, body { height: 100% }
+.app { position: relative; z-index: 2; min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: 16px }
+.desk { display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(300px, 360px); gap: 16px; align-items: start }
+.col { display: grid; gap: 16px; min-width: 0 }
+.watch-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; padding: 8px 10px; border-radius: 6px; text-decoration: none; color: inherit }
+.watch-row[aria-current] { background: rgba(90,169,255,0.12); box-shadow: inset 3px 0 0 var(--price) }
+.watch-row .who { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.watch-row .meta { color: var(--muted); font-size: 13px }
+.watch-row .right { text-align: right }
+.centre { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: calc(100vh - 110px); min-width: 0 }
+.strip { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 32px }
+.strip h1 { font-size: clamp(40px, 4.4vw, 64px) }
+.strip .stat .value { font-size: 30px }
+.tape { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(110px, 1fr); gap: 8px; overflow-x: auto; padding: 12px }
+.tape div { display: grid; gap: 2px; font-size: 14px }
+.tape b { font-size: 18px }
+.order-line { display: flex; align-items: center; justify-content: space-between; gap: 10px }
+.order-line button { background: transparent; color: var(--ink); border: 1px solid var(--glass-edge); border-radius: 6px; font: inherit; min-height: 36px; padding: 0 14px; cursor: pointer }
+.book-row { cursor: default; border-radius: 4px }
+.book-row:hover { background: rgba(228,236,245,0.08) }
+form.glass { display: grid; gap: 14px }
+@media (max-width: 1100px) { .desk { grid-template-columns: minmax(0, 1fr) } .centre { min-height: 60vh } .site-header { position: static } }
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="app">
+  <header class="site-header">
+    <div class="logo">OPENELO</div>
+    <nav aria-label="Main">
+      <a href="#top" aria-current="page">Trade</a>
+      <a href="#top">Market</a>
+      <a href="#top">Portfolio</a>
+    </nav>
+    <div class="wallet">Available <strong>1,250.00 cr</strong>, in orders <strong>84.20 cr</strong></div>
+  </header>
+
+  <div class="desk" id="top">
+    <div class="col">
+      <nav class="glass" aria-label="Watchlist" style="padding: 10px">
+        <h3 style="padding: 6px 10px 8px">Watchlist</h3>
+        <div id="watch"></div>
+      </nav>
+      <div class="glass">
+        <h3>Your position</h3>
+        <div class="stats" style="margin-top: 8px; gap: 10px 24px">
+          <div class="stat"><div class="label">Held</div><div class="value" style="font-size: 26px">40</div></div>
+          <div class="stat"><div class="label">Paid on average</div><div class="value" style="font-size: 26px">2.10</div></div>
+          <div class="stat"><div class="label">Gain</div><div class="value" style="font-size: 26px; color: var(--price)">+52.80</div></div>
+        </div>
+      </div>
+      <div class="glass">
+        <h3>Open orders</h3>
+        <div id="orders" style="margin-top: 10px; display: grid; gap: 8px">
+          <div class="order-line"><span><b style="color: var(--ask)">Sell</b> 10 at 3.58</span><button type="button" data-cancel>Cancel</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="centre">
+      <div class="strip">
+        <div>
+          <div class="muted">Central midfield, Vale do Sado FC</div>
+          <h1>Mendonça</h1>
+        </div>
+        <div class="stat"><div class="label">Last</div><div class="value">3.42</div><div class="delta">+4.3% today</div></div>
+        <div class="stat"><div class="label">OpenElo</div><div class="value" style="color: var(--elo)">1,842</div><div class="delta" style="color: var(--elo)">+23 this week</div></div>
+        <div class="stat"><div class="label">New shares</div><div class="value" style="color: var(--ask)">3.61</div><div class="delta down">heat +12.8%</div></div>
+      </div>
+      <div class="legend"><span><i class="swatch price"></i>Price this week</span><span><i class="swatch elo"></i>OpenElo rating</span><span><i class="swatch mint"></i>New-share price, a ceiling</span><span><i class="swatch" style="background: linear-gradient(90deg, var(--price) 50%, var(--elo) 50%)"></i>Trend, dashed ahead</span><span>Bars ahead of the line: orders waiting</span></div>
+      <div class="glass tape" aria-label="Recent trades" id="tape"></div>
+    </div>
+
+    <div class="col">
+      <div class="glass">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px"><h3>Order book</h3><span class="muted" style="font-size: 14px">Point at a row to find it in 3D</span></div>
+        <div class="book-mint"><span>3.61 new shares</span><span>any amount</span></div>
+        <div id="asks"></div>
+        <div class="book-last"><span>3.42</span><span>last trade, spread 0.06</span></div>
+        <div id="bids"></div>
+      </div>
+      <form class="glass" id="ticket" novalidate>
+        <div class="seg side" role="group" aria-label="Side">
+          <button type="button" id="side-buy" aria-pressed="true">Buy</button>
+          <button type="button" id="side-sell" class="sell" aria-pressed="false">Sell</button>
+        </div>
+        <fieldset>
+          <legend id="venue-legend">Buy from</legend>
+          <label class="radio"><input type="radio" name="venue" id="venue-holders" value="holders" checked> Other holders, at your limit price</label>
+          <label class="radio" id="venue-mint-row"><input type="radio" name="venue" id="venue-mint" value="mint"> New shares, at 3.61</label>
+        </fieldset>
+        <div class="fields">
+          <label for="shares">Shares<input id="shares" type="text" inputmode="numeric" value="40"></label>
+          <label for="limit">Limit price (cr)<input id="limit" type="text" inputmode="decimal" value="3.45"></label>
+        </div>
+        <div class="totals">
+          <div><span>Cost</span><span id="cost"></span></div>
+          <div><span>Trading fee, 5%</span><span id="fee"></span></div>
+          <div class="sum"><span id="sum-label">Held until filled</span><span id="sum"></span></div>
+        </div>
+        <button class="submit" type="submit" id="submit">Place buy order</button>
+        <p class="notice" id="notice" role="status"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { market, book } from './sample-data.js';
+import { mountTicket, renderBook } from './ticket.js';
+import { buildTradeScene } from './trade-scene.js';
+
+renderBook(document.getElementById('asks'), book.asks, 'var(--ask)');
+renderBook(document.getElementById('bids'), book.bids, 'var(--price)');
+mountTicket(document.getElementById('ticket'), { mintHundredths: 361 });
+
+document.getElementById('watch').innerHTML = market.map((p, i) => `
+  <a href="#top" class="watch-row"${i === 0 ? ' aria-current="page"' : ''}>
+    <span class="who">${p.name}</span><span class="right" style="font-weight: 700">${p.price[p.price.length - 1].toFixed(2)}</span>
+    <span class="meta">rated ${p.elo[p.elo.length - 1]}</span><span class="right meta" style="color: ${p.change >= 0 ? 'var(--price)' : 'var(--ask)'}">${p.change >= 0 ? '+' : '−'}${Math.abs(p.change).toFixed(1)}%</span>
+  </a>`).join('');
+document.getElementById('tape').innerHTML = [['14:32', '3.42', 25, 'up'], ['14:29', '3.40', 60, 'down'], ['14:21', '3.61', 12, 'mint'], ['14:08', '3.41', 8, 'up'], ['13:55', '3.38', 140, 'down'], ['13:47', '3.60', 30, 'mint']]
+  .map(([time, price, shares, kind]) => `<div><span class="muted">${time}</span><b style="color: ${kind === 'down' ? 'var(--ask)' : kind === 'mint' ? 'var(--ask)' : 'var(--price)'}">${price}</b><span>${shares} ${kind === 'mint' ? 'new' : 'shares'}</span></div>`).join('');
+document.getElementById('orders').addEventListener('click', (event) => {
+  if (event.target.matches('[data-cancel]')) event.target.closest('.order-line').outerHTML = '<p class="muted" style="margin: 0">Demo only: order removed here, nothing was sent.</p>';
+});
+
+const scene = await buildTradeScene(document.getElementById('scene'));
+document.querySelectorAll('#asks, #bids').forEach((container) => {
+  container.addEventListener('pointerover', (event) => {
+    const row = event.target.closest('.book-row');
+    scene.highlight(row ? row.querySelector('span').textContent : null);
+  });
+  container.addEventListener('pointerleave', () => scene.highlight(null));
+});
+</script>

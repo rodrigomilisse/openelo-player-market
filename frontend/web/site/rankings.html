@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rankings | OpenElo</title>
+<meta name="description" content="Every player's OpenElo rating, filtered by league, club, position and age.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Rankings | OpenElo">
+<meta property="og:description" content="Every player's OpenElo rating, filtered by league, club, position and age.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px }
+  .filters .field { flex: 1 1 220px; min-width: 0 }
+  .count { margin: 14px 0 0; color: var(--muted) }
+  .more { margin-top: 16px }
+  .empty { padding: 24px; color: var(--muted) }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="page-head">
+      <h1>Rankings</h1>
+      <p class="lede" data-field="lede">Every rated player, best first.</p>
+    </section>
+    <form class="filters" data-field="filters" role="search" aria-label="Filter players">
+      <label class="visually-hidden" for="f-name">Name</label>
+      <input class="field" id="f-name" name="name" type="search" placeholder="Filter by name" autocomplete="off">
+      <label class="visually-hidden" for="f-league">League</label>
+      <select id="f-league" name="league"><option value="">All leagues</option></select>
+      <label class="visually-hidden" for="f-club">Club</label>
+      <select id="f-club" name="club"><option value="">All clubs</option></select>
+      <label class="visually-hidden" for="f-position">Position</label>
+      <select id="f-position" name="position"><option value="">All positions</option><option>Goalkeeper</option><option>Defender</option><option>Midfielder</option><option>Forward</option></select>
+      <label class="visually-hidden" for="f-age">Age</label>
+      <select id="f-age" name="age"><option value="">All ages</option><option value="21">21 and under</option><option value="23">23 and under</option><option value="30">30 and over</option></select>
+    </form>
+    <p class="count" data-field="count" role="status"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="num" scope="col">#</th><th scope="col">Player</th><th scope="col">Club</th><th scope="col">Position</th>
+          <th class="num" scope="col"><button type="button" data-sort="age">Age</button></th>
+          <th class="num" scope="col" aria-sort="descending"><button type="button" data-sort="rating">OpenElo</button></th>
+          <th class="num" scope="col"><button type="button" data-sort="week">Last match</button></th>
+          <th class="num" scope="col"><button type="button" data-sort="season">Season</button></th>
+        </tr></thead>
+        <tbody data-field="rows"></tbody>
+      </table>
+    </div>
+    <button class="button more" type="button" data-field="more">Show 50 more</button>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { immersive, galaxyFormation, fieldFormation } from './scene.js';
+  import { getRankings } from './api.js';
+  import { shell, field, number, signed, direction, escape, playerUrl, clubUrl, param } from './site.js';
+  shell();
+  immersive({
+    formations: [galaxyFormation(), galaxyFormation({ center: [0, 2, -8], radius: 12 }), fieldFormation()],
+    palette: ['#FFD66B', '#A9BBD0', '#7FA7D8'], shiftRight: 0.15, next: { href: 'leagues.html', label: 'Leagues' },
+    keyframes: [
+      { at: 0, morph: 0, pos: [0, 7, 18], look: [0, 2, -4] },
+      { at: 0.5, morph: 1, pos: [6, 9, 16], look: [0, 1, -8] },
+      { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -14] },
+    ],
+  });
+  const { players } = await getRankings();
+  const form = field('filters');
+  const leagues = [...new Set(players.map((p) => p.league))].sort();
+  form.league.insertAdjacentHTML('beforeend', leagues.map((l) => `<option>${escape(l)}</option>`).join(''));
+  const fillClubs = () => {
+    const clubs = [...new Map(players.filter((p) => !form.league.value || p.league === form.league.value).map((p) => [p.clubId, p.club])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const keep = form.club.value;
+    form.club.innerHTML = '<option value="">All clubs</option>' + clubs.map(([id, name]) => `<option value="${id}">${escape(name)}</option>`).join('');
+    form.club.value = clubs.some(([id]) => id === keep) ? keep : '';
+  };
+  fillClubs();
+  if (param('club')) form.club.value = param('club');
+  let sort = 'rating', shown = 50;
+  const filtered = () => {
+    const name = form.name.value.trim().toLowerCase();
+    const age = +form.age.value;
+    return players.filter((p) => (!name || p.name.toLowerCase().includes(name))
+      && (!form.league.value || p.league === form.league.value) && (!form.club.value || p.clubId === form.club.value)
+      && (!form.position.value || p.position === form.position.value)
+      && (!age || (age === 30 ? p.age >= 30 : p.age <= age)))
+      .sort((a, b) => (sort === 'age' ? a.age - b.age : b[sort] - a[sort]));
+  };
+  const draw = () => {
+    const list = filtered();
+    field('count').textContent = `${number.format(list.length)} ${list.length === 1 ? 'player' : 'players'}`;
+    field('rows').innerHTML = list.length ? list.slice(0, shown).map((p) => `<tr>
+      <td class="num muted">${p.rank}</td>
+      <td><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation || '')}</small></td>
+      <td><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
+      <td class="muted">${p.position}</td><td class="num">${p.age ?? '–'}</td>
+      <td class="num"><span class="e">${number.format(p.rating)}</span></td>
+      <td class="num ${direction(p.week)}">${signed(p.week)}</td><td class="num ${direction(p.season)}">${signed(p.season)}</td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty">No players match these filters. Clear a filter to see more.</td></tr>';
+    field('more').hidden = list.length <= shown;
+    document.querySelectorAll('[data-sort]').forEach((b) => b.closest('th').toggleAttribute('aria-sort', b.dataset.sort === sort));
+    document.querySelector(`[data-sort="${sort}"]`).closest('th').setAttribute('aria-sort', sort === 'age' ? 'ascending' : 'descending');
+  };
+  form.addEventListener('input', (event) => { if (event.target === form.league) fillClubs(); shown = 50; draw(); });
+  form.addEventListener('submit', (event) => event.preventDefault());
+  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; draw(); }));
+  field('more').addEventListener('click', () => { shown += 50; draw(); });
+  draw();
+</script>
+</body>
+</html>

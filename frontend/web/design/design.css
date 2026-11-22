@@ -1,0 +1,94 @@
+/* Night-stadium design language: one dark look, glass panels over a live 3D scene */
+:root {
+  color-scheme: dark;
+  --night: #060B14;
+  --ink: #E4ECF5;
+  --muted: #93A6BC;
+  --price: #5AA9FF;
+  --elo: #FFD66B;
+  --ask: #FF9A4D;
+  --glass: rgba(14, 26, 44, 0.58);
+  --glass-strong: rgba(10, 19, 33, 0.82);
+  --glass-edge: rgba(150, 190, 235, 0.18);
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --ui: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+}
+* { box-sizing: border-box }
+body { background: var(--night); color: var(--ink); font-family: var(--ui); font-size: 16px; font-variant-numeric: tabular-nums }
+
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0 }
+.grain { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.09; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") }
+
+.site-header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding-block: 16px }
+.site-header .logo { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: 0.02em }
+.site-header nav { display: flex; flex-wrap: wrap; gap: 20px }
+.site-header a { color: var(--muted); text-decoration: none; font-weight: 500 }
+.site-header a[aria-current] { color: var(--ink); border-bottom: 2px solid var(--price) }
+.site-header .wallet { margin-left: auto; color: var(--muted) }
+.site-header .wallet strong { color: var(--ink) }
+
+h1 { margin: 0; font-family: var(--display); font-weight: 900; font-style: italic; font-size: clamp(52px, 7.5vw, 108px); line-height: 0.88; text-transform: uppercase; text-wrap: balance }
+h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(32px, 4vw, 52px); line-height: 0.95; text-wrap: balance }
+h3 { margin: 0; font-size: 17px; font-weight: 700 }
+.lede { margin: 0; color: var(--muted); font-size: 19px; max-width: 48ch; line-height: 1.45 }
+.muted { color: var(--muted) }
+
+.glass { background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 10px; padding: 20px;
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3) }
+
+.kicker { display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; background: var(--ask); color: var(--night);
+  font-family: var(--display); font-weight: 800; font-size: 18px; padding: 4px 14px 4px 10px; transform: skewX(-10deg) }
+
+.stats { display: flex; flex-wrap: wrap; gap: 20px 40px }
+.stat .label { color: var(--muted); font-size: 14px }
+.stat .value { font-size: 38px; font-weight: 700; line-height: 1.05 }
+.stat .delta { font-size: 16px; font-weight: 600; color: var(--price) }
+.stat .delta.down { color: var(--ask) }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--muted) }
+.legend span { display: inline-flex; align-items: center; gap: 8px }
+.swatch { width: 22px; height: 4px; border-radius: 2px; display: inline-block }
+.swatch.price { background: var(--price); box-shadow: 0 0 8px var(--price) }
+.swatch.elo { background: var(--elo); box-shadow: 0 0 8px var(--elo) }
+.swatch.mint { background: repeating-linear-gradient(90deg, var(--ask) 0 5px, transparent 5px 9px) }
+
+.chip { display: inline-block; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: rgba(90,169,255,0.16); color: var(--price) }
+.chip.down { background: rgba(255,154,77,0.16); color: var(--ask) }
+.chip.elo { background: rgba(255,214,107,0.16); color: var(--elo) }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; background: rgba(6,11,20,0.6); padding: 4px; border-radius: 8px }
+.seg button { border: 0; border-radius: 6px; font: inherit; font-weight: 700; min-height: 40px; padding: 0 12px; background: transparent; color: var(--muted); cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--night) }
+.seg.side button[aria-pressed="true"] { background: var(--price) }
+.seg.side button.sell[aria-pressed="true"] { background: var(--ask) }
+
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px }
+legend { color: var(--muted); font-size: 14px; margin-bottom: 6px; padding: 0 }
+.radio { display: flex; gap: 10px; align-items: center; min-height: 34px }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.fields label { display: grid; gap: 6px; color: var(--muted); font-size: 14px }
+.fields input { background: rgba(6,11,20,0.7); color: var(--ink); border: 1px solid var(--glass-edge); border-radius: 6px; padding: 10px 12px; font: inherit; font-size: 20px; font-weight: 600; min-height: 48px; width: 100% }
+.totals { display: grid; gap: 6px }
+.totals div { display: flex; justify-content: space-between }
+.totals div span:first-child { color: var(--muted) }
+.totals .sum { font-weight: 700; font-size: 18px }
+.submit { border: 0; border-radius: 8px; min-height: 52px; font-family: var(--display); font-weight: 800; font-size: 22px; background: var(--price); color: var(--night); cursor: pointer }
+.submit.sell { background: var(--ask) }
+.notice { margin: 0; color: var(--price); font-weight: 600; min-height: 1.4em }
+
+.book-row { position: relative; display: flex; justify-content: space-between; padding: 6px 8px }
+.book-row .bar { position: absolute; right: 0; top: 2px; bottom: 2px; border-radius: 2px; opacity: 0.18 }
+.book-row span { position: relative }
+.book-mint { display: flex; justify-content: space-between; padding: 8px; border: 1px dashed var(--ask); border-radius: 6px; color: var(--ask); font-weight: 600; margin-bottom: 6px }
+.book-last { display: flex; justify-content: space-between; padding: 8px; margin: 4px 0; border-block: 1px solid var(--glass-edge); font-weight: 700; font-size: 20px }
+.book-last span:last-child { color: var(--muted); font-size: 14px; font-weight: 400; align-self: center }
+
+table.data { width: 100%; border-collapse: collapse }
+table.data th { text-align: left; font-weight: 500; color: var(--muted); font-size: 14px; padding: 6px 8px }
+table.data td { padding: 8px; border-top: 1px solid var(--glass-edge) }
+table.data .num { text-align: right }
+.table-scroll { overflow-x: auto }
+
+.credit { font-size: 12px; color: var(--muted) }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px }

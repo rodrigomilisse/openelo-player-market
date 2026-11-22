@@ -1,0 +1,327 @@
+<title>OpenElo Survey</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a survey map. The market's seasons as a 3D ridgeline terrain filling the page, title block top left, legend bottom left, a cross-section and order card on the right */
+:root {
+  color-scheme: light;
+  --paper: #E8EDE9;
+  --ink: #1B2A25;
+  --muted: #53635C;
+  --contour: #9DB2A8;
+  --price: #1F5FBF;
+  --elo: #A86F00;
+  --ask: #B8501A;
+  --sheet: rgba(240,244,241,0.86);
+  --title: 'Archivo', 'Arial Narrow', sans-serif;
+  --mono: 'Spline Sans Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box }
+body { background: var(--paper); color: var(--ink); font-family: var(--title); font-size: 16px; font-variant-numeric: tabular-nums }
+#terrain { position: fixed; inset: 0; width: 100%; height: 100%; display: block }
+.labels { position: fixed; inset: 0; pointer-events: none; z-index: 1 }
+.labels button { position: absolute; transform: translate(-100%, -50%); pointer-events: auto; background: none; border: 0; font-family: var(--title); font-stretch: 75%; font-weight: 700; font-size: 15px; color: var(--muted); cursor: pointer; padding: 6px 10px; white-space: nowrap }
+.labels button[aria-pressed="true"] { color: var(--price); font-weight: 900 }
+.labels button:focus-visible { outline: 2px solid var(--ink); border-radius: 4px }
+.sheet { position: relative; z-index: 2; min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); grid-template-rows: auto minmax(0, 1fr) auto; gap: 20px;
+  padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); padding-block: 24px; pointer-events: none }
+.sheet > * { pointer-events: auto }
+.title h1 { margin: 0; font-stretch: 125%; font-weight: 900; font-size: clamp(40px, 5vw, 72px); line-height: 0.95; letter-spacing: -0.01em }
+.title p { margin: 8px 0 0; color: var(--muted); max-width: 46ch; line-height: 1.45 }
+.title .coords { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-top: 10px }
+.legend { grid-row: 3; align-self: end; justify-self: start; border: 1.5px solid var(--ink); padding: 14px 16px; background: var(--sheet); display: grid; gap: 8px; font-size: 14px; max-width: 320px }
+.legend h2 { margin: 0 0 2px; font-stretch: 112%; font-size: 14px; font-weight: 800 }
+.legend .key { display: flex; align-items: center; gap: 10px }
+.legend .key i { width: 28px; height: 3px; display: inline-block; flex: none }
+.scale { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); font-family: var(--mono); font-size: 11px; margin-top: 4px }
+.scale span { border-top: 4px solid var(--ink); padding-top: 3px }
+.scale span:nth-child(even) { border-top-color: var(--contour) }
+
+.card { grid-column: 2; grid-row: 1 / 4; align-self: start; background: var(--sheet); border-left: 1.5px solid var(--ink); padding: 18px 20px; display: grid; gap: 16px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px) }
+.card .eyebrow { font-family: var(--mono); font-size: 12px; color: var(--muted) }
+.card h2 { margin: 0; font-stretch: 112%; font-weight: 900; font-size: 34px; line-height: 1 }
+.card .nums { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--mono) }
+.card .nums b { font-size: 24px; font-weight: 600 }
+.card svg { width: 100%; height: auto; display: block }
+.pills { display: flex; gap: 6px }
+.pills button { border: 1.5px solid var(--ink); background: none; color: var(--ink); border-radius: 999px; padding: 8px 20px; font: inherit; font-weight: 700; cursor: pointer; min-height: 40px }
+.pills button[aria-pressed="true"] { background: var(--ink); color: var(--paper) }
+.lines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px }
+.lines label { display: grid; gap: 4px; font-size: 13px; color: var(--muted) }
+.lines input { border: 0; border-bottom: 1.5px solid var(--ink); background: none; font-family: var(--mono); font-size: 22px; color: var(--ink); padding: 4px 0; min-height: 40px; width: 100% }
+.lines input:focus-visible { outline: none; border-bottom-width: 3px }
+.outcome { font-size: 15px; line-height: 1.45; margin: 0 }
+.place { justify-self: start; border: 0; border-radius: 999px; background: var(--price); color: #FFFFFF; font: inherit; font-weight: 800; font-stretch: 112%; padding: 12px 26px; cursor: pointer; min-height: 48px }
+.place.sell { background: var(--ask) }
+.place:focus-visible, .pills button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px }
+@media (max-width: 960px) {
+  .sheet { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; padding-block: 16px }
+  .card, .legend { grid-column: 1; grid-row: auto }
+  .title { min-height: 50vh }
+}
+</style>
+
+<canvas id="terrain" aria-hidden="true"></canvas>
+<div class="labels" id="labels" aria-label="Players on the map"></div>
+
+<div class="sheet">
+  <div class="title">
+    <h1>OpenElo Survey</h1>
+    <p>The market as terrain. Each ridge is one player's season, its height his share price. Pick a ridge to cut a cross-section.</p>
+    <div class="coords">Sheet 14, matchday 14, surveyed 18 Nov</div>
+  </div>
+
+  <aside class="legend" aria-label="Map legend">
+    <h2>Legend</h2>
+    <span class="key"><i style="background: var(--ink)"></i>Ridge: a player's price since August</span>
+    <span class="key"><i style="background: var(--price); height: 4px"></i>Selected player's price</span>
+    <span class="key"><i style="background: var(--elo); height: 4px"></i>Selected player's OpenElo</span>
+    <span class="key"><i style="background: var(--contour)"></i>Contours between players</span>
+    <div class="scale" aria-label="Height scale"><span>0</span><span>2</span><span>4</span><span>6 cr</span></div>
+  </aside>
+
+  <section class="card" aria-labelledby="pick-name">
+    <div class="eyebrow" id="pick-club"></div>
+    <h2 id="pick-name"></h2>
+    <div class="nums" id="pick-nums"></div>
+    <div id="section" aria-label="Cross-section of price and OpenElo"></div>
+    <form id="order" novalidate style="display: grid; gap: 14px">
+      <div class="pills" role="group" aria-label="Side">
+        <button type="button" id="buy" aria-pressed="true">Buy</button>
+        <button type="button" id="sell" aria-pressed="false">Sell</button>
+      </div>
+      <div class="lines">
+        <label for="shares">Shares<input id="shares" inputmode="numeric" value="40"></label>
+        <label for="limit">Limit price<input id="limit" inputmode="decimal" value="3.45"></label>
+      </div>
+      <p class="outcome" id="outcome" role="status"></p>
+      <button type="submit" class="place" id="place">Place buy order</button>
+    </form>
+  </section>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { market, mendonca, matches } from './sample-data.js';
+import { quote, toHundredths, formatCredits, bookOutcome } from './ticket.js';
+import { fitTrend } from './analysis.js';
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const field = (id) => document.getElementById(id);
+const PAPER = 0xE8EDE9;
+const INK = 0x1B2A25;
+const CONTOUR = 0x9DB2A8;
+const PRICE = 0x1F5FBF;
+const ELO = 0xA86F00;
+
+const canvas = field('terrain');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(PAPER);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(PAPER, 26, 52);
+const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
+
+const LANE = 3.2;
+const SUB = 6;
+const SPAN = 30;
+const SAMPLES = 140;
+const heightOf = (price) => price * 1.5;
+const xOf = (t) => (t - 0.5) * SPAN;
+const smooth = (t) => t * t * (3 - 2 * t);
+
+function sampleSeries(series) {
+  const curve = new THREE.CatmullRomCurve3(series.map((v, i) => new THREE.Vector3(i, v, 0)));
+  return curve.getPoints(SAMPLES - 1).map((p) => p.y);
+}
+const sampled = market.map((p) => sampleSeries(p.price));
+
+// Rows from the back lane forward; every row gets a paper-coloured curtain so nearer ridges hide farther ones.
+const rows = (market.length - 1) * SUB;
+for (let r = rows; r >= 0; r--) {
+  const t = r / SUB;
+  const lower = Math.floor(t);
+  const upper = Math.min(lower + 1, market.length - 1);
+  const mix = smooth(t - lower);
+  const z = t * LANE;
+  const points = [];
+  const curtain = [];
+  for (let s = 0; s < SAMPLES; s++) {
+    const value = sampled[lower][s] * (1 - mix) + sampled[upper][s] * mix;
+    const x = xOf(s / (SAMPLES - 1));
+    const y = heightOf(value);
+    points.push(new THREE.Vector3(x, y, z));
+    if (s > 0) {
+      const previous = points[s - 1];
+      curtain.push(previous.x, previous.y, z, x, y, z, previous.x, -0.6, z, x, y, z, x, -0.6, z, previous.x, -0.6, z);
+    }
+  }
+  const onLane = r % SUB === 0;
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({ color: onLane ? INK : CONTOUR, transparent: true, opacity: onLane ? 0.9 : 0.75 })));
+  const curtainGeometry = new THREE.BufferGeometry();
+  curtainGeometry.setAttribute('position', new THREE.Float32BufferAttribute(curtain, 3));
+  scene.add(new THREE.Mesh(curtainGeometry, new THREE.MeshBasicMaterial({ color: PAPER, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })));
+}
+
+let selected = 0;
+let highlight = null;
+function tube(values, toY, z, color) {
+  const series = sampleSeries(values);
+  const curve = new THREE.CatmullRomCurve3(series.map((v, s) => new THREE.Vector3(xOf(s / (SAMPLES - 1)), toY(v), z)));
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, SAMPLES, 0.07, 8, false), new THREE.MeshBasicMaterial({ color }));
+}
+function showLane(index) {
+  if (highlight) {
+    scene.remove(highlight);
+    highlight.traverse((child) => { if (child.geometry) child.geometry.dispose(); });
+  }
+  const player = market[index];
+  const z = index * LANE - 0.05;
+  highlight = new THREE.Group();
+  highlight.add(tube(player.price, heightOf, z, PRICE));
+  highlight.add(tube(player.elo, (rating) => (rating - 1650) / 220 * 6 + 0.5, z - 0.35, ELO));
+  scene.add(highlight);
+}
+
+const labels = field('labels');
+labels.innerHTML = market.map((p, i) => `<button type="button" data-index="${i}" aria-pressed="${i === 0}">${p.short}</button>`).join('');
+const labelAnchors = market.map((p, i) => new THREE.Vector3(xOf(0) - 0.4, heightOf(p.price[0]), i * LANE));
+labels.addEventListener('click', (event) => {
+  const button = event.target.closest('button');
+  if (button) select(Number(button.dataset.index));
+});
+
+function placeLabels() {
+  const rect = canvas.getBoundingClientRect();
+  labels.querySelectorAll('button').forEach((button, i) => {
+    const projected = labelAnchors[i].clone().project(camera);
+    button.style.left = `${(projected.x + 1) / 2 * rect.width}px`;
+    button.style.top = `${(1 - projected.y) / 2 * rect.height}px`;
+  });
+}
+
+function crossSection(player) {
+  const W = 600;
+  const H = 230;
+  const pad = 30;
+  const n = player.price.length;
+  const range = (values) => {
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    const margin = (high - low) * 0.12 || 1;
+    return [low - margin, high + margin];
+  };
+  const priceRange = range(player.price);
+  const eloRange = range(player.elo);
+  const x = (i) => pad + i / (n - 1) * (W - 2 * pad);
+  const y = (v, [low, high]) => H - pad - (v - low) / (high - low) * (H - 2 * pad);
+  const path = (values, r) => values.map((v, i) => `${x(i).toFixed(1)},${y(v, r).toFixed(1)}`).join(' ');
+  const trend = (values, r, color) => {
+    const { mean, middle, slope } = fitTrend(values);
+    const at = (i) => mean + slope * (i - middle);
+    return `<line x1="${x(0)}" y1="${y(at(0), r)}" x2="${x(n - 1)}" y2="${y(at(n - 1), r)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 5"></line>`;
+  };
+  const marks = player.name === mendonca.name ? matches.map((m) =>
+    `<line x1="${x(m.index)}" y1="${pad}" x2="${x(m.index)}" y2="${H - pad}" stroke="#9DB2A8" stroke-dasharray="2 4"></line>
+     <text x="${x(m.index) + 4}" y="${pad + 10}" font-size="11" fill="#53635C" font-family="Spline Sans Mono">${m.score}</text>`).join('') : '';
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${player.name}: price from ${player.price[0].toFixed(2)} to ${player.price[n - 1].toFixed(2)}, OpenElo from ${player.elo[0]} to ${player.elo[n - 1]}">
+    <rect x="${pad}" y="${pad}" width="${W - 2 * pad}" height="${H - 2 * pad}" fill="none" stroke="#1B2A25" stroke-width="1"></rect>
+    ${marks}
+    ${trend(player.price, priceRange, '#1F5FBF')}${trend(player.elo, eloRange, '#A86F00')}
+    <polyline points="${path(player.elo, eloRange)}" fill="none" stroke="#A86F00" stroke-width="2.5" stroke-linejoin="round"></polyline>
+    <polyline points="${path(player.price, priceRange)}" fill="none" stroke="#1F5FBF" stroke-width="2.5" stroke-linejoin="round"></polyline>
+    <text x="${pad - 4}" y="${pad + 4}" text-anchor="end" font-size="11" fill="#1F5FBF" font-family="Spline Sans Mono">${priceRange[1].toFixed(1)}</text>
+    <text x="${pad - 4}" y="${H - pad}" text-anchor="end" font-size="11" fill="#1F5FBF" font-family="Spline Sans Mono">${priceRange[0].toFixed(1)}</text>
+    <text x="${W - pad + 4}" y="${pad + 4}" font-size="11" fill="#A86F00" font-family="Spline Sans Mono">${Math.round(eloRange[1])}</text>
+    <text x="${W - pad + 4}" y="${H - pad}" font-size="11" fill="#A86F00" font-family="Spline Sans Mono">${Math.round(eloRange[0])}</text>
+    <text x="${pad}" y="${H - 8}" font-size="11" fill="#53635C" font-family="Spline Sans Mono">Aug</text>
+    <text x="${W - pad}" y="${H - 8}" text-anchor="end" font-size="11" fill="#53635C" font-family="Spline Sans Mono">Nov</text>
+  </svg>`;
+}
+
+function select(index) {
+  selected = index;
+  const player = market[index];
+  const last = player.price.length - 1;
+  labels.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.index) === index)));
+  field('pick-club').textContent = `Cross-section, ${player.position}, ${player.club}`;
+  field('pick-name').textContent = player.name;
+  field('pick-nums').innerHTML = `<span>Price <b style="color: var(--price)">${player.price[last].toFixed(2)}</b></span>
+    <span>OpenElo <b style="color: var(--elo)">${player.elo[last].toLocaleString('en')}</b></span>
+    <span style="color: ${player.change >= 0 ? 'var(--price)' : 'var(--ask)'}">${player.change >= 0 ? '+' : '−'}${Math.abs(player.change).toFixed(1)}% today</span>`;
+  field('section').innerHTML = crossSection(player);
+  showLane(index);
+  render();
+}
+
+let side = 'buy';
+function updateOrder() {
+  const shares = parseInt(field('shares').value, 10);
+  const price = toHundredths(field('limit').value);
+  if (!(shares > 0) || price === null) { field('outcome').textContent = 'Enter a whole number of shares and a price like 3.45.'; return; }
+  const { cost, fee } = quote(shares, price);
+  const outcome = bookOutcome(side, price);
+  const money = side === 'buy' ? `Holds ${formatCredits(cost + fee)}` : `Receives ${formatCredits(cost - fee)}`;
+  const what = outcome.kind === 'mint' ? 'At 3.61 or more, new shares cost no more: mint instead.'
+    : outcome.kind === 'fills' ? `Fills now: ${outcome.shares} shares match.`
+    : `Waits in the book behind ${outcome.shares} shares.`;
+  field('outcome').textContent = `${money} with the 5% fee. ${what}`;
+}
+function setSide(next) {
+  side = next;
+  field('buy').setAttribute('aria-pressed', String(next === 'buy'));
+  field('sell').setAttribute('aria-pressed', String(next === 'sell'));
+  field('place').textContent = next === 'buy' ? 'Place buy order' : 'Place sell order';
+  field('place').classList.toggle('sell', next === 'sell');
+  updateOrder();
+}
+field('buy').addEventListener('click', () => setSide('buy'));
+field('sell').addEventListener('click', () => setSide('sell'));
+['shares', 'limit'].forEach((id) => field(id).addEventListener('input', updateOrder));
+field('order').addEventListener('submit', (event) => {
+  event.preventDefault();
+  field('outcome').textContent = 'Demo only: no order was sent.';
+});
+
+const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
+window.addEventListener('pointermove', (event) => {
+  pointer.x = event.clientX / window.innerWidth - 0.5;
+  pointer.y = event.clientY / window.innerHeight - 0.5;
+});
+const lookAt = new THREE.Vector3(-2, 2.2, (market.length - 1) * LANE * 0.45);
+function placeCamera(time) {
+  pointer.sx += (pointer.x - pointer.sx) * 0.05;
+  pointer.sy += (pointer.y - pointer.sy) * 0.05;
+  const drift = reducedMotion ? 0 : Math.sin(time * 0.06) * 1.5;
+  camera.position.set(-4 + drift + pointer.sx * 5, 9.5 - pointer.sy * 3, -22);
+  camera.lookAt(lookAt);
+}
+function render(time = 0) {
+  placeCamera(time);
+  renderer.render(scene, camera);
+  placeLabels();
+}
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  if (w > 960) camera.setViewOffset(w, h, w * 0.12, 0, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+  render();
+}
+window.addEventListener('resize', resize);
+
+await document.fonts.ready;
+resize();
+select(0);
+updateOrder();
+if (!reducedMotion) {
+  const clock = new THREE.Clock();
+  const loop = () => { render(clock.getElapsedTime()); requestAnimationFrame(loop); };
+  loop();
+}
+</script>

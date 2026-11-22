@@ -1,0 +1,377 @@
+<title>OpenElo Scope</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: a two-channel oscilloscope. Screen with price (channel 1) and rating (channel 2) on the left, a depth meter beside it, knobs and switches on the right */
+:root {
+  color-scheme: dark;
+  --chassis: #1B1F23;
+  --panel: #23292E;
+  --bezel: #0D1112;
+  --screen: #06120F;
+  --silk: #AEB8C0;
+  --dim: #77838C;
+  --ch1: #6FE3FF;
+  --ch2: #FFB547;
+  --ask: #FF6B8B;
+  --label: 'Chakra Petch', 'Arial Narrow', sans-serif;
+  --readout: 'Share Tech Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box }
+body { background: var(--chassis); color: var(--silk); font-family: var(--label); font-size: 15px;
+  background-image: radial-gradient(circle at 20% 0%, rgba(255,255,255,0.05), transparent 50%), repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 2px, transparent 2px 4px) }
+.instrument { max-width: 1440px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 28px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px }
+.topline { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 28px }
+.brand { font-weight: 700; font-size: 20px; letter-spacing: 0.08em; color: #E6ECF1 }
+.model { color: var(--dim); font-size: 13px; letter-spacing: 0.12em }
+.player { margin-left: auto; font-size: 18px; color: #E6ECF1 }
+.player span { color: var(--dim) }
+
+.bay { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 14px; background: var(--panel); border-radius: 18px; padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 20px 40px rgba(0,0,0,0.35) }
+.readouts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--readout); font-size: 15px }
+.readouts .ch { display: flex; gap: 10px; align-items: baseline }
+.readouts .tag { font-family: var(--label); font-weight: 700; font-size: 12px; padding: 1px 7px; border-radius: 4px; color: var(--bezel) }
+.readouts b { font-size: 26px; font-weight: 400 }
+.screen { position: relative; aspect-ratio: 16 / 10; background: var(--screen); border-radius: 14px; border: 10px solid var(--bezel);
+  box-shadow: inset 0 0 60px rgba(111,227,255,0.07), 0 0 0 1px rgba(255,255,255,0.05); overflow: hidden; max-width: 100% }
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100% }
+.screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px); border-radius: 4px }
+.depth { display: grid; align-content: start; gap: 3px; font-family: var(--readout); font-size: 13px }
+.depth h2 { margin: 0 0 6px; font-family: var(--label); font-size: 12px; letter-spacing: 0.14em; color: var(--dim); font-weight: 600 }
+.depth .row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 8px; align-items: center }
+.depth .leds { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px }
+.depth .leds i { height: 9px; border-radius: 2px; background: #11181A }
+.depth .row.mint { color: var(--ask) }
+.depth .row.last { color: #E6ECF1 }
+
+.controls { background: var(--panel); border-radius: 18px; padding: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; align-content: start;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 20px 40px rgba(0,0,0,0.35) }
+.control { display: grid; justify-items: center; gap: 8px; text-align: center }
+.silk { font-size: 12px; letter-spacing: 0.14em; color: var(--dim); font-weight: 600 }
+.knob { width: 92px; height: 92px; border-radius: 50%; position: relative; cursor: ns-resize; touch-action: none;
+  background: radial-gradient(circle at 35% 30%, #4A535B, #22282D 70%); box-shadow: 0 8px 18px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.12) }
+.knob::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; background: conic-gradient(from 225deg, rgba(174,184,192,0.35) 0 270deg, transparent 270deg); -webkit-mask: radial-gradient(circle, transparent 54px, #000 55px); mask: radial-gradient(circle, transparent 54px, #000 55px) }
+.knob .cap { position: absolute; inset: 0; border-radius: 50%; transition: transform 60ms linear }
+.knob .cap i { position: absolute; left: 50%; top: 8px; width: 4px; height: 22px; margin-left: -2px; border-radius: 2px; background: #E6ECF1; box-shadow: 0 0 8px rgba(230,236,241,0.6) }
+.knob:focus-visible { outline: 2px solid var(--ch1); outline-offset: 12px }
+.value { font-family: var(--readout); font-size: 20px; color: #E6ECF1 }
+.lever { width: 64px; height: 92px; border-radius: 32px; border: 0; background: #12171A; position: relative; cursor: pointer; box-shadow: inset 0 3px 8px rgba(0,0,0,0.6) }
+.lever::after { content: ""; position: absolute; left: 8px; right: 8px; height: 40px; top: 8px; border-radius: 24px; background: radial-gradient(circle at 40% 30%, #6B757D, #30373D); box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: top 160ms ease }
+.lever[aria-checked="true"]::after { top: 44px }
+.lever:focus-visible, .switch:focus-visible, .fire:focus-visible { outline: 2px solid var(--ch1); outline-offset: 6px }
+.lever-labels { display: flex; flex-direction: column; justify-content: space-between; height: 92px; font-weight: 700 }
+.switch { width: 70px; height: 34px; border-radius: 17px; border: 0; background: #12171A; position: relative; cursor: pointer; box-shadow: inset 0 3px 8px rgba(0,0,0,0.6) }
+.switch::after { content: ""; position: absolute; top: 5px; left: 6px; width: 24px; height: 24px; border-radius: 50%; background: #5B656D; transition: left 140ms ease, background 140ms }
+.switch[aria-checked="true"]::after { left: 40px; background: var(--ch2); box-shadow: 0 0 12px var(--ch2) }
+.lcd { grid-column: 1 / -1; background: #0A1513; border-radius: 10px; padding: 12px 14px; font-family: var(--readout); font-size: 15px; color: var(--ch1); min-height: 92px; line-height: 1.45; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6) }
+.lcd.sell { color: var(--ask) }
+.fire { grid-column: 1 / -1; justify-self: center; width: 116px; height: 116px; border-radius: 50%; border: 6px solid #12171A; cursor: pointer; font-family: var(--label); font-weight: 700; font-size: 17px; letter-spacing: 0.1em; color: var(--bezel);
+  background: radial-gradient(circle at 40% 35%, #C9F6FF, var(--ch1) 60%); box-shadow: 0 0 30px rgba(111,227,255,0.5), 0 8px 16px rgba(0,0,0,0.5) }
+.fire.sell { background: radial-gradient(circle at 40% 35%, #FFD0DA, var(--ask) 60%); box-shadow: 0 0 30px rgba(255,107,139,0.5), 0 8px 16px rgba(0,0,0,0.5) }
+.fire:active { transform: translateY(2px) }
+@media (max-width: 1000px) {
+  .instrument { grid-template-columns: minmax(0, 1fr) }
+  .bay { grid-template-columns: minmax(0, 1fr) }
+}
+</style>
+
+<div class="instrument">
+  <div class="topline">
+    <span class="brand">OPENELO</span><span class="model">MARKET SCOPE, TWO CHANNEL</span>
+    <span class="player">Tiago Mendonça <span>Vale do Sado FC, midfield</span></span>
+  </div>
+
+  <div class="bay">
+    <div class="readouts" aria-live="polite">
+      <span class="ch"><span class="tag" style="background: var(--ch1)">CH1</span>Price <b style="color: var(--ch1)" id="r-price"></b></span>
+      <span class="ch"><span class="tag" style="background: var(--ch2)">CH2</span>OpenElo <b style="color: var(--ch2)" id="r-elo"></b></span>
+      <span class="ch">Trend <b id="r-trend" style="font-size: 18px"></b></span>
+      <span class="ch" style="color: var(--ask)">New shares <b>3.61</b></span>
+    </div>
+    <div class="screen" role="img" aria-label="Oscilloscope traces of share price and OpenElo rating" id="screen">
+      <canvas id="grid"></canvas>
+      <canvas id="trace"></canvas>
+      <canvas id="overlay"></canvas>
+    </div>
+    <div class="depth" aria-label="Order book depth" id="depth"></div>
+  </div>
+
+  <div class="controls">
+    <div class="control">
+      <div class="silk">SIDE</div>
+      <div style="display: flex; gap: 12px; align-items: center">
+        <button type="button" class="lever" role="switch" aria-checked="false" id="side" aria-label="Side, buy or sell"></button>
+        <div class="lever-labels"><span style="color: var(--ch1)">BUY</span><span style="color: var(--ask)">SELL</span></div>
+      </div>
+    </div>
+    <div class="control">
+      <div class="silk">TIME BASE</div>
+      <div class="knob" id="k-base" tabindex="0" role="slider" aria-label="Time base"><div class="cap"><i></i></div></div>
+      <div class="value" id="v-base"></div>
+    </div>
+    <div class="control">
+      <div class="silk">LIMIT</div>
+      <div class="knob" id="k-limit" tabindex="0" role="slider" aria-label="Limit price"><div class="cap"><i></i></div></div>
+      <div class="value" id="v-limit"></div>
+    </div>
+    <div class="control">
+      <div class="silk">SHARES</div>
+      <div class="knob" id="k-shares" tabindex="0" role="slider" aria-label="Shares"><div class="cap"><i></i></div></div>
+      <div class="value" id="v-shares"></div>
+    </div>
+    <div class="control" style="grid-column: 1 / -1; grid-auto-flow: column; justify-content: center; gap: 14px; align-items: center">
+      <div class="silk">TREND LINES</div>
+      <button type="button" class="switch" role="switch" aria-checked="true" id="trend" aria-label="Trend lines"></button>
+    </div>
+    <div class="lcd" id="lcd" role="status"></div>
+    <button type="button" class="fire" id="fire">PLACE</button>
+  </div>
+</div>
+
+<script type="module">
+import { week, mendonca, matches, book, MINT_PRICE } from './sample-data.js';
+import { quote, formatCredits, bookOutcome } from './ticket.js';
+import { fitTrend } from './analysis.js';
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const COLORS = { ch1: css('--ch1'), ch2: css('--ch2'), ask: css('--ask'), dim: css('--dim') };
+const BASES = [
+  { name: 'WEEK', price: week.price, elo: week.elo, priceRange: [3.0, 3.75], eloRange: [1810, 1848], marks: [{ index: week.matchIndex, label: '2–1 W' }], days: 7 },
+  { name: 'SEASON', price: mendonca.price, elo: mendonca.elo, priceRange: [0.8, 3.95], eloRange: [1690, 1855], marks: matches.map((m) => ({ index: m.index, label: m.score })), days: 105 }
+];
+const state = { side: 'buy', base: 0, limit: 345, shares: 40, trend: true };
+const field = (id) => document.getElementById(id);
+
+function knob(id, { min, max, step, get, set, format }) {
+  const element = field(id);
+  const cap = element.querySelector('.cap');
+  const render = () => {
+    const value = get();
+    cap.style.transform = `rotate(${-135 + 270 * (value - min) / (max - min)}deg)`;
+    element.setAttribute('aria-valuemin', min);
+    element.setAttribute('aria-valuemax', max);
+    element.setAttribute('aria-valuenow', value);
+    element.setAttribute('aria-valuetext', format(value));
+    field(`v-${id.slice(2)}`).textContent = format(value);
+  };
+  const change = (value) => {
+    const clamped = Math.min(max, Math.max(min, Math.round(value / step) * step));
+    if (clamped !== get()) { set(clamped); refresh(); }
+    render();
+  };
+  let dragY = null;
+  let dragValue = 0;
+  element.addEventListener('pointerdown', (event) => { dragY = event.clientY; dragValue = get(); element.setPointerCapture(event.pointerId); });
+  element.addEventListener('pointermove', (event) => {
+    if (dragY === null) return;
+    const span = Math.max(step, (max - min) / 160);
+    change(dragValue + (dragY - event.clientY) * span);
+  });
+  element.addEventListener('pointerup', () => { dragY = null; });
+  element.addEventListener('wheel', (event) => { event.preventDefault(); change(get() + (event.deltaY < 0 ? step : -step)); }, { passive: false });
+  element.addEventListener('keydown', (event) => {
+    const moves = { ArrowUp: step, ArrowRight: step, ArrowDown: -step, ArrowLeft: -step, PageUp: step * 5, PageDown: -step * 5 };
+    if (event.key in moves) { event.preventDefault(); change(get() + moves[event.key]); }
+  });
+  render();
+  return render;
+}
+
+const show = (hundredths) => (hundredths / 100).toFixed(2);
+knob('k-base', { min: 0, max: 1, step: 1, get: () => state.base, set: (v) => { state.base = v; restartSweep(); }, format: (v) => BASES[v].name });
+knob('k-limit', { min: 325, max: 365, step: 1, get: () => state.limit, set: (v) => { state.limit = v; }, format: show });
+knob('k-shares', { min: 5, max: 200, step: 5, get: () => state.shares, set: (v) => { state.shares = v; }, format: (v) => String(v) });
+
+field('side').addEventListener('click', () => {
+  state.side = state.side === 'buy' ? 'sell' : 'buy';
+  field('side').setAttribute('aria-checked', String(state.side === 'sell'));
+  refresh();
+});
+field('trend').addEventListener('click', () => {
+  state.trend = !state.trend;
+  field('trend').setAttribute('aria-checked', String(state.trend));
+  refresh();
+});
+field('fire').addEventListener('click', () => {
+  field('lcd').textContent = `DEMO ONLY. ${state.side.toUpperCase()} ${state.shares} AT ${show(state.limit)} NOT SENT.`;
+});
+
+const ledRow = (label, shares, color, extra = '') => {
+  const lit = Math.min(10, Math.round(shares / 30));
+  const leds = Array.from({ length: 10 }, (_, i) => `<i${i < lit ? ` style="background: ${color}; box-shadow: 0 0 6px ${color}"` : ''}></i>`).join('');
+  return `<div class="row ${extra}"><span>${label}</span><span class="leds">${leds}</span></div>`;
+};
+field('depth').innerHTML = '<h2>DEPTH</h2>' +
+  `<div class="row mint"><span>${MINT_PRICE.toFixed(2)}</span><span>new, any amount</span></div>` +
+  book.asks.map(([p, s]) => ledRow(p, s, COLORS.ask)).join('') +
+  '<div class="row last"><span>3.42</span><span>last trade</span></div>' +
+  book.bids.map(([p, s]) => ledRow(p, s, COLORS.ch1)).join('');
+
+const screen = field('screen');
+const layers = ['grid', 'trace', 'overlay'].map((id) => field(id));
+const [gridCtx, traceCtx, overlayCtx] = layers.map((canvas) => canvas.getContext('2d'));
+let width = 0;
+let height = 0;
+const PAD = 26;
+function size() {
+  const ratio = Math.min(window.devicePixelRatio, 2);
+  width = screen.clientWidth;
+  height = screen.clientHeight;
+  layers.forEach((canvas) => {
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    canvas.getContext('2d').setTransform(ratio, 0, 0, ratio, 0, 0);
+  });
+  drawGrid();
+  refresh();
+  restartSweep();
+}
+const xAt = (i, n) => PAD + i / (n - 1) * (width - 2 * PAD);
+const yAt = (value, [low, high]) => height - PAD - (value - low) / (high - low) * (height - 2 * PAD);
+
+function drawGrid() {
+  gridCtx.clearRect(0, 0, width, height);
+  gridCtx.strokeStyle = 'rgba(111,227,255,0.10)';
+  gridCtx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    const x = PAD + i * (width - 2 * PAD) / 10;
+    gridCtx.beginPath(); gridCtx.moveTo(x, PAD); gridCtx.lineTo(x, height - PAD); gridCtx.stroke();
+  }
+  for (let j = 0; j <= 8; j++) {
+    const y = PAD + j * (height - 2 * PAD) / 8;
+    gridCtx.beginPath(); gridCtx.moveTo(PAD, y); gridCtx.lineTo(width - PAD, y); gridCtx.stroke();
+  }
+  gridCtx.strokeStyle = 'rgba(111,227,255,0.22)';
+  for (let k = 0; k <= 50; k++) {
+    const x = PAD + k * (width - 2 * PAD) / 50;
+    gridCtx.beginPath(); gridCtx.moveTo(x, height / 2 - 3); gridCtx.lineTo(x, height / 2 + 3); gridCtx.stroke();
+  }
+}
+
+function drawOverlay() {
+  const base = BASES[state.base];
+  const n = base.price.length;
+  overlayCtx.clearRect(0, 0, width, height);
+  overlayCtx.font = "13px 'Share Tech Mono', monospace";
+  base.marks.forEach((mark) => {
+    const x = xAt(mark.index, n);
+    overlayCtx.strokeStyle = 'rgba(255,181,71,0.35)';
+    overlayCtx.setLineDash([3, 5]);
+    overlayCtx.beginPath(); overlayCtx.moveTo(x, PAD); overlayCtx.lineTo(x, height - PAD); overlayCtx.stroke();
+    overlayCtx.setLineDash([]);
+    overlayCtx.fillStyle = COLORS.ch2;
+    overlayCtx.fillText(mark.label, x + 5, PAD + 14);
+  });
+  const mintY = yAt(MINT_PRICE, base.priceRange);
+  overlayCtx.strokeStyle = COLORS.ask;
+  overlayCtx.setLineDash([8, 6]);
+  overlayCtx.beginPath(); overlayCtx.moveTo(PAD, mintY); overlayCtx.lineTo(width - PAD, mintY); overlayCtx.stroke();
+  overlayCtx.fillStyle = COLORS.ask;
+  overlayCtx.fillText('NEW SHARES 3.61', PAD + 6, mintY - 6);
+  if (state.trend) {
+    [[base.price, base.priceRange, COLORS.ch1], [base.elo, base.eloRange, COLORS.ch2]].forEach(([values, range, color]) => {
+      const { mean, middle, slope } = fitTrend(values);
+      const at = (i) => mean + slope * (i - middle);
+      overlayCtx.strokeStyle = color;
+      overlayCtx.globalAlpha = 0.55;
+      overlayCtx.setLineDash([2, 6]);
+      overlayCtx.beginPath(); overlayCtx.moveTo(xAt(0, n), yAt(at(0), range)); overlayCtx.lineTo(xAt(n - 1, n), yAt(at(n - 1), range)); overlayCtx.stroke();
+      overlayCtx.globalAlpha = 1;
+    });
+  }
+  const limitY = yAt(state.limit / 100, base.priceRange);
+  const cursor = state.side === 'buy' ? COLORS.ch1 : COLORS.ask;
+  overlayCtx.setLineDash([]);
+  overlayCtx.strokeStyle = cursor;
+  overlayCtx.lineWidth = 1.5;
+  overlayCtx.beginPath(); overlayCtx.moveTo(PAD, limitY); overlayCtx.lineTo(width - PAD, limitY); overlayCtx.stroke();
+  overlayCtx.lineWidth = 1;
+  overlayCtx.fillStyle = cursor;
+  overlayCtx.fillText(`CURSOR ${show(state.limit)}`, width - PAD - 110, limitY - 6);
+}
+
+function refresh() {
+  const base = BASES[state.base];
+  const last = base.price.length - 1;
+  field('r-price').textContent = base.price[last].toFixed(2);
+  field('r-elo').textContent = base.elo[last].toLocaleString('en');
+  const perDay = (values) => fitTrend(values).slope * (values.length - 1) / base.days;
+  const priceTrend = perDay(base.price);
+  const eloTrend = perDay(base.elo);
+  field('r-trend').innerHTML = `<span style="color: var(--ch1)">${priceTrend >= 0 ? '+' : '−'}${Math.abs(priceTrend).toFixed(3)}</span> / <span style="color: var(--ch2)">${eloTrend >= 0 ? '+' : '−'}${Math.abs(eloTrend).toFixed(1)}</span> a day`;
+
+  const outcome = bookOutcome(state.side, state.limit);
+  const { cost, fee } = quote(state.shares, state.limit);
+  const money = state.side === 'buy' ? `HOLDS ${formatCredits(cost + fee).toUpperCase()}` : `RECEIVES ${formatCredits(cost - fee).toUpperCase()}`;
+  const line = outcome.kind === 'mint' ? 'AT OR ABOVE 3.61. NEW SHARES ARE NO DEARER: MINT INSTEAD.'
+    : outcome.kind === 'fills' ? `FILLS NOW. ${outcome.shares} SHARES MATCH AT YOUR PRICE.`
+    : `WAITS. ${outcome.shares} SHARES QUEUED AHEAD. BEST OTHER SIDE ${show(outcome.best)}.`;
+  field('lcd').textContent = `${state.side.toUpperCase()} ${state.shares} AT ${show(state.limit)}. ${money} WITH 5% FEE.\n${line}`;
+  field('lcd').style.whiteSpace = 'pre-line';
+  field('lcd').classList.toggle('sell', state.side === 'sell');
+  field('fire').classList.toggle('sell', state.side === 'sell');
+  field('fire').textContent = state.side === 'buy' ? 'PLACE BUY' : 'PLACE SELL';
+  if (width) drawOverlay();
+}
+
+let sweepStart = performance.now();
+function restartSweep() {
+  sweepStart = performance.now();
+  traceCtx.clearRect(0, 0, width, height);
+  if (reducedMotion) drawTraces(1);
+}
+const SWEEP_MS = 2600;
+const PAUSE_MS = 1400;
+
+function drawTraces(head) {
+  const base = BASES[state.base];
+  const n = base.price.length;
+  traceCtx.globalCompositeOperation = 'lighter';
+  [[base.price, base.priceRange, COLORS.ch1], [base.elo, base.eloRange, COLORS.ch2]].forEach(([values, range, color]) => {
+    const end = head * (n - 1);
+    traceCtx.strokeStyle = color;
+    traceCtx.shadowColor = color;
+    traceCtx.shadowBlur = 12;
+    traceCtx.lineWidth = 2;
+    traceCtx.beginPath();
+    for (let i = 0; i <= Math.floor(end); i++) {
+      const x = xAt(i, n);
+      const y = yAt(values[i], range);
+      if (i === 0) traceCtx.moveTo(x, y); else traceCtx.lineTo(x, y);
+    }
+    const whole = Math.floor(end);
+    let headX = xAt(whole, n);
+    let headY = yAt(values[whole], range);
+    if (whole < n - 1) {
+      const part = end - whole;
+      headX += (xAt(whole + 1, n) - headX) * part;
+      headY += (yAt(values[whole + 1], range) - headY) * part;
+      traceCtx.lineTo(headX, headY);
+    }
+    traceCtx.stroke();
+    traceCtx.fillStyle = '#FFFFFF';
+    traceCtx.beginPath(); traceCtx.arc(headX, headY, 3, 0, Math.PI * 2); traceCtx.fill();
+  });
+  traceCtx.shadowBlur = 0;
+  traceCtx.globalCompositeOperation = 'source-over';
+}
+
+function frame(now) {
+  const elapsed = now - sweepStart;
+  const head = Math.min(elapsed / SWEEP_MS, 1);
+  traceCtx.fillStyle = 'rgba(6,18,15,0.20)';
+  traceCtx.fillRect(0, 0, width, height);
+  drawTraces(head);
+  if (elapsed > SWEEP_MS + PAUSE_MS) sweepStart = now;
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', size);
+await document.fonts.ready;
+size();
+if (!reducedMotion) requestAnimationFrame(frame);
+</script>

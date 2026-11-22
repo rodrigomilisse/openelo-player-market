@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club | OpenElo</title>
+<meta name="description" content="A club's OpenElo rating, its season, and which players carry it.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Club | OpenElo">
+<meta property="og:description" content="A club's OpenElo rating, its season, and which players carry it.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .club-head { padding-block: clamp(20px, 5vw, 56px) 0; display: grid; gap: 14px }
+  .club-head .identity { margin: 0; color: var(--muted); font-size: 19px }
+  .club-head .identity a { color: var(--ink); text-decoration: none }
+  .club-rating { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 40px }
+  .club-rating .big { margin: 0; font-family: var(--display); font-weight: 900; font-style: italic; font-size: clamp(72px, 9vw, 140px); line-height: 0.8; color: var(--club) }
+  .club-rating .big small { font-family: var(--ui); font-style: normal; font-weight: 500; font-size: 16px; color: var(--muted); margin-left: 10px }
+  .facts { display: flex; flex-wrap: wrap; gap: 14px 36px; margin: 0 }
+  .facts div { display: flex; flex-direction: column }
+  .facts dt { order: 2; color: var(--muted); font-size: 14px }
+  .facts dd { order: 1; margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1 }
+  /* Who carries the team: each player's gap to the club, a bar either side of zero */
+  .carry { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 4px }
+  .carry li { display: grid; grid-template-columns: minmax(130px, 15em) minmax(0, 1fr) 3.6em 4em; gap: 14px; align-items: center; padding: 6px 4px }
+  .carry a { text-decoration: none; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .carry a:hover { color: var(--elo) }
+  .carry small { display: block; color: var(--muted); font-size: 13px; font-weight: 400 }
+  .track { position: relative; height: 14px }
+  .track::before { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: rgba(169, 187, 208, 0.5) }
+  .bar { position: absolute; top: 2px; height: 10px; border-radius: 3px }
+  .bar.above { left: 50%; background: var(--elo); box-shadow: 0 0 10px rgba(255, 214, 107, 0.4) }
+  .bar.below { right: 50%; background: rgba(147, 166, 188, 0.45) }
+  .carry .gap { font-family: var(--display); font-weight: 800; font-size: 20px; text-align: right }
+  .carry .e { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--elo); text-align: right }
+  .axis-labels { display: grid; grid-template-columns: minmax(130px, 15em) minmax(0, 1fr) 3.6em 4em; gap: 14px; color: var(--muted); font-size: 13px; margin-top: 12px }
+  .axis-labels span:nth-child(2) { display: flex; justify-content: space-between }
+  .results { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 2px }
+  .results li { display: grid; grid-template-columns: 4.6em minmax(0, 1fr) 4em; gap: 12px; align-items: baseline; padding: 9px 12px; border-radius: 8px; background: var(--row) }
+  .results li:nth-child(odd) { background: var(--row-alt) }
+  .results .d { color: var(--muted); font-size: 15px }
+  .results .s { font-family: var(--display); font-weight: 800; font-size: 20px; margin-right: 6px }
+  .results a { text-decoration: none }
+  .results a:hover { color: var(--elo) }
+  .results .c { font-family: var(--display); font-weight: 800; font-size: 20px; text-align: right }
+  @media (max-width: 860px) {
+    .axis-labels { display: none }
+    .carry li { grid-template-columns: minmax(0, 1fr) 3.2em 3.6em; gap: 4px 10px }
+    .carry .track { grid-column: 1 / -1; grid-row: 2 } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="club-head" aria-labelledby="club-name">
+      <p class="identity" data-field="identity"></p>
+      <h1 id="club-name" data-field="name"></h1>
+      <div class="club-rating"><p class="big" data-field="rating"></p><dl class="facts" data-field="facts"></dl></div>
+    </section>
+
+    <section class="stage" id="stage-squad" aria-label="The squad against the club"><p class="stage-caption" data-field="stage-squad"></p></section>
+
+    <section class="glass-panel" aria-labelledby="carry-title">
+      <div class="section-head"><h2 id="carry-title">Who carries the team</h2>
+        <p class="legend"><span><i class="swatch swatch-player"></i>Above the club</span><span><i class="swatch" style="background:rgba(147,166,188,.45)"></i>Below it</span></p></div>
+      <p class="section-lede">Each player's rating minus the club's. Regular starters who score or play for their country sit above the line; squad players who rarely start sit below it.</p>
+      <div class="axis-labels" aria-hidden="true"><span>Player</span><span data-field="axis"></span><span>Gap</span><span>OpenElo</span></div>
+      <ol class="carry" data-field="carry"></ol>
+    </section>
+
+    <div class="grid-2">
+      <section class="glass-panel" aria-labelledby="season-title">
+        <h2 id="season-title">The club's season</h2>
+        <figure class="chart"><svg class="chart-svg" data-field="chart" role="img" aria-label="The club's rating over the season"></svg>
+          <div class="chart-readout" data-field="readout" aria-live="polite"></div></figure>
+      </section>
+      <section class="glass-panel" aria-labelledby="results-title">
+        <h2 id="results-title">Results</h2>
+        <ol class="results" data-field="results"></ol>
+      </section>
+    </div>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { getClub } from './api.js';
+  import { immersive, curveFormation, columnsFormation, fieldFormation } from './scene.js';
+  import { shell, field, param, number, signed, direction, shortDate, longDate, escape, playerUrl, clubUrl, lineChart, notFound } from './site.js';
+  shell();
+  const c = await getClub((param('id') || 'vale-do-sado-fc').replace(/[^a-z0-9-]/g, ''));
+  if (!c) notFound('club');
+  else {
+    immersive({
+      formations: [
+        curveFormation([{ values: c.history.map((h) => h.rating) }], { from: [-3, -0.3, 3], to: [9, -0.3, -7], height: 6 }),
+        columnsFormation(c.squad.slice().sort((a, b) => b.gap - a.gap).map((p) => p.gap), { center: [0, 2.2, -1], width: 16, scale: 0.014 }),
+        fieldFormation(),
+      ],
+      palette: ['#A9BBD0', '#FFD66B', '#7FA7D8'], alt: '#7D90A8', next: { href: `leagues.html#${c.league.id}`, label: c.league.name },
+      keyframes: [
+        { at: 0, morph: 0, pos: [-2, 3.2, 21], look: [-2.2, 2.6, -2] },
+        { at: 0.06, morph: 0, pos: [0, 3.6, 19], look: [-1.8, 2.6, -2] },
+        { at: '#stage-squad', morph: 1, pos: [0, 4.2, 15], look: [0, 0.9, -1], shift: 0 },
+        { at: '#carry-title', morph: 1, pos: [-4, 3.8, 15], look: [0, 2, -1] },
+        { at: 0.85, morph: 2, pos: [0, 10, 26], look: [0, 0, -12] },
+        { at: 1, morph: 2, pos: [6, 6, 16], look: [0, 1, -22] },
+      ],
+    });
+    document.title = `${c.name}: ${number.format(c.rating)} OpenElo`;
+    field('identity').innerHTML = `<a href="leagues.html#${c.league.id}">${escape(c.league.name)}</a>, ratings as of ${longDate(c.asOf)}`;
+    field('name').textContent = c.name;
+    const above = c.squad.filter((p) => p.gap > 0).length;
+    field('stage-squad').innerHTML = `Every player against the club's ${number.format(c.rating)}: <span class="gold">${above} above it</span>, ${c.squad.length - above} below.`;
+    field('rating').innerHTML = `${number.format(c.rating)}<small>OpenElo</small>`;
+    field('facts').innerHTML = [[`#${c.rank.league}`, `by rating in the ${c.league.name}`], [`${c.rank.table}${['st','nd','rd'][c.rank.table - 1] || 'th'}`, `in the table, ${c.rank.points} points`],
+      [`#${c.rank.world}`, `of ${c.rank.worldOf} clubs rated`], [signed(c.change.season), 'this season']]
+      .map(([v, l]) => `<div><dt>${escape(l)}</dt><dd>${v}</dd></div>`).join('');
+    const span = Math.max(...c.squad.map((p) => Math.abs(p.gap)), 50);
+    field('axis').innerHTML = `<span>−${span}</span><span>Club ${number.format(c.rating)}</span><span>+${span}</span>`;
+    field('carry').innerHTML = c.squad.slice().sort((a, b) => b.gap - a.gap).map((p) => `<li>
+      <a href="${playerUrl(p.id)}">${escape(p.name)}<small>${p.position}, ${p.starts} starts</small></a>
+      <span class="track" aria-hidden="true"><span class="bar ${p.gap >= 0 ? 'above' : 'below'}" style="width:${(Math.abs(p.gap) / span) * 50}%"></span></span>
+      <span class="gap ${p.gap >= 0 ? 'gold' : 'muted'}">${signed(p.gap)}</span><span class="e">${number.format(p.rating)}</span></li>`).join('');
+    lineChart(field('chart'), field('readout'), {
+      dates: c.history.map((h) => h.date),
+      series: [{ label: c.name, cls: 'line-club', values: c.history.map((h) => h.rating), color: '#A9BBD0' }],
+      idle: `Point at the chart to read any matchday.`,
+      read: (i) => { const m = c.matches[i]; return `<strong>${longDate(m.date)}</strong>, ${m.goalsFor}–${m.goalsAgainst} ${m.home ? 'vs' : 'at'} ${escape(m.opponent)}: ${number.format(m.rating)} (${signed(m.change)}).`; },
+    });
+    field('results').innerHTML = c.matches.slice().reverse().map((m) => `<li><span class="d">${shortDate(m.date)}</span>
+      <span><span class="s">${m.goalsFor}–${m.goalsAgainst}</span>${m.home ? 'vs' : 'at'} <a href="${clubUrl(m.opponentId)}">${escape(m.opponent)}</a></span>
+      <span class="c ${direction(m.change)}">${signed(m.change)}</span></li>`).join('');
+  }
+</script>
+</body>
+</html>

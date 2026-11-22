@@ -1,0 +1,107 @@
+/* Player page: the rating as an equation, the surname as the portrait. Shared pieces are in site.css. */
+.player-page { --plate: clamp(132px, 17vw, 260px); background: var(--night) }
+
+.nameplate { position: fixed; z-index: 2; inset: 0 auto 0 0; width: var(--plate); overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 214, 107, 0.07), rgba(255, 214, 107, 0.015) 70%, transparent);
+  border-right: 1px solid rgba(255, 214, 107, 0.14) }
+.nameplate-surname { position: absolute; left: 50%; bottom: 3vh; writing-mode: vertical-rl; transform: translateX(-50%) rotate(180deg);
+  white-space: nowrap; font-family: var(--display); font-style: italic; font-weight: 900; text-transform: uppercase;
+  font-size: calc(var(--plate) * 0.92); line-height: 0.8; letter-spacing: -0.01em; color: transparent; -webkit-text-stroke: 1.5px rgba(255, 214, 107, 0.72) }
+
+.hero { min-height: calc(100vh - 110px); min-height: calc(100svh - 110px); display: flex; flex-direction: column; justify-content: center;
+  gap: 18px; padding-block: 16px 48px; max-width: min(700px, 54vw) }
+.identity { margin: 0; color: var(--muted); font-size: 19px }
+.identity a { text-decoration: none; color: var(--ink) }
+.identity a:hover { color: var(--elo) }
+.hero h1 { font-size: clamp(54px, 7.6vw, 128px); line-height: 0.84 }
+
+/* The equation: the one bold thing on the page */
+.equation { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px clamp(14px, 2.2vw, 30px); margin-top: 18px }
+.parts { list-style: none; margin: 0; padding: 0; display: contents }
+.part button { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 4px; padding: 4px 2px; border-radius: 6px }
+.part button:focus-visible { outline: 2px solid var(--elo); outline-offset: 4px }
+.part-value { font-family: var(--display); font-weight: 800; font-size: clamp(32px, 3.3vw, 52px); line-height: 0.9; white-space: nowrap }
+.part-label { font-size: 15px; color: var(--muted); border-bottom: 1px dotted rgba(147, 166, 188, 0.5); white-space: nowrap }
+.part[data-key="club"] .part-value { color: var(--club) }
+.part[data-sign="minus"] .part-value { color: var(--down) }
+.part[data-zero] .part-value { color: var(--muted) }
+.part button[aria-pressed="true"] .part-label, .part button:hover .part-label { color: var(--ink); border-bottom-color: var(--elo) }
+.total { display: flex; align-items: flex-end; gap: clamp(10px, 1.6vw, 22px); padding-left: 4px }
+.equals { font-family: var(--display); font-weight: 500; font-size: clamp(40px, 5vw, 76px); line-height: 0.9; color: var(--muted) }
+.total-value { font-family: var(--display); font-weight: 900; font-style: italic; color: var(--elo); font-size: clamp(76px, 10vw, 164px);
+  line-height: 0.78; text-shadow: 0 0 42px rgba(255, 214, 107, 0.35) }
+.total-label { font-size: 16px; color: var(--elo); padding-bottom: 6px }
+.part-explain { margin: 0; min-height: 3em; max-width: 62ch; color: var(--muted) }
+.part-explain strong { color: var(--ink); font-weight: 600 }
+.equation .part, .equation .total { opacity: 0; transform: translateY(14px) }
+.equation.is-in .part, .equation.is-in .total { opacity: 1; transform: none;
+  transition: opacity 420ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1); transition-delay: calc(var(--i) * 140ms) }
+
+.hero-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px 40px; margin-top: 10px }
+.ranks { display: flex; flex-wrap: wrap; gap: 14px 36px; margin: 0 }
+.ranks div { display: flex; flex-direction: column }
+.ranks dt { order: 2; color: var(--muted); font-size: 14px }
+.ranks dd { order: 1; margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1 }
+.ranks dd small { font-size: 18px; font-weight: 600; color: var(--muted) }
+.hero-actions { display: flex; gap: 10px }
+
+/* If he moved */
+.rumours { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px }
+.rumours:empty { display: none }
+.rumours span { color: var(--muted); font-size: 15px; align-self: center }
+.rumour { border: 1px solid rgba(255, 214, 107, 0.35); background: rgba(255, 214, 107, 0.08); color: var(--elo); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-weight: 600 }
+.rumour[aria-pressed="true"] { background: rgba(255, 214, 107, 0.2) }
+.transfer-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px }
+.transfer-controls select { flex: 1 1 220px; min-width: 0 }
+.transfer-sum { margin: 18px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; font-family: var(--display); font-weight: 800; font-size: clamp(24px, 2.4vw, 32px) }
+.transfer-sum .club { color: var(--club) }
+.transfer-sum .op { color: var(--muted); font-weight: 500 }
+.transfer-sum .projected { color: var(--elo); font-style: italic; font-size: 1.5em }
+.transfer-sum small { font-family: var(--ui); font-weight: 500; font-size: 15px; color: var(--muted); flex-basis: 100% }
+
+/* Matches */
+.match-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 2px }
+.match { display: grid; grid-template-columns: 5.2em minmax(0, 1fr) 7em 4.6em; align-items: center; gap: 4px 18px; padding: 12px 16px; border-radius: 10px; background: var(--row) }
+.match:nth-child(odd) { background: var(--row-alt) }
+.match-date { color: var(--muted); font-size: 15px }
+.match-main { min-width: 0 }
+.match-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.match-title .score { font-family: var(--display); font-weight: 800; font-size: 20px; margin-right: 6px }
+.match-note { color: var(--muted); font-size: 15px; margin-left: 8px }
+.minutes { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted) }
+.minutes-bar { height: 4px; border-radius: 2px; background: rgba(var(--grid-rgb), 0.14); overflow: hidden }
+.minutes-bar i { display: block; height: 100%; background: var(--club) }
+.match[data-out] .match-title { color: var(--muted) }
+.change { justify-self: end; font-family: var(--display); font-weight: 800; font-size: 24px }
+
+/* How it works, neighbours */
+.how p { margin: 12px 0 0; max-width: 62ch }
+.how a { color: var(--elo) }
+.how-list { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 10px }
+.how-list li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 14px; align-items: baseline }
+.how-list .v { font-family: var(--display); font-weight: 800; font-size: 22px; text-align: right }
+.how-list .v.club { color: var(--club) }
+.how-list .v.minus { color: var(--down) }
+.how-list .t { color: var(--muted) }
+.how-list .t strong { color: var(--ink); font-weight: 600 }
+.formula { color: var(--muted); font-size: 15px }
+.neighbour-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 2px }
+.neighbour-list li { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 12px; border-radius: 8px }
+.neighbour-list li[aria-current] { background: rgba(255, 214, 107, 0.12); box-shadow: inset 3px 0 0 var(--elo) }
+.neighbour-list .r { color: var(--muted) }
+.neighbour-list .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.neighbour-list .n a { text-decoration: none; font-weight: 600 }
+.neighbour-list .n a:hover { color: var(--elo) }
+.neighbour-list .n small { color: var(--muted); font-size: 14px; margin-left: 8px }
+.neighbour-list .e { font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--elo) }
+
+@media (max-width: 860px) {
+  .player-page { --plate: 0px }
+  .nameplate { display: none }   /* on phones the name is already the headline */
+  .hero { min-height: auto; padding-top: 28px; max-width: none }
+  .match { grid-template-columns: minmax(0, 1fr) auto; padding: 12px }
+  .match-date { grid-column: 1 / -1; font-size: 14px }
+  .minutes { grid-column: 1; grid-row: 3 }
+  .change { grid-row: 2 / 4; grid-column: 2 }
+}
+@media (prefers-reduced-motion: reduce) { .equation .part, .equation .total { opacity: 1; transform: none; transition: none } }
