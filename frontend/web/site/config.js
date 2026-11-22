@@ -7,4 +7,7 @@ export const CONFIG = {
   analytics: {
     plausibleDomain: '',  // Plausible: the site's domain as registered there; loads their script, no cookies
   },
+  // Written by the build, not by hand. A production build sets production: true, which turns the mock-data fallback OFF.
+  production: false,
+  staticPages: false,     // true when the build wrote player-<id>.html and club-<id>.html
 };

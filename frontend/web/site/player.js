@@ -5,7 +5,7 @@ import { getPlayer, getClubs } from './api.js';
 import { shell, field, param, number, signed, direction, shortDate, longDate, escape, clubUrl, playerUrl, lineChart, notFound } from './site.js';
 
 shell();
-const player = await getPlayer((param('id') || 'tiago-mendonca').replace(/[^a-z0-9-]/g, ''));
+const player = await getPlayer((param('id') || document.body.dataset.id || 'tiago-mendonca').replace(/[^a-z0-9-]/g, ''));
 if (!player) {
   document.querySelector('.nameplate')?.remove();
   document.body.classList.remove('player-page');

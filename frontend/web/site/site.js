@@ -9,8 +9,9 @@ export const direction = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : 'flat');
 export const asDate = (iso) => new Date(`${iso}T12:00:00Z`);
 export const shortDate = (iso) => asDate(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 export const longDate = (iso) => asDate(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-export const playerUrl = (id) => `player.html?id=${encodeURIComponent(id)}`;
-export const clubUrl = (id) => `club.html?id=${encodeURIComponent(id)}`;
+// The build writes a page per player and club (player-<id>.html) and sets CONFIG.staticPages; otherwise the query form.
+export const playerUrl = (id) => (CONFIG.staticPages ? `player-${encodeURIComponent(id)}.html` : `player.html?id=${encodeURIComponent(id)}`);
+export const clubUrl = (id) => (CONFIG.staticPages ? `club-${encodeURIComponent(id)}.html` : `club.html?id=${encodeURIComponent(id)}`);
 export const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const field = (name, root = document) => root.querySelector(`[data-field="${name}"]`);
 export const param = (name) => new URLSearchParams(location.search).get(name);
@@ -27,6 +28,7 @@ const MARKET_NAV = [
 
 export function shell() {
   install();
+  if (isMock) keepOutOfSearch();
   const header = document.querySelector('[data-shell="header"]');
   if (header.dataset.ready) return;   // a page change without reload: the header and footer stay
   header.dataset.ready = '1';
@@ -238,4 +240,13 @@ export function moverRow(r, { showClub = true } = {}) {
   return `<li class="mover"><a href="${playerUrl(r.id)}">${escape(r.name)}</a>
     <small>${showClub ? `${escape(r.club)}. ` : ''}${escape(r.note || '')}</small>
     <span class="e">${number.format(r.rating)}</span><span class="c ${direction(r.change)}">${signed(r.change)}</span></li>`;
+}
+
+/* Mock data must never be indexed. Every committed page already says noindex; this repeats it at run time for the case
+   where something removed the tag, and drops any canonical link. See frontend/web/build/README.md. */
+function keepOutOfSearch() {
+  let tag = document.querySelector('meta[name="robots"]');
+  if (!tag) { tag = document.createElement('meta'); tag.name = 'robots'; document.head.append(tag); }
+  tag.content = 'noindex, nofollow';
+  document.querySelector('link[rel="canonical"]')?.remove();
 }

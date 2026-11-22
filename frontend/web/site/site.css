@@ -280,3 +280,10 @@ body.mode-market h1 { font-style: normal }
 .footer-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px }
 .footer-links a { color: var(--muted) }
 .footer-links a:hover { color: var(--ink) }
+
+/* Pre-rendered summary under a player, club or list: plain, readable text that is also what search engines see. */
+.seo-summary { max-width: 70ch; margin-top: 32px }
+.seo-summary h2 { font-size: clamp(24px, 2.6vw, 34px); margin: 0 0 12px }
+.seo-summary p, .seo-summary li { color: var(--muted) }
+.seo-summary a { color: var(--elo) }
+.seo-summary .table-wrap { max-width: none }

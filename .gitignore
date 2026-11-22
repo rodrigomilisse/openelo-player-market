@@ -21,3 +21,13 @@ research/data/raw/
 
 # exported ratings (pipeline/export.py); published by the deploy, not committed
 frontend/web/site/data/
+
+# site build output, approval file and lastmod state (frontend/web/build)
+frontend/web/dist/
+frontend/web/.publish-approved
+frontend/web/.build-state.json
+frontend/web/.fixture-data/
+
+# the site build guards are source, not build output (the generic build/ rule above would hide them)
+!frontend/web/build/
+!frontend/web/build/**

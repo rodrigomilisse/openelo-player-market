@@ -1,123 +1,107 @@
 # Deploying the public site
 
-Written from `frontend/web/site/CONNECT.md` and the site's code on the `frontend-web` branch.
+Written from `frontend/web/site/CONNECT.md` and the guarded build in `frontend/web/build/` (read its `README.md`).
 Anything marked **(unverified)** depends on `pipeline/`, which is not on any pushed branch yet.
 
-The site is static files. There is no server and no build tool. Three things to know first:
+The site is static files. Three things to know first:
 
-1. **Publish a folder that contains `design/stadium.js` too.** `site/scene.js` imports
-   `../design/stadium.js`, which lives outside `frontend/web/site/`. Publishing only the `site/` folder
-   breaks the 3D scene. The build step below copies that one file next to the site.
+1. **Never publish `frontend/web/site/` directly.** Use the build: it copies `design/stadium.js` next to the site (the 3D scene
+   imports `../design/stadium.js`), writes the per-player pages and the sitemap, and enforces the rule that **mock data is never
+   indexable or published**. The raw folder is itself safe by default (every page `noindex`, `robots.txt` blocks all), but it
+   shows fictional players.
 2. **Three.js loads from the jsDelivr CDN** (import map in each page), so there is nothing to install.
-3. **Real ratings are not in git.** The pages read `data/*.json` when it exists and fall back to the
-   mock world when it does not. The daily job writes `data/`, so it should also be the thing that deploys.
+3. **Real ratings are not in git.** `site/data/` is gitignored; the daily job writes it.
 
 ## 0. Before real numbers go public
 
-- Settle the data licence (ADR-0017, open point 1) and the API-Football plan. The site publishes
-  per-match minutes, goals and assists for every player.
+- Settle the data licence (ADR-0017, open point 1) and the API-Football plan. The site publishes per-match minutes, goals and
+  assists for every player.
 - Check the top 50 of the real ratings by eye, and backtest past seasons.
+- Make the approval file yourself, by hand (an agent is not allowed to):
 
-Deploying the mock world as a "coming soon" site with the waitlist is fine before either.
+  ```bash
+  echo '{ "approvedBy": "Your Name", "date": "2026-12-01" }' > frontend/web/.publish-approved
+  ```
 
-## 1. Build the publish folder
+  Without it, `--production` refuses to build. It is gitignored.
 
-From the repository root, on the branch that holds the site:
-
-```bash
-rm -rf dist && mkdir -p dist/design
-cp -R frontend/web/site/. dist/
-cp frontend/web/design/stadium.js dist/design/
-```
-
-Preview it locally:
+## 1. Try it locally (preview)
 
 ```bash
-cd dist && python3 -m http.server 8000   # open http://localhost:8000/
+node frontend/web/build/build.mjs          # works with no data: builds from a mock fixture, everything noindex
+cd frontend/web/dist && python3 -m http.server 8000   # open http://localhost:8000/
+node --test frontend/web/build/guard.test.mjs         # the guarantees as tests (about 45 s)
 ```
+
+A preview is `noindex` on every page and `robots.txt` blocks all crawlers, whatever data it was built from.
 
 ## 2. Host it (Cloudflare Pages, recommended)
-
-Direct upload, because the daily job produces `data/` and git does not hold it.
 
 ```bash
 npm install -g wrangler
 wrangler login
 wrangler pages project create openelo --production-branch main
-wrangler pages deploy dist --project-name openelo
+frontend/web/build/deploy.sh preview       # tests, build, verify, upload as a noindex preview
 ```
 
-You get `https://openelo.pages.dev`. `404.html` is served for unknown URLs automatically. The pages are
-plain `.html` files, so no rewrite rules are needed.
+`deploy.sh` is the only supported path: it runs the guard tests, builds, verifies the built folder, then uploads.
+Pages serves `404.html` for unknown URLs, and serves `/about` for `about.html` (the build's canonicals and sitemap assume this;
+use `--no-pretty-urls` if your host keeps `.html`).
 
-Netlify instead: `npm install -g netlify-cli && netlify deploy --prod --dir dist`.
+Netlify instead: build with `build.mjs`, then `netlify deploy --prod --dir frontend/web/dist` (skip `deploy.sh`, so run
+`node build/verify.mjs dist` yourself first).
 
-## 3. Domain
+## 3. Domain, then settings in `config.js`
 
-1. Register a domain (about €10 a year); Cloudflare Registrar or any registrar.
-2. Cloudflare dashboard, Workers & Pages, `openelo`, Custom domains, add it. If the domain's DNS is on
-   Cloudflare this is one click; otherwise point the nameservers at Cloudflare first.
-3. Edit `frontend/web/site/config.js` and set `siteUrl: 'https://your-domain'`, then rebuild and redeploy.
-
-## 4. Waitlist, contact email, analytics (all in `config.js`)
+1. Register a domain (about €10 a year). Cloudflare dashboard, Workers & Pages, `openelo`, Custom domains, add it.
+2. Settings in `frontend/web/site/config.js` (leave `production` and `staticPages` alone; the build writes them):
 
 | Setting | What to do |
 |---|---|
-| `waitlistUrl` | Create a form at Formspree (or Buttondown, or a Supabase function) that accepts POST JSON `{ email, country, page }`. Paste its endpoint URL. Check one test signup lands in your inbox. |
-| `contactEmail` | Cloudflare dashboard, Email, Email Routing: forward `hello@your-domain` to your own inbox. Put that address in the setting. |
-| `analytics.plausibleDomain` | Add the site in Plausible with your domain, then put the same domain here. Cookie-free, so no consent banner for analytics. |
+| `waitlistUrl` | A form (Formspree, Buttondown, Supabase function) that accepts POST JSON `{ email, country, page }`. |
+| `contactEmail` | Cloudflare Email Routing: forward `hello@your-domain` to your inbox. |
+| `analytics.plausibleDomain` | Add the site in Plausible with your domain, put the same domain here. |
 
-Rebuild and redeploy after editing `config.js`.
+## 4. Real data and the daily job (unverified)
 
-## 5. Real data and the daily job (unverified)
-
-`CONNECT.md` names this chain, run from `pipeline/`:
+`pipeline/export.py` must write `data/meta.json` with `"source": "real"`, `asOf` and `generatedAt`
+(see `frontend/web/build/README.md`). Without `source: "real"` every page stays noindex.
 
 ```
-fetch.py        (needs APIFOOTBALL_KEY)  ->  normalize.py  ->  rate.py  ->
-export.py --out dist/data --site-url https://your-domain
+fetch.py (APIFOOTBALL_KEY) -> normalize.py -> rate.py -> export.py --out frontend/web/site/data
 ```
 
-Then deploy. As a script on the machine that runs it, for example `daily.sh`:
+Then, as `daily.sh` on the machine that runs it:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 cd /path/to/openelo-player-market
 export APIFOOTBALL_KEY=...                      # keep it out of git
-# 1. rate (exact commands: see pipeline/, not yet pushed)
-# 2. build the folder and write data/ into it
-rm -rf dist && mkdir -p dist/design
-cp -R frontend/web/site/. dist/
-cp frontend/web/design/stadium.js dist/design/
-# python3 pipeline/export.py --out dist/data --site-url https://your-domain
-# 3. publish
-wrangler pages deploy dist --project-name openelo
+# 1. fetch, normalize, rate, export into frontend/web/site/data   (exact commands: see pipeline/, not yet pushed)
+# 2. test, build with the production gate, verify, upload
+frontend/web/build/deploy.sh production https://your-domain
 ```
-
-Schedule it once a day, after the last matches finish (for example 06:00 UTC):
 
 ```
 0 6 * * *  /path/to/daily.sh >> /var/log/openelo-daily.log 2>&1
 ```
 
-`export.py --site-url` also writes `dist/sitemap.xml`. Then uncomment and fill the `Sitemap:` line in
-`frontend/web/site/robots.txt`, rebuild and redeploy.
+Keep `frontend/web/.build-state.json` and `site/data/weeks/` between runs: the first keeps honest `lastmod` dates in the sitemap,
+the second keeps past weeks as permanent pages. `robots.txt` and the sitemap are written by the production build itself.
 
-## 6. Check it after each deploy
+## 5. Check it after each deploy
 
 - Home page loads, the scene animates, no red errors in the browser console.
-- Open a player page directly by URL, then reload it.
-- A made-up URL shows the 404 page.
+- A player page opens by URL; a made-up URL shows the 404 page.
+- View source of a player page: the title has his name and rating, there is a canonical link, a robots tag saying `index, follow`.
+- `https://your-domain/robots.txt` names the sitemap; `/sitemap.xml` loads; the Search Console sitemap report accepts it.
 - A waitlist signup appears in the form service, and a pageview appears in Plausible.
-- Without `data/` the pages say the data is mock. With it, they should not.
-- Link preview: paste the URL into a chat app. Every page currently shares one generic image
-  (`og.png`) and one title per page type.
+- A preview URL (`preview.openelo.pages.dev`) view source says `noindex, nofollow`.
 
-## Known gaps this does not fix
+## Known gaps
 
-- Player and club pages are built in the browser, so search engines and link previews see an empty
-  page. Fixing it needs a build step that writes one HTML file per player and club.
-- Privacy and Terms still say "Draft" until you fill in "Who we are" in `privacy.html` and have both
-  reviewed.
+- Compare pages are noindex; link previews for arbitrary pairs would need a small Worker. Every page shares one preview image
+  (`og.png`); per-player images are a later step.
+- Privacy and Terms stay noindex and say "Draft" until you fill in "Who we are" in `privacy.html` and have both reviewed.
 - Age and nationality are blank on real data until the `/players` endpoint is added to the pipeline.

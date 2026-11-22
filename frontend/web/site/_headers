@@ -1,0 +1,3 @@
+# SAFE DEFAULT: every response says noindex. The production build replaces this file; nothing else should.
+/*
+  X-Robots-Tag: noindex, nofollow

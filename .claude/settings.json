@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(/frontend/web/.publish-approved)",
+      "Edit(/frontend/web/.publish-approved)"
+    ],
+    "ask": [
+      "Bash(wrangler *)",
+      "Bash(npx wrangler *)",
+      "Bash(netlify *)",
+      "Bash(npx netlify *)",
+      "Bash(*build/deploy.sh*)",
+      "Bash(*build.mjs*--production*)",
+      "Edit(/frontend/web/build/**)",
+      "Write(/frontend/web/build/**)",
+      "Edit(/frontend/web/site/robots.txt)",
+      "Write(/frontend/web/site/robots.txt)",
+      "Edit(/frontend/web/site/_headers)",
+      "Write(/frontend/web/site/_headers)",
+      "Edit(/frontend/web/site/config.js)",
+      "Write(/frontend/web/site/config.js)",
+      "Edit(/CLAUDE.md)",
+      "Write(/CLAUDE.md)",
+      "Edit(/.claude/settings.json)",
+      "Write(/.claude/settings.json)"
+    ]
+  }
+}

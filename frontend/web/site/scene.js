@@ -28,7 +28,11 @@ export const STATIONS = {
   'portfolio.html': [0, 0, -8], 'market.html': [0, 0, -8], 'trade.html': [0, 0, -8],
   'dividends.html': [0, 0, -8], 'watchlist.html': [0, 0, -8], 'activity.html': [0, 0, -8],
 };
-const pageOf = (href) => (new URL(href, location.href).pathname.split('/').pop() || 'index.html');
+// Generated pages (player-<id>.html, club-<id>.html, rankings-…, week-…) stand where their template does.
+const pageOf = (href) => {
+  const file = new URL(href, location.href).pathname.split('/').pop() || 'index.html';
+  return file.replace(/^(player|club)-.+\.html$/, '$1.html').replace(/^rankings-.+\.html$/, 'rankings.html').replace(/^week-.+\.html$/, 'index.html');
+};
 // The pose every page is approached from: in front of its spot, looking at it.
 const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[2] + 24], look: [station[0], station[1] + 3, station[2]] });
 

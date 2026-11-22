@@ -2,9 +2,15 @@
 // Real ratings when the site has a data/ folder (pipeline/export.py writes it); the mock world otherwise.
 // The market is a play-money preview either way: over real ratings its prices are still simulated.
 import * as mock from './mock.js';
+import { CONFIG } from './config.js';
 
 const fetchJson = (path) => fetch(`data/${path}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const meta = await fetchJson('meta.json');
+// Only data that says it is real counts as real. A meta.json without source: 'real' is treated as mock (and noindex).
+const real = !!meta && meta.source === 'real' && meta.mock !== true;
+// A production build never falls back to the mock world: better a broken page than fictional players on a public domain.
+if (CONFIG.production && !real) throw new Error('OpenElo: production build without real data (data/meta.json source "real").');
+
 const cache = new Map();
 const get = (path) => { if (!cache.has(path)) cache.set(path, fetchJson(path)); return cache.get(path); };
 
@@ -21,7 +27,7 @@ function simulatedPrice(id, ratings, dates) {
 }
 const withPrice = (p) => p && { ...p, price: p.price || simulatedPrice(p.id, p.history.map((x) => x.rating), p.history.map((x) => x.date)) };
 
-if (meta) {   // the market preview runs over the real players
+if (real) {   // the market preview runs over the real players
   const r = await get('rankings.json');
   const players = r.players.map((p) => {
     const ratings = [p.rating - p.season, p.rating - p.week, p.rating];
@@ -31,15 +37,15 @@ if (meta) {   // the market preview runs over the real players
   mock.useMarketWorld({ players, ranked: players, asOf: r.asOf });
 }
 
-export const isMock = !meta;
-export const getPlayer = async (id) => (meta ? withPrice(await get(`players/${id}.json`)) : mock.player(id));
-export const getClub = async (id) => (meta ? get(`clubs/${id}.json`) : mock.club(id));
-export const getRankings = async () => (meta ? get('rankings.json') : mock.rankings());
-export const getClubs = async () => (meta ? get('clubs.json') : mock.clubs());
-export const getLeagues = async () => (meta ? get('leagues.json') : mock.leagues());
-export const getWeek = async () => (meta ? get('week.json') : mock.week());
+export const isMock = !real;
+export const getPlayer = async (id) => (real ? withPrice(await get(`players/${id}.json`)) : mock.player(id));
+export const getClub = async (id) => (real ? get(`clubs/${id}.json`) : mock.club(id));
+export const getRankings = async () => (real ? get('rankings.json') : mock.rankings());
+export const getClubs = async () => (real ? get('clubs.json') : mock.clubs());
+export const getLeagues = async () => (real ? get('leagues.json') : mock.leagues());
+export const getWeek = async () => (real ? get('week.json') : mock.week());
 export async function search(query, limit = 8) {
-  if (!meta) return mock.search(query, limit);
+  if (!real) return mock.search(query, limit);
   const q = mock.slug(query);
   if (!q) return [];
   const all = await get('search.json');
