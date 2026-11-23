@@ -8,14 +8,14 @@ Old header: the current formula at 2026-06-01: club + 250 x pecking order + 200 
 import sys; sys.path.insert(0, ".")
 exec(open("adhoc/nt_selection2.py").read().split("def order_t")[0])
 def order_t(rank): return np.clip((20 - rank) / 14, 0, 1)
-SNAP = pd.Timestamp("2026-06-01"); day = int((SNAP - store.EPOCH).days)
+SNAP = pd.Timestamp("2026-07-06"); day = int((SNAP - store.EPOCH).days)
 CLUBS = ["Bayern Munich", "Paris Saint-Germain", "Manchester City", "Arsenal FC", "Sporting CP", "Brighton & Hove Albion", "SC Braga"]
 ids = {n: t for t, n in zip(teams.team_id, teams.name) if n in CLUBS}
 rating = tm[tm.day < day].groupby("team_id").rating.last()
 yr = lineup[(lineup.national == 0) & (lineup.date < SNAP) & (lineup.date >= SNAP - pd.Timedelta(days=365))]
 lg = yr[yr.type == "domestic_league"]
 cur = lg.sort_values("date").groupby("player_id").tail(1)
-recent = set(yr[yr.date >= SNAP - pd.Timedelta(days=42)].player_id)
+recent = set(yr[yr.date >= SNAP - pd.Timedelta(days=70)].player_id) | set(nat[nat.date >= SNAP - pd.Timedelta(days=42)].player_id)
 rows = []
 TMM = ctx.team_matches[["game_id", "team_id", "day", "rating", "opp_rating"]].merge(games[["game_id", "type", "date"]], on="game_id")
 TMM["w"] = TMM.type.map({"international_cup": 3.0, "domestic_league": 1.0}).fillna(0.3) * np.clip(2.0 ** ((TMM.opp_rating - TMM.rating) / 150), 0.2, 5)
@@ -66,9 +66,28 @@ d["TM €m"] = d.player_id.map(dict(zip(v.player_id, v.value_eur))) / 1e6
 d["age"] = ((SNAP - d.dob).dt.days / 365.25).round(0)
 d["order pts"] = 250 * d.coach; d["avail pts"] = 200 * d.avail; d["recent pts"] = 100 * d.recent
 d["rating"] = d.club_rating + d["order pts"] + d["avail pts"] + d["recent pts"]
+# goals: club goals per 90 over the year, shrunk with 5 x 90 at the pooled rate; 226 per goal per 90 x club level
+g = yr.groupby("player_id")[["goals", "minutes"]].sum(); pooled = g.goals.sum() / (g.minutes.sum() / 90)
+d = d.join(g, on="player_id"); d[["goals", "minutes"]] = d[["goals", "minutes"]].fillna(0)
+d["g90"] = (d.goals + 5 * pooled) / (d.minutes / 90 + 5)
+d["goal pts"] = 226 * d.g90 * np.clip((d.club_rating - 1250) / 850, 0, 1.2)
+# national term: squad credit over the nation's covered matches in 2 years (start 1, on 0.6, unused 0.3)
+# x nation strength (mean club rating of that nation's 11 best squad players by club, (x - 1600) / 400), scale 300
+prev = nat[(nat.date < SNAP) & (nat.date >= SNAP - pd.Timedelta(days=730))]
+gp = prev.groupby("nation").game_id.nunique()
+cred = prev.groupby(["nation", "player_id"]).credit.sum().reset_index(); cred["share"] = cred.credit / cred.nation.map(gp)
+cur_club = cur.set_index("player_id").team_id.map(rating)
+strength = prev.drop_duplicates(["nation", "player_id"]).assign(r=lambda x: x.player_id.map(cur_club)).groupby("nation").r.apply(lambda x: x.nlargest(11).mean())
+cred["nt_pts"] = 300 * cred.share * np.clip((cred.nation.map(strength) - 1600) / 400, 0, 1.5)
+best = cred.sort_values("nt_pts").groupby("player_id").tail(1).set_index("player_id")
+d["NT"] = d.player_id.map(best.nation); d["nt pts"] = d.player_id.map(best.nt_pts).fillna(0)
+d["rating"] = d.rating + d["goal pts"] + d["nt pts"]
 d = d[d.position != "Goalkeeper"].sort_values("rating", ascending=False)
 d["rank TM"] = d["TM €m"].rank(ascending=False, method="min")
-cols = ["name", "club", "position", "age", "rating", "club_rating", "order pts", "avail pts", "recent pts", "TM €m", "rank TM"]
+cols = ["name", "club", "position", "age", "rating", "club_rating", "order pts", "avail pts", "recent pts", "goal pts", "nt pts", "NT", "TM €m", "rank TM"]
 out = d[cols].head(50).round(0); out.insert(0, "#", range(1, len(out) + 1))
 print(out.to_string(index=False))
+INT = ["Harry Kane","Michael Olise","Erling Haaland","Luis Díaz","Ousmane Dembélé","Declan Rice","William Saliba","João Neves","Nuno Mendes","Achraf Hakimi","Gabriel","Rodri","Joshua Kimmich","Luis Suárez","Vitinha"]
+d["#"] = range(1, len(d) + 1)
+print("\nowner's list:"); print(d[d.name.isin(INT)][["#"] + cols].round(0).to_string(index=False))
 print(f"\nrank correlation with TM (all {len(d)} outfield players): {d.rating.rank().corr(d['TM €m'].rank()):.2f}")

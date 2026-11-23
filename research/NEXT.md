@@ -105,6 +105,17 @@ Suarez above Vitinha). (2) The coach term is too steep: regulars at mid clubs to
 low-order players too low. (3) Pecking order favours defenders as a group (centre-backs
 start every match); goals partly offset it. (4) The missing national term, as expected.
 
+## Best quick table (2026-11-23, `adhoc/player_table.py`, snapshot 2026-07-06)
+
+rating = club + 250 x coach (importance-weighted start share, last 40 fit matches; continental x3,
+league x1, cups x0.3, x opponent strength) + 200 x availability (injury spells) + 100 x recent squad
++ 226 x goals per 90 x club level + national term (300 x squad share over 2 years x nation strength,
+strength from the club ratings of its best 11). Stand-alone script, not yet player_v2.
+Owner's list: Kane 1, Dembele 2, Olise 5, Kimmich 7, Vitinha 10, Diaz 11, Saliba 14, Rice 15,
+Mendes 16, Haaland 17, Gabriel 20, Rodri 24, Neves 25, Hakimi 37, Suarez 50. TM rank corr 0.80.
+Problems: German and Bayern stacking (national strength 330 for every German), Haaland low
+(Norway weak, City lower), Kimmich high, Hakimi low (injury spells), national term large.
+
 ## Next
 
 1. (done above) Find the underrated groups that the overrated ones push out (league, nationality depth,
