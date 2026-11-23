@@ -84,9 +84,30 @@ Other evidence:
   national-team candidates only instead of the full squad. Fringe players looked higher in the
   order than they were; the actual fringe selection rate is 41-43%, not 27-38%.
 
+## Underrated groups found (2026-11-23, `adhoc/underrated.py`, three tournaments pooled)
+
+Missing = actual selected - predicted selected (players). Biggest systematic errors:
+
+| Group | Actual | Predicted | Missing |
+|---|---|---|---|
+| Players in other European leagues (Portugal, Netherlands, Belgium, Turkey, ...) | 414 | 633 | **-219** |
+| Players in top-5 leagues | 1,169 | 1,056 | +113 |
+| Players in Brazil, Argentina, US, Mexico | 94 | 19 | +75 |
+| Low pecking order (rank 13+) at clubs ranked 11-150 and 150+ | 452 | 256 | +196 |
+| Regulars (rank 1-6) at clubs ranked 11-150 | 424 | 543 | -119 |
+| Defenders / attackers | 649 / 505 | 722 / 440 | -73 / +65 |
+| Core internationals (50%+ of recent squads) / no history | 529 / 390 | 416 / 520 | +113 / -130 |
+
+Reading: (1) the club rating overrates clubs in the second tier of European leagues
+against the top 5 and the Americas: dominant clubs in weaker leagues win a lot, but
+their recruitment power is lower (the owner's "size team Elo by recruitment power"; also
+Suarez above Vitinha). (2) The coach term is too steep: regulars at mid clubs too high,
+low-order players too low. (3) Pecking order favours defenders as a group (centre-backs
+start every match); goals partly offset it. (4) The missing national term, as expected.
+
 ## Next
 
-1. Find the underrated groups that the overrated ones push out (league, nationality depth,
+1. (done above) Find the underrated groups that the overrated ones push out (league, nationality depth,
    positions within a nation, age).
 2. National term: a non-circular test for its weight (does it predict his next club's level?).
 3. Keep the refined coach term in mind; decide with the owner whether a +0.003 gain is worth it.
