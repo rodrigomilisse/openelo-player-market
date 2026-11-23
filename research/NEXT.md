@@ -1,3 +1,74 @@
+# Player rating: where we are (2026-11-23)
+
+## Goal
+
+The rating is **how good a player is right now, as professionals judge him**. Age and
+potential are left to the market. Each term is one professional's judgement, corrected
+for its known biases. Current stage: **deciding what goes in and how**; precise weights
+come last.
+
+## Terms
+
+| Term | Whose judgement | Status |
+|---|---|---|
+| Club rating | Recruiters: the level of club that employs him | Kept; gives the instant transfer adjustment. Owner's notes: club gaps should reflect recruitment power; result swings of a low-ranked club may be noise worth skipping, since its standouts move up and sustained gains show anyway. |
+| Pecking order when fit | His coach: rank among team-mates in matches outside injury spells (an omission there counts as not starting) | Rank, not minutes, so rotation does not penalise. Means nothing without club level. |
+| Availability | Fitness: matches lost to injury spells (4+ league matchday squads in a row missed), and in a squad in the last 6 weeks | Uncapped. Correlates 0.33 / 0.15 with pecking order (old squad-share measure: 0.5). |
+| National term | National coaches: the only cross-club judgement | To be bigger; weight not set (needs a non-circular test). |
+| Goals (no assists) | Separates players at the top (Kane, Haaland above other regulars) | Small, scaled by club level; could go entirely. |
+
+## Evidence (national-team squad selection; scripts in `adhoc/nt_*.py`, `adhoc/availability_check.py`)
+
+Test: Euro + Copa 2024 and World Cup 2026 (2022 World Cup for value changes); outfield
+players aged 19-35 of each nation with covered league football. AUC = chance a selected
+player is rated above a non-selected one of the same nation (0.5 coin flip, 1 perfect).
+Per-nation check: each model's top N (N = players the nation used) is its predicted squad.
+
+- Club rating alone 0.82-0.84; pecking order alone 0.71-0.74 and picks third-division
+  starters (predicts 22-29% of regulars at clubs ranked 150+, actual 5-6%); together 0.87-0.88.
+- Pecking order worth about 160-330 club-rating points; the AUC is flat over that range.
+- **Fit fringe players at top-10 clubs are overrated:** picked 0.27-0.38, predicted 0.58-0.76.
+  Regulars at clubs 11-40 are right (0.60). No club/order weighting fixes both: line-ups
+  cannot tell a returning star from a squad player. Transfermarkt gets both right.
+- Availability at about 200 predicts the selection drop coaches show (injury-spell
+  players: actual 0.02-0.04, predicted 0.02); not a proxy for pecking order (at the same
+  pecking-order level the effect remains).
+- Goals add little to selection, as expected.
+- National-team history adds most (0.88 -> 0.89-0.94) but is circular (past squads predict
+  the next one), so it cannot set its own weight.
+- Transfermarkt value before a tournament predicts selection at 0.91-0.92, ours 0.88.
+- **Selection predicts Transfermarkt's later rise:** selected players gain +17% (2022) and +7%
+  (2024) a year later against players of the same value and age; non-selected -1 to -2%.
+- **Our rating leads Transfermarkt:** players we rate above their value (top quarter against
+  bottom, same value and age) gain +22% vs -15% (2022), +11% vs -9% (2024).
+
+Why we lead Transfermarkt yet predict selection worse (reasoned, not yet tested): leading
+only shows we hold information it lacks; Transfermarkt already holds national-team history
+(the tested rating had none), knows which top-club fringe players are good, and prices
+potential (left out by design). The tested rating was also a stripped version.
+
+## Data caveats
+
+- About 64,000 players in line-ups have no player record (no citizenship, age, position).
+- 2025-26 minutes are thin: 8,700 players with minutes against 37,000 in line-ups.
+- No injury records; injury is read from squad absences.
+
+## Next
+
+1. Optional: break down the pairs Transfermarkt orders right and we do not, by cause
+   (national history, injury return, under 23, top-club fringe, thinly covered league).
+2. Non-circular test for the national term: does it predict his next club's level or his
+   pecking order there?
+3. Rebuild `player_v2` with these terms; judge on national-team selection and the owner's
+   tiers; estimate the run time first.
+
+Parked: club-term sizing, dropping goals, the history rewrite
+(`docs/briefs/history-rewrite.md`).
+
+---
+
+# Earlier working log
+
 # Next steps (agreed with the owner, 2026-11-12)
 
 Working list for the direct player model (`rating = team rating + minutes bonus +
