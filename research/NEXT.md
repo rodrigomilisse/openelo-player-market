@@ -8,75 +8,90 @@
 > another is not a fix; the fix is information that separates the group.
 >
 > **Live example:** fit fringe players at top-10 clubs are picked for their national
-> squads 27-38% of the time; club + pecking order predicts 58-76% (about 2x overrated).
+> squads 27-38% of the time; club + pecking order predicted 58-76% (about 2x overrated;
+> with the rank bug fixed, see below: 41-43% actual, 54-59% predicted).
 > Raising the pecking-order weight to 400 matches their rate (0.27) but drops the good
 > ones as well as the squad players (precision unchanged, 0.641), and overrates
 > mid-club regulars instead (0.86 predicted vs 0.60 actual). Line-ups cannot tell a
 > returning star from a squad player; the fix must add information that can.
 
-## Goal
+## What we are doing and why
 
-The rating is **how good a player is right now, as professionals judge him**. Age and
-potential are left to the market. Each term is one professional's judgement, corrected
-for its known biases. Current stage: **deciding what goes in and how**; precise weights
-come last.
+We are deciding **what goes into the player rating and how each part is measured**, not
+tuning weights yet. The rating should say how good a player is right now, as
+professionals judge him (age and potential are left to the market). Each term stands for
+one professional judgement. National-team squad selection is the check: national coaches
+compare players across clubs, which is exactly what the rating has to get right, and it
+is independent of Transfermarkt. Every change is judged by per-group calibration
+(principle above), not only by overall accuracy.
 
-## Terms
+## The formula as it stands
 
-| Term | Whose judgement | Status |
-|---|---|---|
-| Club rating | Recruiters: the level of club that employs him | Kept; gives the instant transfer adjustment. Owner's notes: club gaps should reflect recruitment power; result swings of a low-ranked club may be noise worth skipping, since its standouts move up and sustained gains show anyway. |
-| Pecking order when fit | His coach: rank among team-mates in matches outside injury spells (an omission there counts as not starting) | Rank, not minutes, so rotation does not penalise. Means nothing without club level. |
-| Availability | Fitness: matches lost to injury spells (4+ league matchday squads in a row missed), and in a squad in the last 6 weeks | Uncapped. Correlates 0.33 / 0.15 with pecking order (old squad-share measure: 0.5). |
-| National term | National coaches: the only cross-club judgement | To be bigger; weight not set (needs a non-circular test). |
-| Goals (no assists) | Separates players at the top (Kane, Haaland above other regulars) | Small, scaled by club level; could go entirely. |
+    rating = club rating                        recruiters: what level of club employs him
+           + 250 x coach term (0 to 1)          his coach: where he stands in the pecking order
+           + 200 x availability (0 to 1)        share of club matches not lost to injury spells
+           + 100 x in a squad, last 6 weeks     currently fit
+           + national term                      national coaches; weight not set yet
+           + small goal term (no assists)       separates the very top; may go
 
-## Evidence (national-team squad selection; scripts in `adhoc/nt_*.py`, `adhoc/availability_check.py`)
+Coach term: rank among the full squad by start rate when fit; rank 1-6 = 1, falling to 0
+at rank 20. Injury spell: 4+ league matchday squads in a row missed. Weights are
+provisional (pecking order fits anywhere in 160-330; the AUC is flat there).
 
-Test: Euro + Copa 2024 and World Cup 2026 (2022 World Cup for value changes); outfield
-players aged 19-35 of each nation with covered league football. AUC = chance a selected
-player is rated above a non-selected one of the same nation (0.5 coin flip, 1 perfect).
-Per-nation check: each model's top N (N = players the nation used) is its predicted squad.
+## How good it is
 
-- Club rating alone 0.82-0.84; pecking order alone 0.71-0.74 and picks third-division
-  starters (predicts 22-29% of regulars at clubs ranked 150+, actual 5-6%); together 0.87-0.88.
-- Pecking order worth about 160-330 club-rating points; the AUC is flat over that range.
-- **Fit fringe players at top-10 clubs are overrated:** picked 0.27-0.38, predicted 0.58-0.76.
-  Regulars at clubs 11-40 are right (0.60). No club/order weighting fixes both: line-ups
-  cannot tell a returning star from a squad player. Transfermarkt gets both right.
-- Availability at about 200 predicts the selection drop coaches show (injury-spell
-  players: actual 0.02-0.04, predicted 0.02); not a proxy for pecking order (at the same
-  pecking-order level the effect remains).
-- Goals add little to selection, as expected.
-- National-team history adds most (0.88 -> 0.89-0.94) but is circular (past squads predict
-  the next one), so it cannot set its own weight.
-- Transfermarkt value before a tournament predicts selection at 0.91-0.92, ours 0.88.
-- **Selection predicts Transfermarkt's later rise:** selected players gain +17% (2022) and +7%
-  (2024) a year later against players of the same value and age; non-selected -1 to -2%.
-- **Our rating leads Transfermarkt:** players we rate above their value (top quarter against
-  bottom, same value and age) gain +22% vs -15% (2022), +11% vs -9% (2024).
+National-team squads at the 2022 World Cup, Euro + Copa 2024 and World Cup 2026; outfield
+players aged 19-35 of each nation with covered league football. Each version ranks a
+nation's candidates; its top N (N = players the nation used) is its predicted squad.
+AUC = chance a selected player is rated above a non-selected one of the same nation
+(0.5 coin flip, 1 perfect). Without the national and goal terms (club, coach,
+availability only):
 
-Why we lead Transfermarkt yet predict selection worse (reasoned, not yet tested): leading
-only shows we hold information it lacks; Transfermarkt already holds national-team history
-(the tested rating had none), knows which top-club fringe players are good, and prices
-potential (left out by design). The tested rating was also a stripped version.
+| | 2022 | 2024 | 2026 |
+|---|---|---|---|
+| AUC: club rating only | | 0.83 | 0.84 |
+| AUC: the formula (club + coach + availability) | 0.88 | 0.87 | 0.88 |
+| AUC: + national-team history (circular, see below) | | 0.89 | 0.89 |
+| AUC: Transfermarkt value before the tournament | 0.91 | 0.92 | 0.92 |
+| Squad precision: the formula | 0.64 | 0.66 | 0.62 |
 
-## Data caveats
+Per-group calibration (selection rate: actual / predicted by the formula, 2022 / 2024 / 2026):
 
-- About 64,000 players in line-ups have no player record (no citizenship, age, position).
-- 2025-26 minutes are thin: 8,700 players with minutes against 37,000 in line-ups.
-- No injury records; injury is read from squad absences.
+| Group | Actual | Predicted | Verdict |
+|---|---|---|---|
+| Fit fringe at a top-10 club (rank 13+) | 0.43 / 0.42 / 0.41 | 0.59 / 0.56 / 0.54 | overrated |
+| **Fit regular at a club ranked 11-40** | 0.58 / 0.67 / 0.60 | **0.87 / 0.93 / 0.81** | **most overrated now** |
+| Regular at a club ranked 41-150 | 0.29 / 0.32 / 0.32 | 0.32 / 0.36 / 0.43 | close |
+| Regular at a club ranked 150+ | 0.07 / 0.06 / 0.07 | 0.10 / 0.07 / 0.06 | right |
+| Injury spells, available <70% | 0.04 / 0.04 / 0.02 | 0.02 / 0.01 / 0.02 | slightly underrated |
+| Defenders / midfielders / attackers | 0.11 / 0.11 / 0.11 (2024) | 0.12 / 0.12 / 0.09 | close; attackers slightly low |
+
+Since the predicted squad has the actual size, the overrated groups push someone else out;
+**which groups are underrated is not yet found** (next item).
+
+Other evidence:
+- Selection predicts Transfermarkt's later rise: selected +17% (2022), +7% (2024) a year
+  later against players of the same value and age; non-selected -1 to -2%.
+- Our rating leads Transfermarkt: players we rate above their value gain +22% vs -15% (2022),
+  +11% vs -9% (2024) the next year. Transfermarkt still predicts selection better; it holds
+  national-team history, which players are good among fringe players, and potential.
+- Signals that separate the good fringe players at top clubs: continental starts (0.80
+  AUC inside the group), pecking order over a longer memory, coming on vs unused.
+- Refined coach term tested (`adhoc/coach_term.py`: last 40 fit matches, all competitions,
+  weighted by competition and opponent strength, used substitutes at 0.3): inside the fringe
+  group 0.79 vs 0.76, overall AUC +0.003, precision mixed. A small gain, not the fix.
+- Bug fixed on 2026-11-23: in the earlier cut-off checks, pecking-order rank was taken among
+  national-team candidates only instead of the full squad. Fringe players looked higher in the
+  order than they were; the actual fringe selection rate is 41-43%, not 27-38%.
 
 ## Next
 
-1. Optional: break down the pairs Transfermarkt orders right and we do not, by cause
-   (national history, injury return, under 23, top-club fringe, thinly covered league).
-2. Non-circular test for the national term: does it predict his next club's level or his
-   pecking order there?
-3. Rebuild `player_v2` with these terms; judge on national-team selection and the owner's
-   tiers; estimate the run time first.
+1. Find the underrated groups that the overrated ones push out (league, nationality depth,
+   positions within a nation, age).
+2. National term: a non-circular test for its weight (does it predict his next club's level?).
+3. Keep the refined coach term in mind; decide with the owner whether a +0.003 gain is worth it.
 
-Parked: club-term sizing, dropping goals, the history rewrite
+Parked: club-term sizing (recruitment power), dropping goals, the history rewrite
 (`docs/briefs/history-rewrite.md`).
 
 ---
