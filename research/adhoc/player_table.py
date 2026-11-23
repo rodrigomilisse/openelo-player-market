@@ -78,8 +78,8 @@ prev = nat[(nat.date < SNAP) & (nat.date >= SNAP - pd.Timedelta(days=730))]
 gp = prev.groupby("nation").game_id.nunique()
 cred = prev.groupby(["nation", "player_id"]).credit.sum().reset_index(); cred["share"] = cred.credit / cred.nation.map(gp)
 cur_club = cur.set_index("player_id").team_id.map(rating)
-strength = prev.drop_duplicates(["nation", "player_id"]).assign(r=lambda x: x.player_id.map(cur_club)).groupby("nation").r.apply(lambda x: x.nlargest(11).mean())
-cred["nt_pts"] = 300 * cred.share * np.clip((cred.nation.map(strength) - 1600) / 400, 0, 1.5)
+strength = prev.drop_duplicates(["nation", "player_id"]).assign(r=lambda x: x.player_id.map(cur_club)).groupby("nation").r.mean()
+cred["nt_pts"] = 100 * cred.share * np.clip((cred.nation.map(strength) - 1600) / 200, 0, None)   # decided rule: scale 100
 best = cred.sort_values("nt_pts").groupby("player_id").tail(1).set_index("player_id")
 d["NT"] = d.player_id.map(best.nation); d["nt pts"] = d.player_id.map(best.nt_pts).fillna(0)
 d["rating"] = d.rating + d["goal pts"] + d["nt pts"]
