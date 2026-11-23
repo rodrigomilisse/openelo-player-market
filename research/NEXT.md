@@ -1,5 +1,19 @@
 # Player rating: where we are (2026-11-23)
 
+> **⚠ PRINCIPLE: NO SYSTEMATIC MISPRICING BY GROUP.** The rating sets dividends, so a
+> whole class of player rated too high or too low is a mispricing traders will exploit.
+> Random misses inside a group are acceptable; a group-wide bias is not. Judge every
+> change by per-group calibration (predicted vs actual rate for each kind of player),
+> not only by overall accuracy (AUC). A weight that only moves errors from one group to
+> another is not a fix; the fix is information that separates the group.
+>
+> **Live example:** fit fringe players at top-10 clubs are picked for their national
+> squads 27-38% of the time; club + pecking order predicts 58-76% (about 2x overrated).
+> Raising the pecking-order weight to 400 matches their rate (0.27) but drops the good
+> ones as well as the squad players (precision unchanged, 0.641), and overrates
+> mid-club regulars instead (0.86 predicted vs 0.60 actual). Line-ups cannot tell a
+> returning star from a squad player; the fix must add information that can.
+
 ## Goal
 
 The rating is **how good a player is right now, as professionals judge him**. Age and
