@@ -9,6 +9,38 @@ Findings: [FINDINGS.md](FINDINGS.md).
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
+## Running it: warm up once, update periodically
+
+The current candidate (RESULTS-communication.md, "Current candidate") is wired into
+`publish.py`; a `Makefile` runs the whole chain.
+
+```
+make warmup    # once: venv, download ~300 MB, build the store, fit team constants (~3 min), publish. ~30-60 min
+make update    # periodically: re-download the Transfermarkt tables, rebuild the store, publish as of the day after the newest match
+make publish   # recompute ratings from the store as it is (no download)
+make history   # once, optional: also every month start since 2013, for charts of a player over time
+make status    # newest match in the store, the last published runs
+```
+
+Output goes to `data/raw/published/` (gitignored): `latest.csv`, `ratings_<date>.csv`
+(rank, player, club, rating, club rating) and `published.sqlite3` (`rating(as_of, player_id, rating, team_id)`,
+one batch per run, so a player's rating over time is a query).
+
+The ratings are only as fresh as the upstream dataset (transfermarkt-datasets, rebuilt about
+weekly), so `publish.py` warns when the newest match in the store is more than 14 days old.
+Weekly is the useful cadence for `make update`. The national-team data (StatsBomb, jfjelstul,
+martj42) is tournament history and does not change between tournaments; refreshing it means
+deleting `data/raw/downloads/{statsbomb,jfjelstul,martj42}*` and running `make update`.
+
+A weekly cron line (Monday 06:00; the lock stops two runs overlapping):
+
+```
+0 6 * * 1  cd /path/to/openelo-player-market/research && flock -n data/raw/update.lock make update >> data/raw/update.log 2>&1
+```
+
+A failed rebuild restores the previous store, so a bad download never leaves you without ratings.
+Change the candidate's settings in `publish.py` (`CANDIDATE`, `TEAM_OVERRIDES`) when `NEXT.md` decides something new.
+
 ## Data
 
 Raw downloads and everything derived from them live under `data/raw/`, which is

@@ -116,15 +116,18 @@ CREATE INDEX valuation_player ON valuation (player_id);
 """
 
 
-def fetch() -> None:
+def fetch(refresh: bool = False) -> None:
+    """Download what is missing. With `refresh`, download the Transfermarkt tables again
+    (the upstream dataset is rebuilt about weekly); the other sources are static."""
     for table in TMD_TABLES:
-        download(TMD_URL.format(table=table), TMD_DIR / f"{table}.csv.gz")
+        download(TMD_URL.format(table=table), TMD_DIR / f"{table}.csv.gz", force=refresh)
     for name in CFMD_FILES:
         download(CFMD_URL.format(name=name), CFMD_DIR / name)
 
 
-def download(url: str, target: Path) -> None:
-    if target.exists():
+def download(url: str, target: Path, force: bool = False) -> None:
+    """Download to a .part file and rename, so a failed refresh keeps the previous file."""
+    if target.exists() and not force:
         print(f"[skip] {target.name} already downloaded")
         return
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -451,10 +454,14 @@ def report(conn: sqlite3.Connection) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--fetch", action="store_true", help="download any raw file that is missing first")
+    parser.add_argument("--refresh", action="store_true",
+                        help="download the Transfermarkt tables again to pick up new matches (implies --fetch)")
+    parser.add_argument("--no-build", action="store_true", help="download only, leave the store as it is")
     args = parser.parse_args()
-    if args.fetch:
-        fetch()
-    build()
+    if args.fetch or args.refresh:
+        fetch(refresh=args.refresh)
+    if not args.no_build:
+        build()
 
 
 if __name__ == "__main__":

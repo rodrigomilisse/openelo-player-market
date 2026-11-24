@@ -385,8 +385,9 @@ def build() -> None:
 
 
 if __name__ == "__main__":
-    if not STORE_PATH.exists():
-        sys.exit(f"{STORE_PATH} is missing. Run `.venv/bin/python -I ingest.py --fetch` first.")
     if "--fetch" in sys.argv:
         fetch()
-    build()
+    if "--no-build" not in sys.argv:
+        if not STORE_PATH.exists():
+            sys.exit(f"{STORE_PATH} is missing. Run `.venv/bin/python -I ingest.py --fetch` first.")
+        build()
