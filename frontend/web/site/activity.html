@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity | OpenElo</title>
+<meta name="description" content="Your trades and payouts. Play-money preview.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Activity | OpenElo">
+<meta property="og:description" content="Your trades and payouts. Play-money preview.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .act li { grid-template-columns: 1fr auto }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body class="mode-market">
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="mhead" aria-labelledby="ac-title">
+      <div><h1 id="ac-title">Activity</h1><p class="lede">Every trade and payout on your practice account, newest first.</p></div>
+      <button class="button" type="button" data-field="reset">Reset practice account</button>
+    </section>
+    <section class="glass-panel" aria-label="Activity"><div data-field="list"></div></section>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { shell, field, escape, number } from './site.js';
+  import { wallet, saveWallet } from './api.js';
+  import { boxScene, cr, signedCr, tone, tradeUrl } from './market-ui.js';
+  shell();
+  const what = (h) => h.kind === 'dividend' ? `Dividend from ${h.rows.length} player${h.rows.length === 1 ? '' : 's'}`
+    : `${h.kind === 'buy' || h.side === 'buy' ? 'Bought' : 'Sold'} ${number.format(h.shares)} shares of <a href="${tradeUrl(h.id)}">${escape(h.name || h.id)}</a>`;
+  const draw = () => {
+    boxScene({ next: { href: 'portfolio.html', label: 'Portfolio' } });
+    const list = wallet().history;
+    field('list').innerHTML = list.length ? `<ol class="rows act">${list.map((h) => `<li class="mover"><span>${what(h)}<small>${new Date(h.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</small></span>
+      <span class="e ${tone(h.credits)}">${signedCr(h.credits)}</span></li>`).join('')}</ol>`
+      : '<p class="empty">Nothing yet. Your trades and payouts will show here.</p>';
+  };
+  draw();
+  field('reset').addEventListener('click', () => {
+    if (!confirm('Start again with 1,000 practice credits and no players?')) return;
+    saveWallet({ credits: 1000, positions: {}, watch: wallet().watch, history: [], dividends: 0 }); draw();
+  });
+  document.querySelector('main').addEventListener('pageshow-again', draw);
+</script>
+</body>
+</html>

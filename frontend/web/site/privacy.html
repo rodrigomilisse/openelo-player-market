@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy | OpenElo</title>
+<meta name="description" content="What OpenElo collects and why.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Privacy | OpenElo">
+<meta property="og:description" content="What OpenElo collects and why.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .prose { max-width: 70ch }
+  .prose h2 { font-size: clamp(28px, 3vw, 40px); margin-top: 36px }
+  .prose p, .prose li { color: var(--muted) }
+  .prose strong { color: var(--ink) }
+  .prose a { color: var(--elo) }
+
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="page-head" aria-labelledby="pv-title">
+      <h1 id="pv-title">Privacy</h1>
+      <p class="preview-note"><strong>Draft.</strong> A plain-language starting point, to be reviewed before launch.</p>
+    </section>
+    <section class="glass-panel prose" aria-label="Privacy">
+      <h2>What we collect</h2>
+      <ul>
+        <li><strong>Waitlist:</strong> your email address and country, only if you join the waitlist. We use them to tell you when the market opens where you live.</li>
+        <li><strong>Visits:</strong> anonymous page counts (which pages, from which country, on what kind of device), with no cookies and nothing that identifies you.</li>
+        <li><strong>In your browser only:</strong> your light or dark choice and the play-money market account are stored on your device and never sent to us.</li>
+      </ul>
+      <h2>What we don't do</h2>
+      <p>We don't sell or share your email, we don't run advertising trackers, and we don't build profiles.</p>
+      <h2>Your choices</h2>
+      <p>Every waitlist email has an unsubscribe link. To have your email deleted, write to us from the <a href="about.html">About</a> page. Clearing your browser's site data removes everything stored on your device.</p>
+      <h2>Who we are</h2>
+      <p data-field="controller">OpenElo. Company details will be added here before launch.</p>
+    </section>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { immersive, fieldFormation, sphereFormation } from './scene.js';
+  import { shell } from './site.js';
+  shell();
+  immersive({ formations: [fieldFormation(), sphereFormation({ center: [0, 3, -1], radius: 3 }), fieldFormation()], palette: ['#7FA7D8', '#FFD66B', '#7FA7D8'], dim: 0.4, shiftRight: 0,
+    keyframes: [{ at: 0, morph: 0, pos: [0, 6, 22], look: [0, 1, -6] }, { at: 1, morph: 0, pos: [-3, 7, 20], look: [0, 1, -8] }], next: { href: 'index.html', label: 'This week' } });
+
+</script>
+</body>
+</html>

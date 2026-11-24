@@ -11,7 +11,23 @@ build/
 .github/
 puppeteer-config.json
 docs/schema/
-
+# FotMob capture: scraped, public repo (see services/ingestion-service/README.md)
+services/ingestion-service/FotMob - Football Live Scores.html
+services/ingestion-service/FotMob - Football Live Scores_files/
+*:Zone.Identifier
 
 # research: downloaded/scraped raw data and everything derived from it (public repo; see research/README.md)
 research/data/raw/
+
+# exported ratings (pipeline/export.py); published by the deploy, not committed
+frontend/web/site/data/
+
+# site build output, approval file and lastmod state (frontend/web/build)
+frontend/web/dist/
+frontend/web/.publish-approved
+frontend/web/.build-state.json
+frontend/web/.fixture-data/
+
+# the site build guards are source, not build output (the generic build/ rule above would hide them)
+!frontend/web/build/
+!frontend/web/build/**

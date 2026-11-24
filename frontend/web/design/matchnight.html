@@ -1,0 +1,197 @@
+<title>OpenElo Matchnight</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="design.css">
+<style>
+/* Layout: tall player photo fixed on the left, glass panels scrolling on the right; the camera flies along his price and rating */
+.layout { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(300px, 34vw) minmax(0, 1fr) }
+.player { position: sticky; top: 0; height: 100vh; overflow: hidden }
+.player .photo { position: absolute; inset: 0; background: url(player.jpg) 58% 46% / cover no-repeat; filter: grayscale(1) contrast(1.25) brightness(1.08) }
+.player .tint { position: absolute; inset: 0; background: #2C6FD1; mix-blend-mode: multiply }
+.player .fade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,11,20,0) 55%, var(--night) 100%), linear-gradient(0deg, rgba(6,11,20,0.9) 0%, rgba(6,11,20,0) 40%) }
+.player .name { position: absolute; top: 0; bottom: 0; right: 4%; writing-mode: vertical-rl; transform: rotate(180deg);
+  font-family: var(--display); font-style: italic; font-weight: 900; font-size: clamp(88px, 15vh, 170px); line-height: 0.85;
+  color: transparent; -webkit-text-stroke: 1.5px rgba(228,236,245,0.9); text-transform: uppercase; text-align: center; white-space: nowrap }
+.player .tag { position: absolute; left: max(24px, env(safe-area-inset-left, 0px)); bottom: 28px; display: grid; gap: 6px }
+.player .number { font-family: var(--display); font-weight: 900; font-size: 64px; line-height: 0.8 }
+.player .credit { position: absolute; left: max(24px, env(safe-area-inset-left, 0px)); top: 18px }
+
+.content { min-width: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); padding-block: 0 80px }
+section { min-height: 92vh; display: flex; flex-direction: column; justify-content: center; gap: 24px; max-width: 640px; margin-left: clamp(0px, 4vw, 64px) }
+section.hero { justify-content: flex-start; padding-top: 8vh }
+.price-big { font-family: var(--display); font-weight: 900; font-size: clamp(96px, 13vw, 168px); line-height: 0.8 }
+.price-big small { font-size: 0.28em; font-weight: 700 }
+.cue { display: flex; align-items: center; gap: 10px; color: var(--muted); margin-top: 3vh }
+.cue span.line { width: 48px; height: 1px; background: var(--muted) }
+.moment { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start }
+.moment .score { font-family: var(--display); font-weight: 900; font-size: 44px; line-height: 0.9 }
+.moment .title { font-weight: 700; font-size: 19px }
+.moment .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px }
+form.glass { display: grid; gap: 16px }
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr) }
+  .player { position: relative; height: 70vh }
+  .player .name { font-size: 96px }
+  section { min-height: auto; padding-block: 48px; margin-left: 0 }
+  .site-header { position: static }
+}
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="layout">
+  <aside class="player" aria-label="Tiago Mendonça">
+    <div class="photo" role="img" aria-label="A player in white celebrating in front of the stands"></div>
+    <div class="tint"></div>
+    <div class="fade"></div>
+    <div class="credit">Photo: Alex Rizzardi, Unsplash. Stand-in image.</div>
+    <div class="name" aria-hidden="true">Mendonça</div>
+    <div class="tag">
+      <div class="number">8</div>
+      <div class="muted">Vale do Sado FC, central midfield, 24</div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="site-header">
+      <div class="logo">OPENELO</div>
+      <nav aria-label="Main">
+        <a href="#top" aria-current="page">Market</a>
+        <a href="#top">Portfolio</a>
+        <a href="#top">Wallet</a>
+      </nav>
+      <div class="wallet">Available <strong>1,250.00 cr</strong></div>
+    </header>
+
+    <section class="hero" id="top">
+      <div class="kicker">Man of the match, Saturday</div>
+      <h1>Tiago Mendonça</h1>
+      <div class="price-big">3.42<small> cr</small></div>
+      <div class="stats">
+        <div class="stat"><div class="label">Today</div><div class="value" style="color: var(--price)">+4.3%</div></div>
+        <div class="stat"><div class="label">OpenElo rating</div><div class="value" style="color: var(--elo)">1,842</div><div class="delta">+23 this week</div></div>
+        <div class="stat"><div class="label">New-share price</div><div class="value" style="color: var(--ask)">3.61</div></div>
+      </div>
+      <div class="legend"><span><i class="swatch price"></i>Share price</span><span><i class="swatch elo"></i>OpenElo rating</span><span><i class="swatch mint"></i>New-share price</span></div>
+      <div class="cue"><span class="line"></span>Scroll to fly through his season</div>
+    </section>
+
+    <section aria-labelledby="season-title">
+      <h2 id="season-title">Two lines, one season</h2>
+      <p class="lede">The gold ribbon is his rating, the blue one his share price. Watch the rating move first after each match, and the price follow it.</p>
+      <div class="glass moment">
+        <div class="score">3–0</div>
+        <div><div class="title">Scored against União Litoral</div><div class="muted">Rating jumped, and buyers piled in over the next week.</div>
+          <div class="chips"><span class="chip elo">Rating +11</span><span class="chip">Price +46% in 4 games</span></div></div>
+      </div>
+    </section>
+
+    <section aria-label="The dip and the high">
+      <div class="glass moment">
+        <div class="score">0–2</div>
+        <div><div class="title">Lost at FC Montebravo</div><div class="muted">A quiet game. Some holders sold, the price dipped.</div>
+          <div class="chips"><span class="chip down">Rating −6</span><span class="chip down">Price −7%</span></div></div>
+      </div>
+      <div class="glass moment">
+        <div class="score">2–1</div>
+        <div><div class="title">Assisted the winner against Atlético Serrano</div><div class="muted">Season high on both lines. Man of the match.</div>
+          <div class="chips"><span class="chip elo">Rating +9</span><span class="chip">Price 3.70 peak</span></div></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="book-title">
+      <h2 id="book-title">Who's selling, who's buying</h2>
+      <p class="lede">The dashed orange line is the new-share price. Anyone can always mint at 3.61, so holders sell below it.</p>
+      <div class="glass">
+        <div class="book-mint"><span>3.61 new shares</span><span>any amount</span></div>
+        <div id="asks"></div>
+        <div class="book-last"><span>3.42</span><span>last trade, spread 0.06</span></div>
+        <div id="bids"></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="trade-title">
+      <h2 id="trade-title">Back him</h2>
+      <form class="glass" id="ticket" novalidate>
+        <div class="seg side" role="group" aria-label="Side">
+          <button type="button" id="side-buy" aria-pressed="true">Buy</button>
+          <button type="button" id="side-sell" class="sell" aria-pressed="false">Sell</button>
+        </div>
+        <fieldset>
+          <legend id="venue-legend">Buy from</legend>
+          <label class="radio"><input type="radio" name="venue" id="venue-holders" value="holders" checked> Other holders, at your limit price</label>
+          <label class="radio" id="venue-mint-row"><input type="radio" name="venue" id="venue-mint" value="mint"> New shares, at 3.61</label>
+        </fieldset>
+        <div class="fields">
+          <label for="shares">Shares<input id="shares" type="text" inputmode="numeric" value="40"></label>
+          <label for="limit">Limit price (cr)<input id="limit" type="text" inputmode="decimal" value="3.45"></label>
+        </div>
+        <div class="totals">
+          <div><span>Cost</span><span id="cost"></span></div>
+          <div><span>Trading fee, 5%</span><span id="fee"></span></div>
+          <div class="sum"><span id="sum-label">Held until filled</span><span id="sum"></span></div>
+        </div>
+        <button class="submit" type="submit" id="submit">Place buy order</button>
+        <p class="notice" id="notice" role="status"></p>
+      </form>
+    </section>
+  </main>
+</div>
+
+<script type="module">
+import { THREE, COLOR, createStage, addStadium, addRibbon, addPillar, addDashedLine, textSprite, smoothstep, scrollTracker, pointerTracker } from './stadium.js';
+import { mendonca, matches, book, MINT_PRICE } from './sample-data.js';
+import { mountTicket, renderBook } from './ticket.js';
+
+renderBook(document.getElementById('asks'), book.asks, 'var(--ask)');
+renderBook(document.getElementById('bids'), book.bids, 'var(--price)');
+mountTicket(document.getElementById('ticket'), { mintHundredths: 361 });
+
+const STEP = 2;
+const priceY = (price) => (price - 1) * 2.2;
+const eloY = (rating) => (rating - 1690) / 160 * 5.6;
+const last = mendonca.price.length - 1;
+const centerZ = -last * STEP / 2;
+
+const stage = createStage(document.getElementById('scene'), { shiftRight: 0.17 });
+addStadium(stage, { centerZ, length: last * STEP + 8 });
+const priceRibbon = addRibbon(stage.scene, mendonca.price, { toY: priceY, step: STEP });
+const eloRibbon = addRibbon(stage.scene, mendonca.elo, { toY: eloY, step: STEP, x: -3.4, color: COLOR.elo, core: COLOR.eloCore, curtain: false });
+addDashedLine(stage.scene, new THREE.Vector3(1.8, priceY(MINT_PRICE), 4), new THREE.Vector3(1.8, priceY(MINT_PRICE), -(last + 3) * STEP), COLOR.ask);
+matches.forEach((match) => {
+  const up = match.change >= 0;
+  addPillar(stage.scene, eloRibbon.points[match.index], up ? '255,214,107' : '255,154,77', { color: up ? COLOR.elo : COLOR.ask });
+});
+
+await document.fonts.ready;
+const priceLabel = textSprite('PRICE 3.42', { color: '#BFE0FF' });
+priceLabel.position.copy(priceRibbon.points[last]).add(new THREE.Vector3(0, 0.9, 0));
+const eloLabel = textSprite('OPENELO 1,842', { color: '#FFF3CC' });
+eloLabel.position.copy(eloRibbon.points[last]).add(new THREE.Vector3(0, 0.9, 0));
+stage.scene.add(priceLabel, eloLabel);
+
+const scroll = scrollTracker();
+const pointer = pointerTracker();
+const overview = new THREE.Vector3(15, 12, 13);
+const overviewTarget = new THREE.Vector3(-1.5, 2.5, centerZ);
+const position = new THREE.Vector3();
+const target = new THREE.Vector3();
+const chase = new THREE.Vector3();
+
+stage.start(() => {
+  const progress = scroll.step();
+  const mouse = pointer.step();
+  const fly = smoothstep(0.05, 0.3, progress);
+  const t = Math.min(0.02 + progress * 0.94, 0.96);
+  const onCurve = priceRibbon.curve.getPointAt(t);
+  const ahead = priceRibbon.curve.getPointAt(Math.min(t + 0.05, 1));
+  chase.set(onCurve.x + 5, onCurve.y + 2.6, onCurve.z + 6);
+  position.lerpVectors(overview, chase, fly);
+  target.lerpVectors(overviewTarget, ahead.clone().add(new THREE.Vector3(-1.7, 0, 0)), fly);
+  stage.camera.position.set(position.x + mouse.x * 2, position.y - mouse.y * 1.2, position.z);
+  stage.camera.lookAt(target);
+});
+</script>

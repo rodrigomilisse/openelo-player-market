@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player | OpenElo</title>
+<meta name="description" content="A player's OpenElo rating, how it is made, and how it moved this season.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Player | OpenElo">
+<meta property="og:description" content="A player's OpenElo rating, how it is made, and how it moved this season.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="player.css">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body class="player-page">
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<aside class="nameplate" aria-hidden="true"><span class="nameplate-surname" data-field="surname"></span></aside>
+
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="hero" aria-labelledby="player-name">
+      <p class="identity" data-field="identity"></p>
+      <h1 id="player-name" data-field="name"></h1>
+      <div class="equation" role="group" aria-label="How his rating adds up">
+        <ol class="parts" data-field="parts"></ol>
+        <div class="total">
+          <span class="equals" aria-hidden="true">=</span>
+          <span class="total-value" data-field="rating"></span>
+          <span class="total-label">OpenElo</span>
+        </div>
+      </div>
+      <p class="part-explain" data-field="explain" aria-live="polite"></p>
+      <div class="hero-foot">
+        <dl class="ranks" data-field="ranks"></dl>
+        <div class="hero-actions">
+          <a class="button button-gold" data-field="trade-link" href="trade.html">Trade</a>
+          <a class="button" data-field="compare-link" href="compare.html">Compare</a>
+          <button class="button" type="button" data-action="share">Share</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage" id="stage-rating" aria-label="His rating"><p class="stage-caption" data-field="stage-rating"></p></section>
+
+    <section class="glass-panel" aria-labelledby="season-title">
+      <div class="section-head">
+        <h2 id="season-title">His season against his club's</h2>
+        <p class="legend"><span><i class="swatch swatch-player"></i><span data-field="legend-player"></span></span>
+          <span><i class="swatch swatch-club"></i><span data-field="legend-club"></span></span></p>
+      </div>
+      <p class="section-lede">The gold line is his rating, the silver line his club's. The gap between them is what he adds himself: starting, scoring, national-team selection.</p>
+      <figure class="chart"><svg class="chart-svg" data-field="season-chart" role="img" aria-labelledby="season-summary"></svg>
+        <figcaption id="season-summary" class="visually-hidden" data-field="season-summary"></figcaption>
+        <div class="chart-readout" data-field="season-readout" aria-live="polite"></div></figure>
+    </section>
+
+    <div class="grid-2">
+      <section class="glass-panel transfer" aria-labelledby="transfer-title">
+        <h2 id="transfer-title">If he moved</h2>
+        <p class="section-lede">Swap his club's rating for another club's and choose how often he would play. Everything else in his rating stays as it is today.</p>
+        <div class="rumours" data-field="rumours"></div>
+        <div class="transfer-controls">
+          <label class="visually-hidden" for="transfer-club">Club</label>
+          <select id="transfer-club" data-field="transfer-club"></select>
+          <div class="seg" role="radiogroup" aria-label="How often he would play" data-field="transfer-role">
+            <button type="button" role="radio" aria-checked="true" data-role="same">As now</button>
+            <button type="button" role="radio" aria-checked="false" data-role="rotation">Rotation</button>
+            <button type="button" role="radio" aria-checked="false" data-role="bench">Bench</button>
+          </div>
+        </div>
+        <p class="transfer-sum" data-field="transfer-sum" aria-live="polite"></p>
+        <p class="preview-note">A projection, not a forecast: after a real move his rating takes the new club's rating at once, and his selection bonus follows over the next matches.</p>
+      </section>
+
+      <section class="glass-panel price" aria-labelledby="price-title">
+        <div class="section-head"><h2 id="price-title">Market price</h2>
+          <p class="legend"><span><i class="swatch" style="background:var(--up)"></i>Price per share</span></p></div>
+        <figure class="chart"><svg class="chart-svg short" data-field="price-chart" role="img" aria-label="Simulated share price over the season"></svg>
+          <div class="chart-readout" data-field="price-readout" aria-live="polite"></div></figure>
+        <p class="preview-note"><strong>Preview.</strong> The market is not open, so this line is simulated to design the page. Real prices will come from trading between fans, never from OpenElo.</p>
+      </section>
+    </div>
+
+    <section aria-labelledby="matches-title">
+      <div class="section-head">
+        <h2 id="matches-title">What moved him</h2>
+        <div class="seg" role="radiogroup" aria-label="Matches shown">
+          <button type="button" role="radio" aria-checked="true" data-range="10">Last 10</button>
+          <button type="button" role="radio" aria-checked="false" data-range="all">Season</button>
+        </div>
+      </div>
+      <ol class="match-list" data-field="matches"></ol>
+    </section>
+
+    <div class="pair">
+      <section class="how glass-panel" aria-labelledby="how-title">
+        <h2 id="how-title">Anyone can check this number</h2>
+        <p>OpenElo comes only from match results and minutes played. No scouts, no votes, no transfer fees. The formula and its code are public. <a href="how.html">How it works</a></p>
+        <ul class="how-list" data-field="how"></ul>
+        <p class="formula" data-field="formula"></p>
+      </section>
+      <section class="neighbours glass-panel" aria-labelledby="neighbours-title">
+        <h2 id="neighbours-title">Around him in the world rankings</h2>
+        <ol class="neighbour-list" data-field="neighbours"></ol>
+      </section>
+    </div>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module" src="player.js"></script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trade | OpenElo</title>
+<meta name="description" content="Buy or sell shares in a player. Play-money preview.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Trade | OpenElo">
+<meta property="og:description" content="Buy or sell shares in a player. Play-money preview.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  /* trading: calm, dense, precise; motion only to confirm what changed */
+  .trade-head { padding-block: clamp(18px, 3vw, 36px) 0; display: grid; gap: 6px }
+  .trade-head .who { margin: 0; color: var(--muted); font-size: 18px }
+  .trade-head .who a { color: var(--ink); text-decoration: none }
+  .trade-head h1 { font-style: normal; font-size: clamp(40px, 5vw, 72px) }
+  .quoteline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; margin-top: 8px }
+  .quoteline .px { font-family: var(--display); font-weight: 800; font-size: clamp(48px, 6vw, 84px); line-height: 0.9 }
+  .quoteline .px small { font-family: var(--ui); font-weight: 500; font-size: 16px; color: var(--muted); margin-left: 6px }
+  .quoteline .fact { display: flex; flex-direction: column }
+  .quoteline .fact span { color: var(--muted); font-size: 14px }
+  .quoteline .fact strong { font-family: var(--display); font-weight: 800; font-size: 26px }
+  .desk { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: clamp(16px, 2vw, 24px); margin-top: 24px; align-items: start }
+  .desk > * { margin-top: 0 }
+  .side-stack { display: grid; gap: clamp(16px, 2vw, 24px) }
+  .ticket h2, .book h2, .why h2 { font-size: 28px }
+  .ticket .seg { margin-top: 14px; width: 100% }
+  .ticket label { display: block; color: var(--muted); font-size: 14px; margin: 16px 0 6px }
+  .ticket .field { width: 100%; font-size: 20px; font-family: var(--display); font-weight: 700 }
+  .quick { display: flex; gap: 6px; margin-top: 8px }
+  .quick button { flex: 1; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); border-radius: 999px; padding: 5px 0; cursor: pointer; color: var(--muted) }
+  .breakdown { margin: 16px 0 0; display: grid; gap: 6px; font-size: 15px }
+  .breakdown div { display: flex; justify-content: space-between; gap: 12px }
+  .breakdown dt { color: var(--muted) }
+  .breakdown dd { margin: 0; font-variant-numeric: tabular-nums }
+  .breakdown .total { padding-top: 8px; border-top: 1px solid var(--line); font-weight: 700 }
+  .ticket-note { margin: 10px 0 0; color: var(--muted); font-size: 14px }
+  /* slide to confirm */
+  .slide { position: relative; margin-top: 18px; height: 54px; border-radius: 999px; background: rgba(var(--well), 0.45); box-shadow: inset 0 1px 3px rgba(var(--shade), calc(0.5 * var(--shade-k))); overflow: hidden }
+  .slide input { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; cursor: grab; z-index: 2 }
+  .slide input::-webkit-slider-thumb { -webkit-appearance: none; width: 54px; height: 54px; border-radius: 50%; background: var(--elo); box-shadow: 0 4px 14px rgba(var(--shade), calc(0.4 * var(--shade-k))) }
+  .slide input::-moz-range-thumb { width: 54px; height: 54px; border: 0; border-radius: 50%; background: var(--elo) }
+  .slide input:disabled { cursor: not-allowed }
+  .slide input:disabled::-webkit-slider-thumb { background: rgba(255, 255, 255, 0.2) }
+  .slide span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-weight: 600; pointer-events: none }
+  .slide .fill { position: absolute; inset: 0 auto 0 0; width: var(--slid, 0%); background: linear-gradient(90deg, rgba(255, 214, 107, 0.0), rgba(255, 214, 107, 0.25)) }
+  .done { margin: 12px 0 0; min-height: 1.5em; color: var(--elo); font-weight: 600 }
+  .done.flash { animation: flash 900ms ease }
+  @keyframes flash { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+  /* order book */
+  .levels { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 15px }
+  .levels li { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 4px 10px; border-radius: 6px; font-variant-numeric: tabular-nums }
+  .levels li i { position: absolute; inset: 0 0 0 auto; border-radius: 6px; z-index: -1 }
+  .levels.asks li i { background: rgba(255, 154, 77, 0.14) }
+  .levels.bids li i { background: rgba(90, 169, 255, 0.14) }
+  .levels li span:last-child { text-align: right; color: var(--muted) }
+  .mid { margin: 8px 0; display: flex; justify-content: space-between; color: var(--muted); font-size: 14px }
+  .mint-line { margin: 8px 0 0; padding: 6px 10px; border: 1px dashed rgba(255, 154, 77, 0.5); border-radius: 6px; display: flex; justify-content: space-between; font-size: 15px; color: var(--down) }
+  .why p { margin: 10px 0 0; color: var(--muted); max-width: 60ch }
+  .why .mini { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-family: var(--display); font-weight: 800; font-size: 22px }
+  .why .mini .op { color: var(--muted); font-weight: 500 }
+  .why .mini .t { color: var(--elo) }
+  .why a { color: var(--elo) }
+  .position { margin-top: 10px; color: var(--muted) }
+  .position strong { color: var(--ink) }
+  .limit { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px }
+  .limit summary { cursor: pointer; color: var(--muted); font-weight: 600 }
+  .limit-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-top: 10px }
+  .limit-row label { margin: 0 }
+  .limit-row .field { font-size: 17px }
+  .orders { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px }
+  .orders li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px }
+  @media (max-width: 960px) { .desk { grid-template-columns: minmax(0, 1fr) } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body class="mode-market">
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="trade-head" aria-labelledby="trade-name">
+      <p class="who" data-field="who"></p>
+      <h1 id="trade-name" data-field="name"></h1>
+      <div class="quoteline" data-field="quoteline"></div>
+      <p class="preview-note"><strong>Play money.</strong> Practice credits kept in this browser. Prices, payouts and fees are illustrative.</p>
+    </section>
+
+    <div class="desk">
+      <div class="side-stack">
+        <section class="glass-panel" aria-labelledby="chart-title">
+          <div class="section-head"><h2 id="chart-title">Price</h2>
+            <p class="legend"><span><i class="swatch" style="background:var(--up)"></i>Price per share</span></p></div>
+          <figure class="chart"><svg class="chart-svg" data-field="price-chart" role="img" aria-label="Price over the season"></svg>
+            <div class="chart-readout" data-field="price-readout" aria-live="polite"></div></figure>
+          <div class="section-head" style="margin-top:18px"><h3>OpenElo</h3>
+            <p class="legend"><span><i class="swatch swatch-player"></i>Rating, which sets the payout</span></p></div>
+          <figure class="chart"><svg class="chart-svg short" data-field="rating-chart" role="img" aria-label="Rating over the season"></svg>
+            <div class="chart-readout" data-field="rating-readout" aria-live="polite"></div></figure>
+        </section>
+        <section class="glass-panel why" aria-labelledby="why-title">
+          <h2 id="why-title">What you're paid on</h2>
+          <p>Every share earns a slice of the market's daily payout, set by his OpenElo rating against every other share held. A higher rating pays more; the price you paid doesn't change the payout.</p>
+          <div class="mini" data-field="mini"></div>
+          <p data-field="why-link"></p>
+        </section>
+      </div>
+
+      <div class="side-stack">
+        <section class="glass-panel ticket" aria-labelledby="ticket-title">
+          <div class="section-head"><h2 id="ticket-title">Back him</h2><button class="button watch-btn" type="button" data-field="watch" aria-pressed="false">☆ Watch</button></div>
+          <div class="seg" role="radiogroup" aria-label="Buy or sell" data-field="side">
+            <button type="button" role="radio" aria-checked="true" data-side="buy">Buy</button>
+            <button type="button" role="radio" aria-checked="false" data-side="sell">Sell</button>
+          </div>
+          <label for="amount" data-field="amount-label">Credits to spend</label>
+          <input class="field" id="amount" type="number" inputmode="decimal" min="0" step="1" value="100">
+          <div class="quick" data-field="quick"></div>
+          <dl class="breakdown" data-field="breakdown"></dl>
+          <div class="slide" data-field="slide"><i class="fill"></i><span data-field="slide-label">Slide to buy</span>
+            <input type="range" min="0" max="100" value="0" aria-label="Slide to confirm the order" data-field="slider"></div>
+          <p class="done" role="status" data-field="done"></p>
+          <p class="position" data-field="position"></p>
+          <details class="limit" data-field="limit">
+            <summary>Or wait for a price (limit order)</summary>
+            <div class="limit-row">
+              <label>Shares<input class="field" type="number" min="1" step="1" value="10" data-field="limit-shares"></label>
+              <label>At most / at least<input class="field" type="number" min="0.01" step="0.01" data-field="limit-price"></label>
+              <button class="button" type="button" data-field="limit-place">Place</button>
+            </div>
+            <p class="ticket-note" data-field="limit-note"></p>
+            <ul class="orders" data-field="orders"></ul>
+          </details>
+        </section>
+        <section class="glass-panel book" aria-labelledby="book-title">
+          <h2 id="book-title">Order book</h2>
+          <p class="ticket-note">Fans selling (top) and buying (bottom). New shares are always available at the new-share price, which rises a little with each one.</p>
+          <div class="mint-line" data-field="mint"></div>
+          <ol class="levels asks" data-field="asks" aria-label="Sellers"></ol>
+          <p class="mid" data-field="mid"></p>
+          <ol class="levels bids" data-field="bids" aria-label="Buyers"></ol>
+        </section>
+      </div>
+    </div>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { getPlayer, getBook, getQuote, wallet, recordTrade, toggleWatch, getProjection, placeOrder, cancelOrder, checkOrders, FEES } from './api.js';
+  import { boxScene } from './market-ui.js';
+  import { shell, field, param, number, signed, escape, longDate, shortDate, lineChart, notFound, playerUrl, clubUrl } from './site.js';
+  shell();
+  const id = (param('id') || 'tiago-mendonca').replace(/[^a-z0-9-]/g, '');
+  const [p, b] = await Promise.all([getPlayer(id), getBook(id)]);
+  if (!p) notFound('player');
+  else {
+    boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });
+    const cr = (v) => v.toFixed(2);
+    document.title = `Trade ${p.name} | OpenElo`;
+    field('who').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}${p.age ? `, ${p.age}` : ''}`;
+    field('name').textContent = p.name;
+    const prices = p.price.map((x) => x.price);
+    const seasonPct = Math.round((b.price / prices[0] - 1) * 100);
+    field('quoteline').innerHTML = `<span class="px">${cr(b.price)}<small>credits a share</small></span>
+      <span class="fact"><span>This week</span><strong class="${b.week >= 0 ? 'up' : 'down'}">${b.week >= 0 ? '+' : '−'}${Math.abs(b.week).toFixed(2)}</strong></span>
+      <span class="fact"><span>Season</span><strong class="${seasonPct >= 0 ? 'up' : 'down'}">${signed(seasonPct)}%</strong></span>
+      <span class="fact"><span>Pays per share a day</span><strong class="gold">${cr(b.payoutDay)}</strong></span>
+      <span class="fact"><span>OpenElo</span><strong class="gold">${number.format(p.rating)}</strong></span>`;
+    lineChart(field('price-chart'), field('price-readout'), {
+      dates: p.price.map((x) => x.date), series: [{ cls: 'line-price', values: prices, color: '#5AA9FF' }],
+      format: (v) => v.toFixed(2), idle: 'Point at the chart to read a price.',
+      read: (i) => `<strong>${longDate(p.price[i].date)}</strong>: ${cr(prices[i])} a share.`,
+    });
+    lineChart(field('rating-chart'), field('rating-readout'), {
+      dates: p.history.map((x) => x.date), series: [{ cls: 'line-player', values: p.history.map((x) => x.rating), color: '#FFD66B' }],
+      idle: '', read: (i) => `<strong>${shortDate(p.history[i].date)}</strong>: rated ${number.format(p.history[i].rating)} (${signed(p.matches[i].change)}).`,
+    });
+    field('mini').innerHTML = p.parts.map((x, i) => `${i ? `<span class="op">${x.value < 0 ? '−' : '+'}</span>` : ''}<span>${number.format(Math.abs(x.value))}</span>`).join('') + `<span class="op">=</span><span class="t">${number.format(p.rating)}</span>`;
+    field('why-link').innerHTML = `<a href="${playerUrl(p.id)}">How ${escape(p.shortName)}'s rating is made</a>`;
+
+    // the book
+    const maxLevel = Math.max(...b.asks.map((l) => l.shares), ...b.bids.map((l) => l.shares), 1);
+    const level = (l) => `<li><i style="width:${(l.shares / maxLevel) * 100}%"></i><span>${cr(l.price)}</span><span>${l.shares}</span></li>`;
+    field('mint').innerHTML = `<span>New shares</span><span>${cr(b.newShare)} and up</span>`;
+    field('asks').innerHTML = b.asks.slice().reverse().map(level).join('');
+    field('bids').innerHTML = b.bids.map(level).join('');
+    field('mid').innerHTML = `<span>Last ${cr(b.price)}</span><span>${b.asks[0] && b.bids[0] ? `Gap ${cr(b.asks[0].price - b.bids[0].price)}` : ''}</span>`;
+
+    // the ticket
+    let side = 'buy';
+    const amount = document.getElementById('amount');
+    const slider = field('slider');
+    let current = null;
+    const position = () => {
+      const w = wallet(), pos = w.positions[p.id] || { shares: 0, cost: 0 }, shares = pos.shares;
+      const gain = shares * b.price - pos.cost;
+      field('position').innerHTML = shares ? `You hold <strong>${shares}</strong> shares, worth ${cr(shares * b.price)} credits${pos.cost ? ` (${gain >= 0 ? 'up' : 'down'} ${cr(Math.abs(gain))} on the ${cr(pos.cost)} you paid)` : ''}${pos.dividends ? `, and they've paid you ${cr(pos.dividends)} so far` : ''}. Credits to spend: ${cr(w.credits)}.`
+        : `You don't hold ${escape(p.shortName)} yet. Credits to spend: <strong>${cr(w.credits)}</strong>.`;
+      return { w, shares };
+    };
+    const watchBtn = field('watch');
+    const showWatch = () => { const on = wallet().watch.includes(p.id); watchBtn.setAttribute('aria-pressed', String(on)); watchBtn.textContent = on ? '★ Watching' : '☆ Watch'; };
+    watchBtn.addEventListener('click', () => { toggleWatch(p.id); showWatch(); });
+    showWatch();
+    // what an order does to your next payout, if ratings stay as they are
+    const payoutEffect = async (w, q) => {
+      const before = await getProjection(w.positions);
+      const pos = { ...(w.positions[p.id] || { shares: 0, cost: 0 }) };
+      pos.shares += q.side === 'buy' ? q.shares : -q.shares;
+      const after = await getProjection({ ...w.positions, [p.id]: pos });
+      return after.next - before.next;
+    };
+    const update = async () => {
+      const { w, shares } = position();
+      const v = Math.max(0, +amount.value || 0);
+      field('quick').innerHTML = side === 'buy'
+        ? [50, 100, 250].map((x) => `<button type="button" data-v="${x}">${x}</button>`).join('') + `<button type="button" data-v="${Math.floor(w.credits)}">All</button>`
+        : [0.25, 0.5, 1].map((f) => `<button type="button" data-v="${Math.max(1, Math.floor(shares * f))}">${f === 1 ? 'All' : `${f * 100}%`}</button>`).join('');
+      current = await getQuote(p.id, side, v);
+      const rows = [];
+      let ok = false;
+      if (!current || !current.shares) {
+        rows.push(['', side === 'buy' ? 'Enter how many credits to spend.' : 'Enter how many shares to sell.']);
+      } else if (side === 'buy') {
+        const fans = current.fills.filter((f) => f.from === 'fans').reduce((s, f) => s + f.shares, 0);
+        const minted = current.shares - fans;
+        if (fans) rows.push(['From fans selling', `${fans} shares`]);
+        if (minted) rows.push(['New shares', `${minted} shares`]);
+        rows.push(['Average price', cr(current.average)], [`Fees (${FEES.taker * 100}% / ${FEES.mint * 100}% new)`, cr(current.fees)], ['Adds to your next payout', `+${cr(await payoutEffect(w, current))}`]);
+        rows.push(['You pay', `${cr(current.spent)} for ${current.shares} shares`, 'total']);
+        ok = current.spent <= w.credits + 1e-9;
+        if (!ok) rows.push(['', `That's more than your ${cr(w.credits)} credits.`]);
+      } else {
+        rows.push(['To fans buying', `${current.shares} shares`], ['Average price', cr(current.average)], [`Fee (${FEES.taker * 100}%)`, cr(current.fees)]);
+        if (current.unsold) rows.push(['Not sold (no buyers left)', `${current.unsold} shares`]);
+        if (current.shares <= shares) rows.push(['Takes from your next payout', `−${cr(-(await payoutEffect(w, current)))}`]);
+        rows.push(['You receive', cr(current.received), 'total']);
+        ok = current.shares <= shares;
+        if (!ok) rows.push(['', `You hold ${shares} shares.`]);
+      }
+      field('breakdown').innerHTML = rows.map(([k, v, cls]) => `<div class="${cls || ''}"><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+      slider.disabled = !ok;
+      field('slide-label').textContent = ok ? (side === 'buy' ? `Slide to buy ${current.shares} shares` : `Slide to sell ${current.shares} shares`) : 'Adjust the order';
+    };
+    field('side').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-side]');
+      if (!btn) return;
+      side = btn.dataset.side;
+      field('side').querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === btn)));
+      field('amount-label').textContent = side === 'buy' ? 'Credits to spend' : 'Shares to sell';
+      amount.value = side === 'buy' ? 100 : Math.max(1, wallet().positions[p.id]?.shares || 1);
+      update();
+    });
+    field('quick').addEventListener('click', (e) => { const btn = e.target.closest('[data-v]'); if (btn) { amount.value = btn.dataset.v; update(); } });
+    amount.addEventListener('input', update);
+    slider.addEventListener('input', () => { field('slide').style.setProperty('--slid', `${slider.value}%`); });
+    slider.addEventListener('change', () => {
+      if (+slider.value >= 96 && current && !slider.disabled) {
+        recordTrade(p.id, p.name, current);
+        boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });   // your squad below changes
+        const done = field('done');
+        done.textContent = side === 'buy' ? `Bought ${current.shares} shares of ${p.name}.` : `Sold ${current.shares} shares of ${p.name}.`;
+        done.classList.remove('flash'); void done.offsetWidth; done.classList.add('flash');
+      }
+      slider.value = 0;
+      field('slide').style.setProperty('--slid', '0%');
+      update();
+    });
+    // limit orders: wait for a price instead of taking the book now
+    const limitPrice = field('limit-price');
+    const drawOrders = () => {
+      const mine = (wallet().orders || []).filter((o) => o.playerId === p.id);
+      field('orders').innerHTML = mine.map((o) => `<li><span>${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.shares} at ${o.side === 'buy' ? 'most' : 'least'} ${cr(o.limit)}</span>
+        <button class="button" type="button" data-cancel="${o.id}">Cancel</button></li>`).join('');
+      field('limit-note').textContent = side === 'buy' ? `Buys when a fan sells at or under your price (best offer now ${b.asks[0] ? cr(b.asks[0].price) : '–'}).`
+        : `Sells when a fan bids at or over your price (best bid now ${b.bids[0] ? cr(b.bids[0].price) : '–'}).`;
+      if (!limitPrice.value) limitPrice.value = cr(b.price * (side === 'buy' ? 0.97 : 1.03));
+    };
+    field('limit-place').addEventListener('click', () => {
+      const shares = Math.floor(+field('limit-shares').value), limit = +limitPrice.value;
+      if (!(shares > 0 && limit > 0)) return;
+      const filled = placeOrder({ playerId: p.id, name: p.name, side, shares, limit });
+      const done = field('done');
+      done.textContent = filled.length ? `Filled at once: ${side === 'buy' ? 'bought' : 'sold'} ${shares} at ${cr(filled[0].price)}.` : `Order placed: ${side} ${shares} at ${cr(limit)}. It fills when the book gets there.`;
+      done.classList.remove('flash'); void done.offsetWidth; done.classList.add('flash');
+      drawOrders(); update();
+    });
+    field('orders').addEventListener('click', (e) => { const btn = e.target.closest('[data-cancel]'); if (btn) { cancelOrder(btn.dataset.cancel); drawOrders(); } });
+    field('side').addEventListener('click', () => { limitPrice.value = ''; drawOrders(); });
+    checkOrders();
+    drawOrders();
+    update();
+    document.querySelector('main').addEventListener('pageshow-again', () => { showWatch(); update(); boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } }); });   // coming back after trading elsewhere
+  }
+</script>
+</body>
+</html>

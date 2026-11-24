@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms | OpenElo</title>
+<meta name="description" content="The terms for using OpenElo.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Terms | OpenElo">
+<meta property="og:description" content="The terms for using OpenElo.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  .prose { max-width: 70ch }
+  .prose h2 { font-size: clamp(28px, 3vw, 40px); margin-top: 36px }
+  .prose p, .prose li { color: var(--muted) }
+  .prose strong { color: var(--ink) }
+  .prose a { color: var(--elo) }
+
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="page-head" aria-labelledby="tm-title">
+      <h1 id="tm-title">Terms</h1>
+      <p class="preview-note"><strong>Draft.</strong> A plain-language starting point, to be reviewed before launch.</p>
+    </section>
+    <section class="glass-panel prose" aria-label="Terms">
+      <h2>The ratings</h2>
+      <p>OpenElo ratings are calculated from public match results and minutes played. They are a measure of past results, not a valuation, a transfer fee, a prediction or advice of any kind. They are provisional during the beta and may change when the formula changes.</p>
+      <h2>The market preview</h2>
+      <p>The market pages are a preview with practice credits that have no value and can't be bought, sold or withdrawn. Prices, payouts and fees there are illustrative. Nothing on this site is an offer to buy or sell anything.</p>
+      <h2>Using the site</h2>
+      <p>You may link to any page and quote ratings with credit to OpenElo. Please don't scrape the site in bulk; the data files will be published openly instead.</p>
+      <h2>Club and player names</h2>
+      <p>Names are used only to identify who a rating belongs to. OpenElo isn't affiliated with or endorsed by any club, league or player.</p>
+    </section>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { immersive, fieldFormation, sphereFormation } from './scene.js';
+  import { shell } from './site.js';
+  shell();
+  immersive({ formations: [fieldFormation(), sphereFormation({ center: [0, 3, -1], radius: 3 }), fieldFormation()], palette: ['#7FA7D8', '#FFD66B', '#7FA7D8'], dim: 0.4, shiftRight: 0,
+    keyframes: [{ at: 0, morph: 0, pos: [0, 6, 22], look: [0, 1, -6] }, { at: 1, morph: 0, pos: [-3, 7, 20], look: [0, 1, -8] }], next: { href: 'index.html', label: 'This week' } });
+
+</script>
+</body>
+</html>

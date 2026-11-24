@@ -1,0 +1,183 @@
+<title>OpenElo Player Rating</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="design.css">
+<style>
+/* Layout: content left, tall gold-toned photo fixed on the right; the camera flies along his rating through one goal frame per match */
+.layout { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 32vw) }
+.content { min-width: 0; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: 16px; padding-block: 0 80px }
+.player { position: sticky; top: 0; height: 100vh; overflow: hidden }
+.player .photo { position: absolute; inset: 0; background: url(player.jpg) 58% 46% / cover no-repeat; filter: grayscale(1) contrast(1.3) brightness(1.1) }
+.player .tint { position: absolute; inset: 0; background: #9A7414; mix-blend-mode: multiply }
+.player .fade { position: absolute; inset: 0; background: linear-gradient(270deg, rgba(6,11,20,0) 55%, var(--night) 100%), linear-gradient(0deg, rgba(6,11,20,0.9) 0%, rgba(6,11,20,0) 40%) }
+.player .name { position: absolute; top: 0; bottom: 0; left: 4%; writing-mode: vertical-rl;
+  font-family: var(--display); font-style: italic; font-weight: 900; font-size: clamp(88px, 15vh, 170px); line-height: 0.85;
+  color: transparent; -webkit-text-stroke: 1.5px rgba(255,243,204,0.9); text-transform: uppercase; text-align: center; white-space: nowrap }
+.player .rating { position: absolute; right: max(24px, env(safe-area-inset-right, 0px)); bottom: 28px; text-align: right }
+.player .rating b { display: block; font-family: var(--display); font-weight: 900; font-size: 88px; line-height: 0.85; color: var(--elo) }
+.player .credit { position: absolute; right: max(24px, env(safe-area-inset-right, 0px)); top: 18px }
+section { min-height: 90vh; display: flex; flex-direction: column; justify-content: center; gap: 22px; max-width: 700px }
+section.hero { justify-content: flex-start; padding-top: 8vh }
+.big-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.big-stats .glass .value { font-family: var(--display); font-weight: 900; font-size: 56px; line-height: 0.95 }
+.verdict { font-family: var(--display); font-weight: 900; font-size: clamp(64px, 9vw, 120px); line-height: 0.85; color: var(--elo) }
+.verdict small { font-size: 0.32em; color: var(--ink); font-weight: 700 }
+.result { display: inline-block; min-width: 30px; text-align: center; font-weight: 800; border-radius: 4px; padding: 0 6px }
+.fixture { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--glass-edge) }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr) }
+  .player { position: relative; height: 60vh; order: -1 }
+  section { min-height: auto; padding-block: 44px }
+  .site-header { position: static }
+}
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="layout">
+  <main class="content">
+    <header class="site-header">
+      <div class="logo">OPENELO</div>
+      <nav aria-label="Main">
+        <a href="#top">Market</a>
+        <a href="#top" aria-current="page">Players</a>
+        <a href="#top">Portfolio</a>
+      </nav>
+    </header>
+
+    <section class="hero" id="top">
+      <div class="muted">Vale do Sado FC, central midfield, 24</div>
+      <h1>Mendonça's season</h1>
+      <p class="lede">His OpenElo rating, match by match. Each goal frame you fly through is a match, gold for a win, orange for a loss. The blue line beside it is his share price.</p>
+      <div class="big-stats" id="season"></div>
+      <div class="legend"><span><i class="swatch elo"></i>OpenElo rating</span><span><i class="swatch price"></i>Share price</span></div>
+    </section>
+
+    <section aria-labelledby="lead-title">
+      <h2 id="lead-title">Rating leads, price follows</h2>
+      <div class="verdict" id="verdict"></div>
+      <p class="lede" id="verdict-text"></p>
+    </section>
+
+    <section aria-labelledby="log-title">
+      <h2 id="log-title">Match log</h2>
+      <div class="glass table-scroll">
+        <table class="data">
+          <thead><tr><th>Result</th><th>Opponent</th><th class="num">Minutes</th><th class="num">Rating</th><th class="num">Price, 3 games later</th></tr></thead>
+          <tbody id="log"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="next-title">
+      <h2 id="next-title">Next up</h2>
+      <p class="lede">Every match is a chance for his rating, and his dividends, to move. These are the next three.</p>
+      <div class="glass" id="fixtures"></div>
+    </section>
+  </main>
+
+  <aside class="player" aria-label="Tiago Mendonça">
+    <div class="photo" role="img" aria-label="A player in white celebrating in front of the stands"></div>
+    <div class="tint"></div>
+    <div class="fade"></div>
+    <div class="credit">Photo: Alex Rizzardi, Unsplash. Stand-in image.</div>
+    <div class="name" aria-hidden="true">Mendonça</div>
+    <div class="rating"><span class="muted">OpenElo</span><b>1842</b></div>
+  </aside>
+</div>
+
+<script type="module">
+import { THREE, COLOR, createStage, addStadium, addRibbon, smoothstep, scrollTracker, pointerTracker } from './stadium.js';
+import { mendonca, matches, fixtures } from './sample-data.js';
+
+const { price, elo } = mendonca;
+const last = elo.length - 1;
+const signed = (n, digits = 0) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(digits);
+const percent = (from, to) => Math.round((to - from) / from * 100);
+const priceAfter = (match) => price[Math.min(match.index + 3, last)];
+const followed = matches.filter((m) => Math.sign(m.change) === Math.sign(priceAfter(m) - price[m.index - 1]));
+const best = [...matches].sort((a, b) => b.change - a.change)[0];
+
+document.getElementById('season').innerHTML = [
+  ['Rating now', elo[last].toLocaleString('en'), 'var(--elo)'],
+  ['Since August', signed(elo[last] - elo[0]), 'var(--elo)'],
+  ['Best match', `${signed(best.change)} vs ${best.opponent}`, 'var(--ink)'],
+  ['Share price since August', `${signed(percent(price[0], price[last]))}%`, 'var(--price)']
+].map(([label, value, color]) => `<div class="glass"><div class="muted">${label}</div><div class="value" style="color: ${color}; ${value.length > 8 ? 'font-size: 30px' : ''}">${value}</div></div>`).join('');
+
+document.getElementById('verdict').innerHTML = `${followed.length} of ${matches.length} <small>matches</small>`;
+document.getElementById('verdict-text').textContent =
+  `After ${followed.length} of his last ${matches.length} matches, the share price moved the same way as his rating within three games. Buyers read the rating.`;
+
+document.getElementById('log').innerHTML = [...matches].reverse().map((m) => {
+  const win = m.score.split('–').map(Number);
+  const outcome = win[0] > win[1] ? ['W', 'var(--elo)'] : win[0] < win[1] ? ['L', 'var(--ask)'] : ['D', 'var(--muted)'];
+  const move = percent(price[m.index - 1], priceAfter(m));
+  return `<tr><td><span class="result" style="background: ${outcome[1]}; color: var(--night)">${outcome[0]}</span> ${m.score}</td>
+    <td>${m.venue === 'home' ? 'vs' : 'at'} ${m.opponent}<div class="muted" style="font-size: 14px">${m.note}</div></td>
+    <td class="num">${m.minutes}</td>
+    <td class="num"><span class="chip ${m.change >= 0 ? 'elo' : 'down'}">${signed(m.change)}</span></td>
+    <td class="num" style="color: ${move >= 0 ? 'var(--price)' : 'var(--ask)'}">${signed(move)}%</td></tr>`;
+}).join('');
+
+document.getElementById('fixtures').innerHTML = fixtures.map((f) =>
+  `<div class="fixture"><span>${f.venue === 'home' ? 'vs' : 'at'} <b>${f.opponent}</b></span><span class="muted">${f.when}</span></div>`).join('');
+
+const STEP = 2;
+const eloY = (rating) => (rating - 1690) / 160 * 6;
+const priceY = (value) => (value - 1) * 1.6;
+const centerZ = -last * STEP / 2;
+const stage = createStage(document.getElementById('scene'), { shiftRight: -0.15 });
+addStadium(stage, { centerZ, length: last * STEP + 8 });
+const eloRibbon = addRibbon(stage.scene, elo, { toY: eloY, step: STEP, color: COLOR.elo, core: COLOR.eloCore });
+addRibbon(stage.scene, price, { toY: priceY, step: STEP, x: 4, color: COLOR.price, core: COLOR.priceCore, curtain: false, radius: 0.04 });
+
+function addGoal(centre, color) {
+  const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
+  const width = 4.2;
+  const height = 2.6;
+  const post = new THREE.CylinderGeometry(0.05, 0.05, height, 8);
+  const group = new THREE.Group();
+  const left = new THREE.Mesh(post, material);
+  left.position.set(-width / 2, height / 2, 0);
+  const right = new THREE.Mesh(post, material);
+  right.position.set(width / 2, height / 2, 0);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, width, 8), material);
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, height, 0);
+  const net = new THREE.Mesh(new THREE.PlaneGeometry(width, height, 8, 5),
+    new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.12 }));
+  net.position.set(0, height / 2, -0.6);
+  group.add(left, right, bar, net);
+  group.position.set(centre.x, centre.y - height * 0.45, centre.z);
+  stage.scene.add(group);
+}
+matches.forEach((m) => {
+  const goals = m.score.split('–').map(Number);
+  addGoal(eloRibbon.points[m.index], goals[0] > goals[1] ? COLOR.elo : goals[0] < goals[1] ? COLOR.ask : 0x93A6BC);
+});
+
+const scroll = scrollTracker();
+const pointer = pointerTracker();
+const overview = new THREE.Vector3(-14, 11, 12);
+const overviewTarget = new THREE.Vector3(1, 2.5, centerZ);
+const position = new THREE.Vector3();
+const target = new THREE.Vector3();
+const behind = new THREE.Vector3();
+
+stage.start(() => {
+  const progress = scroll.step();
+  const mouse = pointer.step();
+  const fly = smoothstep(0.04, 0.25, progress);
+  const t = Math.min(0.02 + progress * 0.94, 0.96);
+  const here = eloRibbon.curve.getPointAt(Math.max(t - 0.03, 0));
+  const ahead = eloRibbon.curve.getPointAt(Math.min(t + 0.04, 1));
+  behind.set(here.x - 1.2, here.y + 1.1, here.z + 3.5);
+  position.lerpVectors(overview, behind, fly);
+  target.lerpVectors(overviewTarget, ahead, fly);
+  stage.camera.position.set(position.x + mouse.x * 1.5, position.y - mouse.y, position.z);
+  stage.camera.lookAt(target);
+});
+</script>

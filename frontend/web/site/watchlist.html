@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watchlist | OpenElo</title>
+<meta name="description" content="Players you are keeping an eye on. Play-money preview.">
+<meta property="og:site_name" content="OpenElo">
+<meta property="og:title" content="Watchlist | OpenElo">
+<meta property="og:description" content="Players you are keeping an eye on. Play-money preview.">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060B14">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+  td small { display: block; color: var(--muted) }
+  td.spark { width: 110px }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body class="mode-market">
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="page">
+  <header data-shell="header"></header>
+  <main>
+    <section class="mhead" aria-labelledby="wl-title">
+      <div><h1 id="wl-title">Watchlist</h1><p class="lede">Players you're keeping an eye on. Add one with the star on his trade page.</p></div>
+    </section>
+    <section class="glass-panel" aria-label="Watched players"><div data-field="list"></div></section>
+  </main>
+  <div data-shell="footer"></div>
+</div>
+<script type="module">
+  import { shell, field, escape, number, direction } from './site.js';
+  import { wallet, toggleWatch } from './api.js';
+  import { boxScene, marketById, cr, signedCr, spark, tradeUrl } from './market-ui.js';
+  shell();
+  const byId = await marketById();
+  const draw = () => {
+    boxScene({ next: { href: 'market.html', label: 'Browse players' } });
+    const list = wallet().watch.map((id) => byId.get(id)).filter(Boolean);
+    field('list').innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th scope="col">Player</th><th class="num" scope="col">OpenElo</th><th class="num" scope="col">Price</th>
+      <th class="num" scope="col">This week</th><th scope="col">Season</th><th class="num" scope="col">Pays per share a day</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead><tbody>${list.map((p) => `<tr>
+      <td><a href="${tradeUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.club)}</small></td><td class="num"><span class="e">${number.format(p.rating)}</span></td>
+      <td class="num money">${cr(p.price)}</td><td class="num ${direction(p.week)}">${signedCr(p.week)}</td><td class="spark">${spark(p.spark)}</td>
+      <td class="num gold">${cr(p.payoutDay)}</td><td><button class="button" type="button" data-remove="${p.id}">Remove</button></td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="empty">Nobody watched yet. <a href="market.html">Browse players</a> and star the ones you like.</p>';
+  };
+  draw();
+  field('list').addEventListener('click', (e) => { const b = e.target.closest('[data-remove]'); if (b) { toggleWatch(b.dataset.remove); draw(); } });
+  document.querySelector('main').addEventListener('pageshow-again', draw);
+</script>
+</body>
+</html>
