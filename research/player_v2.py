@@ -77,6 +77,28 @@ class Variant:
     goal_scale: float = 100.0
     assist_scale: float = 100.0
     big_game: bool = False
+    absence_mode: str = "capped"      # capped (the old bounded discount) | linear | log: uncapped, grows with every missed club match
+    absence_scale: float = 2.0        # linear: points per missed match; log: points × ln(1 + missed / absence_tau)
+    absence_tau: float = 10.0
+    absence_recovery: float = 3.0     # missed matches forgiven per match played (× his share)
+    absence_window: int = 150         # window mode: club matches counted
+    absence_half_life: float = 100.0  # decay mode: matches until a miss counts half
+    absence_bench: float = 0.0        # weight of a match he was listed for but did not play
+    minutes_half_life: float = 0.0    # >0: share is a recency-weighted average over all club matches (missed = 0), halving every N matches
+    minutes_strength: bool = False    # credit each match at the strength of the club where it was earned
+    strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
+    strength_r0: float = 2000.0
+    goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
+    goal_d: float = 400.0
+    goal_r0: float = 2000.0
+    goal_comp_power: float = 1.0      # competition factor for the goal term: importance ** power
+    importance_power: float = 1.0     # competition weight in the minutes window: importance ** power
+    output_per_team_match: int = 0   # >0: goal term over his club's last N matches, missed ones as zeros
+    match_importance: bool = False  # weight minutes and goal-term matches by the team model's stage weight
+    team_weight: float = 1.0       # club rating counts as anchor + weight × (club − anchor)
+    team_anchor: float = 1600.0
+    onpitch_scale: float = 0.0     # on-pitch goal difference relative to the team's, per 90
+    onpitch_prior: float = 10.0
     bonus_scale: float = BONUS_SCALE
 
     def name(self) -> str:
@@ -98,6 +120,7 @@ class Context:
     team's squad mean share over the trailing 365 days."""
 
     def __init__(self, team_constants: te.TeamConstants):
+        self.stage_weights = dict(team_constants.stage_weights)
         matches = te.load_matches()
         predictions, _ = te.run(matches, team_constants)
         appearances = store.appearances()
@@ -108,11 +131,12 @@ class Context:
             expected = te.expected_score(p.rating_difference)
             surprise = te.score_of(m.goal_difference) - expected
             spread = expected * (1 - expected)
-            for team, rating, swing, sign, own in ((m.home, p.home_rating, p.home_swing, 1, expected),
-                                                   (m.away, p.away_rating, p.away_swing, -1, 1 - expected)):
-                rows.append((m.game_id, team, m.day, rating, swing, sign * surprise, spread, lengths.get(m.game_id, 90), own))
+            for team, rating, swing, sign, own, opp in ((m.home, p.home_rating, p.home_swing, 1, expected, p.away_rating),
+                                                        (m.away, p.away_rating, p.away_swing, -1, 1 - expected, p.home_rating)):
+                rows.append((m.game_id, team, m.day, rating, swing, sign * surprise, spread, lengths.get(m.game_id, 90), own,
+                             sign * m.goal_difference, team_constants.stage_weights.get(m.stage, 1.0), opp))
         self.team_matches = pd.DataFrame(rows, columns=["game_id", "team_id", "day", "rating", "swing", "surprise",
-                                                        "spread", "length", "expected"]).sort_values(["day", "game_id"])
+                                                        "spread", "length", "expected", "team_gd", "importance", "opp_rating"]).sort_values(["day", "game_id"])
         self.by_team = {t: g.reset_index(drop=True) for t, g in self.team_matches.groupby("team_id")}
         self.length = dict(zip(self.team_matches.game_id, self.team_matches.length))
         self.day = dict(zip(self.team_matches.game_id, self.team_matches.day))
@@ -135,6 +159,11 @@ class Context:
         self._played = {("minutes", 0.0): self.played_by_team}
         players = store.players()
         self.keepers = set(players[players.position == "Goalkeeper"].player_id)
+        try:
+            self.onpitch = store.query("SELECT game_id, player_id, minutes_on, goals_for, goals_against FROM onpitch")
+        except Exception:
+            self.onpitch = pd.DataFrame(columns=["game_id", "player_id", "minutes_on", "goals_for", "goals_against"])
+        self.team_gd = {(g, t): d for g, t, d in zip(self.team_matches.game_id, self.team_matches.team_id, self.team_matches.team_gd)}
         self.position = dict(zip(players.player_id, players.position))
         # goal involvements per 90 by position (all club matches), for the position-scaled output test
         apps = appearances[appearances.game_id.isin(self.day.keys())]
@@ -282,6 +311,9 @@ class Context:
         rows["goals"] = rows.goals.fillna(0)
         rows["assists"] = rows.assists.fillna(0)
         rows["starter"] = rows.starter.fillna(-1)  # no line-up: unknown, minutes decide
+        on = self.onpitch[self.onpitch.player_id == player][["game_id", "minutes_on", "goals_for", "goals_against"]]
+        rows = rows.merge(on, on="game_id", how="left")
+        rows["team_gd"] = [self.team_gd.get((g, t), 0) for g, t in zip(rows.game_id, rows.team_id)]
         return rows.sort_values(["day", "game_id"])
 
 
@@ -372,9 +404,14 @@ class Player:
         self.offset = 0.0
         self.offset_variance = OFFSET_PRIOR_VARIANCE
         self.discount = 0.0
+        self.missed = 0.0
         self.window = deque(maxlen=variant.window)
         self.output_window = deque(maxlen=variant.window)
+        self.q_window = deque(maxlen=variant.window)
+        self.f_window = deque(maxlen=variant.window)
+        self.g_factors = deque(maxlen=max(variant.output_per_team_match, 1))
         self.weights = deque(maxlen=variant.window)
+        self.onpitch_window = deque(maxlen=variant.window)
         self.team = None
         self.last_played = None
         self.last_listed = None
@@ -394,9 +431,27 @@ class Player:
             return 1.0
         return minutes_share if self.v.share_rule == "starter" else (self.v.sub_credit if played else 0.0)
 
-    def match(self, row, listed: bool, minutes: float, started=None, goals: float = 0.0, assists: float = 0.0) -> None:
+    def match(self, row, listed: bool, minutes: float, started=None, goals: float = 0.0, assists: float = 0.0,
+              onpitch=None, ref=None) -> None:
+        if listed and self.v.onpitch_scale and onpitch is not None:
+            self.onpitch_window.append(onpitch)
+        if self.v.output != "none" and self.v.output_per_team_match:
+            if not hasattr(self, "team_window"):
+                self.team_window = deque(maxlen=self.v.output_per_team_match)
+            f = 1.0
+            if self.v.goal_scaling:
+                kinds = self.v.goal_scaling.split("+")
+                if "club" in kinds:
+                    f *= 2.0 ** ((row.rating - self.v.goal_r0) / self.v.goal_d)
+                if "opp" in kinds:
+                    f *= 2.0 ** ((row.opp_rating - self.v.goal_r0) / self.v.goal_d)
+                if "comp" in kinds:
+                    f *= getattr(row, "importance", 1.0) ** self.v.goal_comp_power
+            self.g_factors.append(f)
+            self.team_window.append((goals * f, assists * f) if listed else (0.0, 0.0))
         if listed and self.v.output != "none":
-            self.output_window.append((minutes, goals, assists))
+            importance = getattr(row, "importance", 1.0) if self.v.match_importance else 1.0
+            self.output_window.append((minutes * importance, goals * importance, assists * importance))
         share = self.share_of(min(minutes, row.length) / row.length, started, minutes > 0)
         if self.level is None:
             self.level = row.rating - DEBUTANT_OFFSET
@@ -407,7 +462,7 @@ class Player:
             self.apply_decay(row.day)
         usual = np.mean(self.window) if self.window else share
         if self.v.direct:
-            self.level = row.rating + row.swing
+            self.level = self.v.team_anchor + self.v.team_weight * (row.rating + row.swing - self.v.team_anchor)
         elif self.v.split:
             self.level += row.swing + LEVEL_RATE * share * (row.rating - self.level)
             if self.v.weighted:
@@ -416,12 +471,34 @@ class Player:
                 self.offset += (share - usual) * row.swing
         else:
             self.level += share * row.swing + share * LEVEL_RATE * (row.rating - self.level)
-        if self.v.absence:
+        if self.v.absence and self.v.absence_mode in ("window", "decay"):
+            flag = 0.0 if share > 0 else (1.0 if not listed else self.v.absence_bench)
+            if self.v.absence_mode == "window":
+                if not hasattr(self, "miss_window"):
+                    self.miss_window = deque(maxlen=self.v.absence_window)
+                self.miss_window.append(flag)
+            else:
+                self.missed = self.missed * 0.5 ** (1.0 / self.v.absence_half_life) + flag
+        elif self.v.absence and self.v.absence_mode != "capped":
+            if share > 0:
+                self.missed = max(0.0, self.missed - self.v.absence_recovery * share)
+            elif not listed:
+                self.missed += 1.0
+            else:
+                self.missed += self.v.absence_bench
+        elif self.v.absence:
             self.absence_step(row, listed, share)
         if listed or not self.v.squad_window:
             self.window.append(share)
+            if self.v.minutes_strength and ref is not None:
+                factor = 2.0 ** ((row.rating - self.v.strength_r0) / self.v.strength_d)
+                self.f_window.append(factor)
+                self.q_window.append((share - ref) * factor)
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
-            self.weights.append(2.0 * (1.0 - row.expected) if self.v.big_game else 1.0)
+            weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
+            if self.v.match_importance:
+                weight *= getattr(row, "importance", 1.0) ** self.v.importance_power
+            self.weights.append(weight)
         if share > 0:
             self.last_played = row.day
         if listed:
@@ -449,6 +526,13 @@ class Player:
         if self.v.selection:
             pass
 
+    def uncapped_discount(self) -> float:
+        if self.v.absence_mode == "window":
+            return self.v.absence_scale * sum(getattr(self, "miss_window", ()))
+        if self.v.absence_mode in ("linear", "decay"):
+            return self.v.absence_scale * self.missed
+        return self.v.absence_scale * math.log1p(self.missed / self.v.absence_tau)
+
     def absence_step(self, row, listed: bool, share: float) -> None:
         if share > 0:
             self.discount *= 0.5 ** share
@@ -467,7 +551,9 @@ class Player:
 
     def published(self, day: int, context: Context) -> float:
         rating = self.rating()
-        if self.v.absence:
+        if self.v.absence and self.v.absence_mode != "capped":
+            rating = max(REPLACEMENT, rating - self.uncapped_discount())
+        elif self.v.absence:
             listed = self.last_listed if self.last_listed is not None else day
             if day - listed > RETIRED_AFTER_DAYS:
                 over = day - listed - RETIRED_AFTER_DAYS
@@ -478,7 +564,18 @@ class Player:
                 idle = day - self.last_played - GRACE_DAYS
                 if idle > 0:
                     rating = REPLACEMENT + (rating - REPLACEMENT) * max(0, DECAY_DAYS - idle) / DECAY_DAYS
-        return rating + self.bonus(day, context) + self.national_points(day, context) + self.output_points(context)
+        return rating + self.bonus(day, context) + self.national_points(day, context) + self.output_points(context) \
+            + self.onpitch_points()
+
+    def onpitch_points(self) -> float:
+        """His team's goal difference while he was on the pitch, minus his minutes' share
+        of the team's goal difference in those matches, per 90, shrunk with
+        `onpitch_prior` matches of no difference, × `onpitch_scale`."""
+        if not self.v.onpitch_scale or not self.onpitch_window:
+            return 0.0
+        minutes = sum(m for m, _ in self.onpitch_window)
+        difference = sum(d for _, d in self.onpitch_window)
+        return self.v.onpitch_scale * difference / (minutes / 90 + self.v.onpitch_prior)
 
     def output_points(self, context: "Context") -> float:
         """Goal involvement over the same window of listed matches: goals (or goals +
@@ -487,6 +584,10 @@ class Player:
         position's average rate (analysis only: position is not meant for the rating)."""
         if self.v.output == "none" or not self.output_window:
             return 0.0
+        if self.v.output_per_team_match and self.v.output == "weighted" and getattr(self, "team_window", None):
+            goals = sum(g for g, _ in self.team_window)
+            assists = sum(a for _, a in self.team_window)
+            return (self.v.goal_scale * goals + self.v.assist_scale * assists) / (len(self.team_window) + self.v.output_prior)
         minutes = sum(m for m, _, _ in self.output_window)
         per_90 = minutes / 90 + self.v.output_prior
         if self.v.output == "weighted":
@@ -563,11 +664,17 @@ class Player:
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
             return 0.0
+        if self.v.minutes_strength:
+            return self.v.bonus_scale * float(np.mean(self.q_window)) if self.q_window else 0.0
         squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)
         if self.v.gk_reference and getattr(self, "keeper", False):
             squad = 1.0  # a keeper is measured against playing every match: the first choice gets 0
-        if self.v.selection and self.v.big_game and self.window:
+        if self.v.selection and (self.v.big_game or self.v.match_importance) and self.window:
             share = float(np.dot(self.window, self.weights) / sum(self.weights))
+        elif self.v.selection and self.v.minutes_half_life > 0 and self.window:
+            arr = np.fromiter(self.window, float)
+            w = 0.5 ** ((len(arr) - 1 - np.arange(len(arr))) / self.v.minutes_half_life)
+            share = float(arr @ w / w.sum())
         elif self.v.selection:
             share = np.mean(self.window) if self.window else squad
         else:
@@ -583,14 +690,22 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
     listings = context.listings(player_id, variant.fill)
     if listings.empty:
         return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])
-    listed = {(int(r.game_id), int(r.team_id)): (float(r.minutes), r.starter, float(r.goals), float(r.assists))
-              for r in listings.itertuples()}
+    listed = {}
+    for r in listings.itertuples():
+        on = None
+        if r.minutes_on == r.minutes_on and r.length:      # not NaN: he was on the pitch
+            on = (float(r.minutes_on), (r.goals_for - r.goals_against) - r.minutes_on / r.length * r.team_gd)
+        elif r.minutes == r.minutes:
+            on = (0.0, 0.0)
+        listed[(int(r.game_id), int(r.team_id))] = (float(r.minutes), r.starter, float(r.goals), float(r.assists), on)
     timeline = []
     for team, first, last in stints(listings):
         schedule = context.by_team.get(team)
         if schedule is None:
             continue
         end = last
+        if variant.absence_mode != "capped" and (team, first, last) == stints(listings)[-1]:
+            end = int(schedule.day.max())      # matches he missed since his last appearance still count
         timeline.append(schedule[(schedule.day >= first) & (schedule.day <= end)])
     if not timeline:
         return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])
@@ -609,8 +724,12 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
             position += 1
             key = (int(row.game_id), int(row.team_id))
             is_listed = key in listed
-            minutes, started, goals, assists = listed.get(key, (0.0, 0, 0.0, 0.0))
-            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started), goals, assists)
+            minutes, started, goals, assists, onp = listed.get(key, (0.0, 0, 0.0, 0.0, None))
+            ref = None
+            if variant.minutes_strength:
+                ref = 1.0 if (variant.gk_reference and state.keeper) else \
+                    context.squad_mean_at(int(row.team_id), int(row.day), variant.squad_top, variant.share_rule, variant.sub_credit)
+            state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started), goals, assists, onp, ref)
             own_shares.append((row.day, min(minutes, row.length) / row.length, row.team_id))
         if state.level is None:
             continue

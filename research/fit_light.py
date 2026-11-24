@@ -16,14 +16,15 @@ import player_v2 as v2, player_checks as pc, store, team_checks, candidate as c
 BASE = dict(direct=True, absence=True, selection=True, window=50, squad_window=True, squad_top=16,
             national="clubs", bonus_scale=400.0, national_scale=100.0)
 SAMPLE, SPLIT = float(os.environ.get("FIT_SAMPLE", "1")), "2023-01-01"
-TEAM = json.loads(os.environ.get("FIT_TEAM", "{}"))   # team-constant overrides, e.g. {"process_noise": 3}
-CACHE = store.RAW_DIR / "cache" / ("context" + "".join(f"_{k}{v}" for k, v in sorted(TEAM.items())) + ".pkl")
+TEAM = json.loads(os.environ.get("FIT_TEAM", "{}"))   # overrides on the fitted team constants; empty = current_team_constants()
+CACHE = store.RAW_DIR / "cache" / ("context" + "".join(f"_{k}{v}" for k, v in sorted(TEAM.items())) + ".pkl"
+                                   if TEAM else "context_current.pkl")
 
 t = time.time()
 if CACHE.exists():
     ctx = pickle.loads(CACHE.read_bytes())
 else:
-    ctx = v2.Context(c.team_constants().with_(**TEAM))
+    ctx = v2.Context(c.team_constants().with_(**TEAM) if TEAM else c.current_team_constants())
     CACHE.parent.mkdir(exist_ok=True); CACHE.write_bytes(pickle.dumps(ctx, protocol=5))
 print(f"context {time.time()-t:.0f}s", flush=True)
 
