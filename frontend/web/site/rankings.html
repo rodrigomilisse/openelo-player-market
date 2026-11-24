@@ -25,6 +25,7 @@
   .more { margin-top: 16px }
   .empty { padding: 24px; color: var(--muted) }
 </style>
+<link rel="stylesheet" href="mobile.css" media="(max-width: 860px), (max-height: 500px)">
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
@@ -40,6 +41,7 @@
     <form class="filters" data-field="filters" role="search" aria-label="Filter players">
       <label class="visually-hidden" for="f-name">Name</label>
       <input class="field" id="f-name" name="name" type="search" placeholder="Filter by name" autocomplete="off">
+      <button class="filters-toggle" type="button" data-mobile-only aria-expanded="false" aria-controls="f-more">Filters</button>
       <label class="visually-hidden" for="f-league">League</label>
       <select id="f-league" name="league"><option value="">All leagues</option></select>
       <label class="visually-hidden" for="f-club">Club</label>
@@ -48,10 +50,12 @@
       <select id="f-position" name="position"><option value="">All positions</option><option>Goalkeeper</option><option>Defender</option><option>Midfielder</option><option>Forward</option></select>
       <label class="visually-hidden" for="f-age">Age</label>
       <select id="f-age" name="age"><option value="">All ages</option><option value="21">21 and under</option><option value="23">23 and under</option><option value="30">30 and over</option></select>
+      <label class="visually-hidden" for="f-sort">Sort by</label>
+      <select id="f-sort" name="sort" data-mobile-only><option value="rating">Sort: OpenElo</option><option value="week">Sort: last match</option><option value="season">Sort: season</option><option value="age">Sort: age</option></select>
     </form>
     <p class="count" data-field="count" role="status"></p>
     <div class="table-wrap">
-      <table>
+      <table class="stack-rows stack-rank">
         <thead><tr>
           <th class="num" scope="col">#</th><th scope="col">Player</th><th scope="col">Club</th><th scope="col">Position</th>
           <th class="num" scope="col"><button type="button" data-sort="age">Age</button></th>
@@ -106,20 +110,28 @@
     const list = filtered();
     field('count').textContent = `${number.format(list.length)} ${list.length === 1 ? 'player' : 'players'}`;
     field('rows').innerHTML = list.length ? list.slice(0, shown).map((p) => `<tr>
-      <td class="num muted">${p.rank}</td>
-      <td><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation || '')}</small></td>
-      <td><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
-      <td class="muted">${p.position}</td><td class="num">${p.age ?? '–'}</td>
-      <td class="num"><span class="e">${number.format(p.rating)}</span></td>
-      <td class="num ${direction(p.week)}">${signed(p.week)}</td><td class="num ${direction(p.season)}">${signed(p.season)}</td></tr>`).join('')
+      <td class="num muted rk">${p.rank}</td>
+      <td class="who"><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation || '')}</small><span class="m-sub">${escape(p.club)} · ${p.position.toLowerCase()}${p.age ? ` · ${p.age}` : ''}</span></td>
+      <td class="club"><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
+      <td class="muted pos">${p.position}</td><td class="num age">${p.age ?? '–'}</td>
+      <td class="num elo"><span class="e">${number.format(p.rating)}</span></td>
+      <td class="num wk ${direction(p.week)}">${signed(p.week)}</td><td class="num ssn ${direction(p.season)}">${signed(p.season)}</td></tr>`).join('')
       : '<tr><td colspan="8" class="empty">No players match these filters. Clear a filter to see more.</td></tr>';
     field('more').hidden = list.length <= shown;
+    const active = [form.league, form.club, form.position, form.age].filter((x) => x.value).length;
+    toggle.textContent = active ? `Filters · ${active}` : 'Filters';
     document.querySelectorAll('[data-sort]').forEach((b) => b.closest('th').toggleAttribute('aria-sort', b.dataset.sort === sort));
     document.querySelector(`[data-sort="${sort}"]`).closest('th').setAttribute('aria-sort', sort === 'age' ? 'ascending' : 'descending');
   };
-  form.addEventListener('input', (event) => { if (event.target === form.league) fillClubs(); shown = 50; draw(); });
+  const toggle = form.querySelector('.filters-toggle');
+  toggle.addEventListener('click', () => { const open = form.classList.toggle('open'); toggle.setAttribute('aria-expanded', open); });
+  form.addEventListener('input', (event) => {
+    if (event.target === form.league) fillClubs();
+    if (event.target === form.sort) sort = form.sort.value;   // the phone's sort menu (the column buttons are hidden there)
+    shown = 50; draw();
+  });
   form.addEventListener('submit', (event) => event.preventDefault());
-  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; draw(); }));
+  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; form.sort.value = sort; draw(); }));
   field('more').addEventListener('click', () => { shown += 50; draw(); });
   draw();
 </script>

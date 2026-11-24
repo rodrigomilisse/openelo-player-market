@@ -50,7 +50,7 @@ function saveCurrent() {
 }
 
 function setNav(url) {
-  document.querySelectorAll('.site-header nav a').forEach((a) => {
+  document.querySelectorAll('.site-header nav a, .tabbar a').forEach((a) => {
     if (new URL(a.href).pathname === url.pathname) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
 }

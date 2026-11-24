@@ -16,7 +16,22 @@ import { addStadium } from '../design/stadium.js';
 import { go, rememberScene, prefetch } from './router.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const small = () => window.innerWidth <= 860;
+// A phone, as mobile.css defines it. Everything phone-specific below is behind this, so desktop paths are unchanged.
+const small = () => window.innerWidth <= 860 || window.innerHeight <= 500;
+// Phones: a portrait screen sees a narrow slice of the stadium through a 50° vertical lens. Back the camera off along its own
+// line of sight (page keyframes stay as designed) so the pitch and stands fit across the width; particles are smaller and dimmer
+// so the text on top stays readable.
+const PHONE = { size: 0.75, dim: 0.75, reach: 0.5, max: 2.3 };
+// Tuning on a real phone without a rebuild: open any page with ?scene=reach,size,dim (e.g. ?scene=0.8,0.7,0.6).
+// reach: how far the camera backs off in portrait (0 = not at all); size and dim scale the particles. Visual only.
+try {
+  const q = new URLSearchParams(location.search).get('scene');
+  const [reach, size, dim] = q ? q.split(',').map(Number) : [];
+  if (Number.isFinite(reach)) PHONE.reach = Math.min(2, Math.max(0, reach));
+  if (Number.isFinite(size)) PHONE.size = Math.min(1.5, Math.max(0.2, size));
+  if (Number.isFinite(dim)) PHONE.dim = Math.min(1.5, Math.max(0.1, dim));
+} catch { /* the defaults stand */ }
+const phoneDolly = (aspect) => (aspect < 1.3 ? Math.min(PHONE.max, 1 + (1.3 / aspect - 1) * PHONE.reach) : 1);
 const smooth = (t) => t * t * (3 - 2 * t);
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
 
@@ -38,14 +53,14 @@ const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[
 
 const VERTEX = /* glsl */`
   attribute vec4 aRand; attribute vec3 aTag; attribute vec2 aDyn;
-  uniform float uSeg; uniform float uTime; uniform float uPixelRatio; uniform float uDim; uniform float uLight;
+  uniform float uSeg; uniform float uTime; uniform float uPixelRatio; uniform float uDim; uniform float uLight; uniform float uSize;
   uniform vec3 uColorA; uniform vec3 uColorB; uniform vec3 uColorC; uniform vec3 uSpark; uniform vec3 uAlt;
   varying vec3 vColor; varying float vAlpha;
   void main() {
     vec4 view = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * view;
     float speed = clamp(aDyn.y, 0.0, 1.0);
-    gl_PointSize = (1.4 + aRand.y * 2.4) * uPixelRatio * (26.0 / -view.z) * (1.0 + speed * 0.9);
+    gl_PointSize = (1.4 + aRand.y * 2.4) * uPixelRatio * (26.0 / -view.z) * (1.0 + speed * 0.9) * uSize;
     vec3 cA = mix(uColorA, uAlt, aTag.x), cB = mix(uColorB, uAlt, aTag.y), cC = mix(uColorC, uAlt, aTag.z);
     vec3 base = uSeg < 1.0 ? mix(cA, cB, aDyn.x) : mix(cB, cC, aDyn.x);
     vColor = mix(base, uSpark, max(step(0.94, aRand.w) * 0.8, speed * 0.55));
@@ -108,7 +123,7 @@ function createWorld({ count } = {}) {
   geometry.setAttribute('aDyn', dynAttr);
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
   const uniforms = {
-    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() }, uDim: { value: 1 }, uLight: { value: 0 },
+    uSeg: { value: 0 }, uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() }, uDim: { value: 1 }, uLight: { value: 0 }, uSize: { value: 1 },
     uColorA: { value: new THREE.Color() }, uColorB: { value: new THREE.Color() }, uColorC: { value: new THREE.Color() },
     uSpark: { value: new THREE.Color() }, uAlt: { value: new THREE.Color() },
   };
@@ -146,7 +161,8 @@ function createWorld({ count } = {}) {
   // what the current page sets
   let station = [0, 0, 0], shiftRight = 0.2, keys = [], next = null;
   let target = 0, progress = 0, lastShift = null;
-  let arrival = null, boostStart = -1e9;
+  let arrival = null, boostStart = -1e9, pageDim = 1;
+  const applyDim = () => { uniforms.uDim.value = pageDim * (small() ? PHONE.dim : 1); };
   const currentLook = new THREE.Vector3();
 
   const resample = (formation, into, tagIndex) => {
@@ -190,6 +206,8 @@ function createWorld({ count } = {}) {
     renderer.setSize(w, h, false);
     composer?.setSize(w, h);
     camera.aspect = w / h;
+    uniforms.uSize.value = small() ? PHONE.size : 1;
+    applyDim();
     lastShift = null;   // the frame sets the view offset
     if (reducedMotion) frame(0, 0);
   }
@@ -230,6 +248,7 @@ function createWorld({ count } = {}) {
       pos = pos.clone().lerp(new THREE.Vector3(...a.pos), pull * 0.18);
       look = look.clone().lerp(new THREE.Vector3(...a.look), pull * 0.25);
     }
+    if (small()) pos = look.clone().add(tmp.copy(pos).sub(look).multiplyScalar(phoneDolly(camera.aspect)));
     const sh = small() ? 0 : p.shift;   // the scene sits right of hero text, centred on stages
     if (lastShift === null || Math.abs(sh - lastShift) > 0.0005) {
       const w = window.innerWidth, h = window.innerHeight;
@@ -317,7 +336,7 @@ function createWorld({ count } = {}) {
     started: false,
     // point the running scene at a page: its spot, shapes, colours, camera path and next stop
     apply({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight: sr = 0.2, next: nx = null, dim = 1 }, transition) {
-      uniforms.uDim.value = dim;
+      pageDim = dim; applyDim();
       station = STATIONS[pageOf(location.href)] || [0, 0, 0];
       shiftRight = sr;
       next = nx;
@@ -374,7 +393,7 @@ function createTour(onDepart) {
   window.addEventListener('wheel', (e) => { if (atBottom() && e.deltaY > 0) feed(e.deltaY * (e.deltaMode === 1 ? 33 : 1)); }, { passive: true });
   window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
   window.addEventListener('touchmove', (e) => {
-    if (touchY === null || !atBottom()) return;
+    if (touchY === null || !atBottom() || small()) return;
     const d = touchY - e.touches[0].clientY;
     if (d > 0) { feed(d * 2.2); touchY = e.touches[0].clientY; }
   }, { passive: true });
@@ -388,7 +407,7 @@ function createTour(onDepart) {
       el.className = 'next-stop liquid';
       el.href = next.href;
       el.innerHTML = `<svg class="next-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19"/><circle class="fill" cx="22" cy="22" r="19" pathLength="1"/></svg>
-        <span><small>${reducedMotion ? 'Next stop' : 'Keep scrolling to fly to'}</small><strong>${next.label}</strong></span>`;
+        <span><small>${reducedMotion || small() ? 'Next stop' : 'Keep scrolling to fly to'}</small><strong>${next.label}</strong></span>`;
       page.append(el);
       ring = el.querySelector('.fill');
     },

@@ -54,14 +54,17 @@ export function shell() {
         <ul class="search-results" aria-label="Search results"></ul>
       </div>
       <a class="header-cta" href="#waitlist">Join the waitlist</a>
+      <button class="m-search-btn" type="button" data-mobile-only aria-label="Search" aria-expanded="false">${ICON.search}</button>
     </div>`;
   const note = document.createElement('p');
   note.className = 'mock-note';
-  note.innerHTML = isMock ? '<strong>Mock data.</strong> Every player, club and number here is fictional, generated to build the site.'
-    : '<strong>Beta.</strong> Real ratings from real results, still provisional while the formula is tested. Market prices are simulated.';
+  note.innerHTML = isMock ? '<strong>Mock data.</strong> <span>Every player, club and number here is fictional, generated to build the site.</span>'
+    : '<strong>Beta.</strong> <span>Real ratings from real results, still provisional while the formula is tested. Market prices are simulated.</span>';
   header.after(note);
   wireSearch(header);
   wireTheme(header);
+  buildTabs(here);
+  wireMobile(header, note);
   const footer = document.querySelector('[data-shell="footer"]');
   footer.innerHTML = `
     <section id="waitlist" class="waitlist" aria-labelledby="waitlist-title">
@@ -249,4 +252,65 @@ function keepOutOfSearch() {
   if (!tag) { tag = document.createElement('meta'); tag.name = 'robots'; document.head.append(tag); }
   tag.content = 'noindex, nofollow';
   document.querySelector('link[rel="canonical"]')?.remove();
+}
+
+/* ---------- phones: bottom tabs, a More sheet, search that opens on tap, a header that gets out of the way ----------
+   Everything here is hidden by default (data-mobile-only) and shown by mobile.css, which only loads on phones. */
+const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  search: ico('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
+  week: ico('<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'), rankings: ico('<path d="M5 20V10M12 20V4M19 20v-7"/>'),
+  leagues: ico('<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4v1a4 4 0 0 0 4 4M16 6h4v1a4 4 0 0 1-4 4M12 13v4M8 20h8"/>'), compare: ico('<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>'),
+  more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
+  portfolio: ico('<path d="M12 3v9h9a9 9 0 1 1-9-9zM15 3.5A9 9 0 0 1 20.5 9H15z"/>'), browse: ico('<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>'),
+  dividends: ico('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M9.5 9.7c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.7-1 1.4-2.5 1.7-2.5.7-2.5 1.8 1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/>'),
+  watchlist: ico('<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'),
+};
+const TABS_EXPLORE = [['index.html', 'This week', 'week'], ['rankings.html', 'Rankings', 'rankings'], ['leagues.html', 'Leagues', 'leagues'], ['compare.html', 'Compare', 'compare']];
+const TABS_MARKET = [['portfolio.html', 'Portfolio', 'portfolio'], ['market.html', 'Browse', 'browse'], ['dividends.html', 'Dividends', 'dividends'], ['watchlist.html', 'Watchlist', 'watchlist']];
+const MORE_LINKS = [['how.html', 'How it works'], ['about.html', 'About'], ['activity.html', 'Market activity'], ['privacy.html', 'Privacy'], ['terms.html', 'Terms']];
+
+function buildTabs(here) {
+  const tabs = (list) => list.map(([href, label, icon]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${ICON[icon]}<span>${label}</span></a>`).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="more-sheet liquid" data-mobile-only data-more-sheet hidden>
+      <ul>${MORE_LINKS.map(([href, label]) => `<li><a href="${href}">${label}</a></li>`).join('')}</ul>
+      <div class="more-actions"><button type="button" class="button" data-sheet-theme></button><a class="button button-gold" href="#waitlist" data-sheet-waitlist>Join the waitlist</a></div>
+    </div>
+    <nav class="tabbar liquid" data-mobile-only aria-label="Pages">
+      <div class="tabs-explore">${tabs(TABS_EXPLORE)}<button type="button" data-more aria-expanded="false">${ICON.more}<span>More</span></button></div>
+      <div class="tabs-market">${tabs(TABS_MARKET)}<button type="button" data-more aria-expanded="false">${ICON.more}<span>More</span></button></div>
+    </nav>`);
+}
+
+function wireMobile(header, note) {
+  const phone = matchMedia('(max-width: 860px), (max-height: 500px)');
+  const searchBtn = header.querySelector('.m-search-btn'), input = header.querySelector('#site-search');
+  searchBtn.addEventListener('click', () => {
+    const open = header.classList.toggle('search-open');
+    searchBtn.setAttribute('aria-expanded', String(open));
+    if (open) input.focus(); else { input.value = ''; header.querySelector('.search-results').innerHTML = ''; }
+  });
+  note.addEventListener('click', () => note.classList.toggle('open'));
+
+  // the header leaves when you scroll down and returns when you scroll up
+  let last = window.scrollY;
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    if (!phone.matches || header.classList.contains('search-open')) { header.classList.remove('is-hidden'); last = y; return; }
+    if (y > last + 8 && y > 140) header.classList.add('is-hidden');
+    else if (y < last - 8 || y < 60) header.classList.remove('is-hidden');
+    last = y;
+  }, { passive: true });
+
+  const sheet = document.querySelector('[data-more-sheet]'), moreBtns = [...document.querySelectorAll('[data-more]')];
+  const themeBtn = sheet.querySelector('[data-sheet-theme]');
+  const label = () => { themeBtn.textContent = theme() === 'light' ? 'Dark mode' : 'Light mode'; };
+  const setSheet = (open) => { sheet.hidden = !open; moreBtns.forEach((b) => b.setAttribute('aria-expanded', String(open))); if (open) label(); };
+  moreBtns.forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); setSheet(sheet.hidden); }));
+  // a click that does not bubble: the outside-tap handler below must not read it as a tap elsewhere
+  themeBtn.addEventListener('click', () => { header.querySelector('[data-theme-toggle]').dispatchEvent(new MouseEvent('click')); label(); });
+  sheet.addEventListener('click', (e) => { if (e.target.closest('a')) setSheet(false); });
+  document.addEventListener('click', (e) => { if (!sheet.hidden && !sheet.contains(e.target)) setSheet(false); });
+  window.addEventListener('openelo:navigate', () => { setSheet(false); header.classList.remove('is-hidden', 'search-open'); });
 }

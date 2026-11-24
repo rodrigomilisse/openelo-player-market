@@ -287,3 +287,6 @@ body.mode-market h1 { font-style: normal }
 .seo-summary p, .seo-summary li { color: var(--muted) }
 .seo-summary a { color: var(--elo) }
 .seo-summary .table-wrap { max-width: none }
+
+/* Phone-only controls (bottom tabs, More sheet, search button, Filters button): hidden here, shown by mobile.css. */
+[data-mobile-only], .m-sub { display: none }
