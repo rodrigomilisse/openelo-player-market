@@ -97,3 +97,7 @@ body table.stack-watch td.rm { grid-area: rm; justify-self: end; position: relat
 /* ---- dense tables keep their columns; the first one stays put while you scroll sideways ---- */
 body .table-wrap { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain }
 body .table-wrap table:not(.stack-rows) th:first-child, body .table-wrap table:not(.stack-rows) td:first-child { position: sticky; left: 0; z-index: 1; background: rgb(var(--pane-2)); box-shadow: 1px 0 0 var(--line) }
+
+/* ---- less decoration, less work for a phone's GPU ---- */
+body .grain { display: none }
+body .glass-panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(var(--pane-2), 0.78) }
