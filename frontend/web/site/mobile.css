@@ -1,0 +1,99 @@
+/* Phone layout. Loaded only under (max-width: 860px), (max-height: 500px): the <link> carries that media query, so desktop
+   browsers never apply a rule from this file. Selectors start with `body` so they beat page-level <style> blocks, which the router
+   re-appends after this file. Nothing here may be needed by the desktop layout. */
+
+:root { --gutter: 16px; --tab-h: 64px }
+body { font-size: 16px }
+
+/* ---- header: a slim bar; the pages live in the tab bar ---- */
+body .site-header { top: calc(8px + env(safe-area-inset-top)); flex-wrap: nowrap; gap: 8px; padding: 8px 12px; border-radius: 20px; transition: transform 0.28s ease }
+body .site-header nav { display: none !important }
+body .site-header .logo { font-size: 22px }
+body .mode-switch a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-size: 14px }
+body .header-end { margin-left: auto; width: auto; gap: 6px }
+body .theme-toggle, body .header-cta { display: none }
+body .m-search-btn { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(var(--well), 0.35); color: var(--muted); padding: 0; cursor: pointer }
+body .m-search-btn svg { width: 20px; height: 20px }
+body .site-header.search-open .m-search-btn { color: var(--elo); border-color: var(--elo) }
+body .search { display: none; flex: none }
+body .site-header.search-open .search { display: block; position: absolute; left: 0; right: 0; top: calc(100% + 8px) }
+body .search input { width: 100%; padding: 13px 18px; font-size: 16px; border-radius: 18px; background: rgb(var(--pane-2)) }
+body .search-results { left: 0; right: 0; width: auto; max-height: 60vh; overflow-y: auto; background: rgb(var(--pane-2)) }
+body .site-header.is-hidden { transform: translateY(calc(-100% - 24px)) }
+
+/* the data notice: one line, tap to read it all */
+body .mock-note { display: flex; align-items: baseline; gap: 6px; max-width: 100%; margin: 6px 0 0; padding: 4px 12px; font-size: 12px; border-radius: 999px; cursor: pointer }
+body .mock-note strong { flex: none }
+body .mock-note span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+body .mock-note.open { border-radius: 16px }
+body .mock-note.open span { white-space: normal }
+
+/* ---- bottom tabs and the More sheet ---- */
+body .tabbar, body .more-sheet, body .site-header { background: rgba(var(--pane-2), 0.88); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px) }
+body .tabbar { display: block; position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 30; padding: 5px; border-radius: 24px }
+body .tabbar > div { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px }
+body .tabbar .tabs-market { display: none }
+body.mode-market .tabbar .tabs-explore { display: none }
+body.mode-market .tabbar .tabs-market { display: grid }
+body .tabbar a, body .tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 6px 2px; border: 0; border-radius: 18px;
+  background: none; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent }
+body .tabbar svg { width: 22px; height: 22px }
+body .tabbar a[aria-current="page"], body .tabbar button[aria-expanded="true"] { color: var(--ink); background: rgba(var(--well), 0.55) }
+body .tabbar a[aria-current="page"] svg { color: var(--elo) }
+body .more-sheet:not([hidden]) { display: block; position: fixed; left: 10px; right: 10px; bottom: calc(var(--tab-h) + 22px + env(safe-area-inset-bottom)); z-index: 29; padding: 8px; border-radius: 22px }
+body .more-sheet ul { list-style: none; margin: 0; padding: 0 }
+body .more-sheet li a { display: block; padding: 13px 12px; border-radius: 12px; color: var(--ink); font-weight: 600; text-decoration: none }
+body .more-sheet li a:active { background: rgba(var(--well), 0.55) }
+body .more-actions { display: flex; gap: 8px; padding: 8px 4px 4px }
+body .more-actions .button { flex: 1; min-height: 44px; padding: 11px 14px; text-align: center }
+
+/* ---- spacing: more room for content, less for decoration ---- */
+body .page { padding-bottom: calc(var(--tab-h) + 48px + env(safe-area-inset-bottom)) }
+body .page-head { padding-block: 14px 0; gap: 10px }
+body .page-head h1 { font-size: clamp(42px, 13vw, 56px) }
+body .lede { font-size: 17px }
+body .stage { min-height: 42svh; padding-bottom: 3svh }
+body .next-stop { margin-top: 32px; padding: 14px 18px 14px 14px }
+body button, body .button, body select, body .field, body input { min-height: 44px }
+body input, body select, body textarea { font-size: 16px }
+
+/* ---- filters: the name box and a Filters button; the rest opens on tap ---- */
+body .filters { display: flex; flex-wrap: wrap; gap: 8px }
+body .filters .field { flex: 1 1 60%; min-width: 0; padding: 11px 16px }
+body .filters .filters-toggle { display: inline-flex; align-items: center; flex: none; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line); background: rgba(var(--well), 0.4); font-weight: 600; cursor: pointer }
+body .filters .filters-toggle[aria-expanded="true"] { color: var(--elo); border-color: var(--elo) }
+body .filters select { display: none }
+body .filters.open select { display: block; flex: 1 1 calc(50% - 4px); min-width: 0; padding: 0 14px }
+
+/* ---- long lists become rows: who he is, and the number that matters ---- */
+body .table-wrap { border-radius: 18px }
+body table.stack-rows, body table.stack-rows tbody { display: block }
+body table.stack-rows thead { display: none }
+body table.stack-rows tr { position: relative; display: grid; align-items: center; column-gap: 12px; row-gap: 2px; padding: 12px 14px; border-bottom: 1px solid var(--line) }
+body table.stack-rows td { display: block; padding: 0; border: 0; background: none; white-space: normal }
+body table.stack-rows td.empty { grid-area: auto; grid-column: 1 / -1; padding: 6px 0 }
+body table.stack-rows .who { min-width: 0 }
+body table.stack-rows .who a { font-size: 17px; font-weight: 700 }
+body table.stack-rows .who a::after { content: ''; position: absolute; inset: 0 }       /* the whole row opens the player */
+body table.stack-rows .who small { display: none }
+body table.stack-rows .who .m-sub { display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 14px }
+body table.stack-rows .wk { font-size: 14px; text-align: right }
+
+body table.stack-rank tr { grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "rk who elo" "rk who wk" }
+body table.stack-rank .rk { grid-area: rk; font-size: 15px }
+body table.stack-rank .who { grid-area: who }
+body table.stack-rank .elo { grid-area: elo; text-align: right }
+body table.stack-rank .wk { grid-area: wk }
+body table.stack-rank .club, body table.stack-rank .pos, body table.stack-rank .age, body table.stack-rank .ssn { display: none }
+
+body table.stack-market tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who px" "who wk" }
+body table.stack-market .who { grid-area: who }
+body table.stack-market td.price { grid-area: px; text-align: right }
+body table.stack-market .wk { grid-area: wk }
+body table.stack-market .elo, body table.stack-market .spark, body table.stack-market .pay, body table.stack-market .holders { display: none }
+body table.stack-watch tr { grid-template-areas: "who px" "who wk" "rm rm" }
+body table.stack-watch td.rm { grid-area: rm; justify-self: end; position: relative; z-index: 2; margin-top: 8px }
+
+/* ---- dense tables keep their columns; the first one stays put while you scroll sideways ---- */
+body .table-wrap { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain }
+body .table-wrap table:not(.stack-rows) th:first-child, body .table-wrap table:not(.stack-rows) td:first-child { position: sticky; left: 0; z-index: 1; background: rgb(var(--pane-2)); box-shadow: 1px 0 0 var(--line) }
