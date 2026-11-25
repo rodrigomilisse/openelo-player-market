@@ -67,7 +67,7 @@ def players(fid):
 @pytest.fixture
 def conn():
     c = psycopg.connect(URL)
-    c.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
+    c.execute("DROP SCHEMA IF EXISTS research CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public")
     db.migrate(c)
     yield c
     c.close()
