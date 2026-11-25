@@ -451,7 +451,16 @@ class Player:
             self.team_window.append((goals * f, assists * f) if listed else (0.0, 0.0))
         if listed and self.v.output != "none":
             importance = getattr(row, "importance", 1.0) if self.v.match_importance else 1.0
-            self.output_window.append((minutes * importance, goals * importance, assists * importance))
+            gf = 1.0                                  # per-90 mode: goals and assists scaled by where they were scored
+            if self.v.goal_scaling and not self.v.output_per_team_match:
+                kinds = self.v.goal_scaling.split("+")
+                if "club" in kinds:
+                    gf *= 2.0 ** ((row.rating - self.v.goal_r0) / self.v.goal_d)
+                if "opp" in kinds:
+                    gf *= 2.0 ** ((row.opp_rating - self.v.goal_r0) / self.v.goal_d)
+                if "comp" in kinds:
+                    gf *= getattr(row, "importance", 1.0) ** self.v.goal_comp_power
+            self.output_window.append((minutes * importance, goals * importance * gf, assists * importance * gf))
         share = self.share_of(min(minutes, row.length) / row.length, started, minutes > 0)
         if self.level is None:
             self.level = row.rating - DEBUTANT_OFFSET
