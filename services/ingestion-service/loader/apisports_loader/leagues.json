@@ -1,0 +1,18 @@
+{
+  "_comment": "API-Football league ids the loader tracks. Add or remove freely; cups can be added by id.",
+  "leagues": [
+    {"id": 39,  "name": "Premier League"},
+    {"id": 140, "name": "La Liga"},
+    {"id": 135, "name": "Serie A"},
+    {"id": 78,  "name": "Bundesliga"},
+    {"id": 61,  "name": "Ligue 1"},
+    {"id": 94,  "name": "Primeira Liga"},
+    {"id": 88,  "name": "Eredivisie"},
+    {"id": 144, "name": "Jupiler Pro League"},
+    {"id": 203, "name": "Super Lig"},
+    {"id": 179, "name": "Scottish Premiership"},
+    {"id": 2,   "name": "UEFA Champions League"},
+    {"id": 3,   "name": "UEFA Europa League"},
+    {"id": 848, "name": "UEFA Europa Conference League"}
+  ]
+}
