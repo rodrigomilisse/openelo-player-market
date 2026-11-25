@@ -88,6 +88,7 @@ class Variant:
     minutes_strength: bool = False    # credit each match at the strength of the club where it was earned
     strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
     strength_r0: float = 2000.0
+    strength_relative: bool = False   # factor against his current club's rating instead of strength_r0
     goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
     goal_d: float = 400.0
     goal_r0: float = 2000.0
@@ -409,6 +410,7 @@ class Player:
         self.output_window = deque(maxlen=variant.window)
         self.q_window = deque(maxlen=variant.window)
         self.f_window = deque(maxlen=variant.window)
+        self.r_window = deque(maxlen=variant.window)
         self.g_factors = deque(maxlen=max(variant.output_per_team_match, 1))
         self.weights = deque(maxlen=variant.window)
         self.onpitch_window = deque(maxlen=variant.window)
@@ -503,6 +505,7 @@ class Player:
                 factor = 2.0 ** ((row.rating - self.v.strength_r0) / self.v.strength_d)
                 self.f_window.append(factor)
                 self.q_window.append((share - ref) * factor)
+                self.r_window.append((share - ref, row.rating))
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
             weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
             if self.v.match_importance:
@@ -673,6 +676,14 @@ class Player:
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
             return 0.0
+        if self.v.minutes_strength and self.v.strength_relative:
+            if not self.r_window:
+                return 0.0
+            sched = context.by_team[self.team]; before = sched[sched.day < day]
+            now = float(before.rating.iloc[-1] + before.swing.iloc[-1]) if len(before) else None
+            if now is None:
+                return 0.0
+            return self.v.bonus_scale * float(np.mean([q * 2.0 ** ((r - now) / self.v.strength_d) for q, r in self.r_window]))
         if self.v.minutes_strength:
             return self.v.bonus_scale * float(np.mean(self.q_window)) if self.q_window else 0.0
         squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)

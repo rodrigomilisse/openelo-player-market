@@ -17,9 +17,12 @@ CAND = dict(direct=True, absence=True, selection=True, window=50, squad_window=T
             bonus_scale=400.0, share_rule="starter", gk_reference=True, nt_matches=20, nt_days=730, nt_credit=0.2,
             national_scale=100.0, output="weighted", team_weight=0.7, goal_scale=226.0, assist_scale=113.0,
             absence_mode="window", absence_window=150, absence_scale=2.0)
-ALL = {**CAND, "match_importance": True, "big_game": True, "minutes_strength": True, "strength_d": 400.0,
-       "goal_scaling": "opp", "goal_d": 400.0, "goal_r0": 1624.0}
-CLUBS = {27: "Bayern", 11: "Arsenal", 281: "City", 583: "PSG", 131: "Barcelona", 418: "Real Madrid", 336: "Sporting", 1237: "Brighton", 1075: "Braga"}
+tmr = new_ctx.team_matches[new_ctx.team_matches.day >= (pd.Timestamp("2026-07-07") - store.EPOCH).days - 730].rating
+R0 = 400.0 * np.log2(np.mean(2.0 ** (tmr / 400.0)))     # club strength where the minutes factor is 1, market average
+print("minutes-factor centre", round(R0))
+ALL = {**CAND, "match_importance": True, "big_game": True, "minutes_strength": True, "strength_d": 400.0, "strength_relative": True,
+       "goal_scaling": "opp", "goal_d": 400.0, "goal_r0": 1624.0, "goal_scale": 226.0 * 0.7, "assist_scale": 113.0 * 0.7}
+CLUBS = {27: "Bayern", 11: "Arsenal", 281: "City", 985: "Man United", 583: "PSG", 131: "Barcelona", 418: "Real Madrid", 336: "Sporting", 1237: "Brighton", 1075: "Braga"}
 snap = (pd.Timestamp("2026-07-07") - store.EPOCH).days
 apps = base_ctx.appearances.copy(); apps["day"] = apps.game_id.map(base_ctx.day)
 pl = store.players().set_index("player_id")
@@ -59,7 +62,7 @@ page = (f"<title>Rating With Everything Applied</title><meta name=\"claude:viewp
         f"<style>{css}.clubs{{max-width:360px}}</style><h1>Previous candidate vs everything applied</h1>"
         f"<p>Snapshot 7 July 2026. Top 7 outfield players of each club under either version; ranks count only the players listed. "
         f"Applied: league redistribution of European results (0.3, zero-sum) in the team Elo; minutes weighted by competition and opponent; "
-        f"minutes bonus scaled by the club where it was earned; goals weighted by opposition strength. No extra shift: mean rating "
+        f"minutes bonus scaled by the club where it was earned relative to his current club (minutes at the same club unchanged); goals and assists weighted by opposition strength and cut by 30% (158 per goal, 79 per assist per 90). No extra shift: mean rating "
         f"{d.off.mean():.0f} before, {d.on.mean():.0f} after. Rank correlation with Transfermarkt: {corr('off'):.3f} before, {corr('on'):.3f} after.</p>"
         f"<h2>Club ratings</h2><div class=clubs><table><tr><th>Club</th><th>Before</th><th>After</th></tr>{clubrows}</table></div>"
         f"<h2>Players</h2><div class=pair><div><h3>Previous candidate</h3>{table('off', 'on')}</div><div><h3>Everything applied</h3>{table('on', 'off')}</div></div>")
