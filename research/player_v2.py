@@ -505,12 +505,13 @@ class Player:
                 factor = 2.0 ** ((row.rating - self.v.strength_r0) / self.v.strength_d)
                 self.f_window.append(factor)
                 self.q_window.append((share - ref) * factor)
-                self.r_window.append((share - ref, row.rating))
             # big-game trust: a match counts more the harder the opponent (2 × his team's chance of not winning)
             weight = 2.0 * (1.0 - row.expected) if self.v.big_game else 1.0
             if self.v.match_importance:
                 weight *= getattr(row, "importance", 1.0) ** self.v.importance_power
             self.weights.append(weight)
+            if self.v.minutes_strength and ref is not None:
+                self.r_window.append((share - ref, row.rating, weight))
         if share > 0:
             self.last_played = row.day
         if listed:
@@ -683,7 +684,9 @@ class Player:
             now = float(before.rating.iloc[-1] + before.swing.iloc[-1]) if len(before) else None
             if now is None:
                 return 0.0
-            return self.v.bonus_scale * float(np.mean([q * 2.0 ** ((r - now) / self.v.strength_d) for q, r in self.r_window]))
+            w = np.array([x[2] for x in self.r_window])
+            q = np.array([x[0] * 2.0 ** ((x[1] - now) / self.v.strength_d) for x in self.r_window])
+            return self.v.bonus_scale * float(q @ w / w.sum())
         if self.v.minutes_strength:
             return self.v.bonus_scale * float(np.mean(self.q_window)) if self.q_window else 0.0
         squad = context.squad_mean_at(self.team, day, self.v.squad_top, self.v.share_rule, self.v.sub_credit)
