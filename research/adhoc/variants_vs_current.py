@@ -38,8 +38,8 @@ def run(cfg, ctx):
     return pd.Series(r), tr
 CUR = ALL
 VARS = {"No absence term": {**ALL, "absence_scale": 0.0},
-        "No absence, no assists, goals -25% (170 per 90)": {**ALL, "absence_scale": 0.0, "goal_scale": 226.0 * 0.75, "assist_scale": 0.0},
-        "No absence, goals and assists -25% (170 and 85 per 90)": {**ALL, "absence_scale": 0.0, "goal_scale": 226.0 * 0.75, "assist_scale": 113.0 * 0.75}}
+        "No assists, goals -25% (170 per 90)": {**ALL, "goal_scale": 226.0 * 0.75, "assist_scale": 0.0},
+        "Goals and assists -25% (170 and 85 per 90)": {**ALL, "goal_scale": 226.0 * 0.75, "assist_scale": 113.0 * 0.75}}
 cur, _ = run(CUR, new_ctx); res = {k: run(v, new_ctx)[0] for k, v in VARS.items()}
 print(f"players {time.time() - t0:.0f}s", flush=True)
 tmS = pd.Series(tmv)
