@@ -68,8 +68,10 @@ def import_store(conn, store: Path = DEFAULT_STORE, replace: list[str] | None = 
         keys = create_table(conn, table, columns)
         added[table] = copy_table(conn, lite, table, columns, keys, table in (replace or []), log)
         conn.commit()
+    present = tables_of(lite)
     for statement in INDEXES:
-        conn.execute(statement)
+        if statement.split(" ON research.")[1].split(" ")[0] in present:
+            conn.execute(statement)
     newest = lite.execute("SELECT MAX(date) FROM game WHERE national = 0").fetchone()[0]
     import json
     conn.execute("INSERT INTO research.import_log (source, newest_club_match, rows_added) VALUES (%s, %s, %s)",
