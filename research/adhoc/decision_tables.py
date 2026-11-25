@@ -12,7 +12,7 @@ CAND = dict(direct=True, absence=True, selection=True, window=50, squad_window=T
 DEC = {"Minutes weighted by match importance (competition x opponent)": {"match_importance": True, "big_game": True},
        "Minutes bonus scaled by the club where it was earned (D400)": {"minutes_strength": True, "strength_d": 400.0},
        "Goals weighted by opposition strength (D400, centred)": {"goal_scaling": "opp", "goal_d": 400.0, "goal_r0": 1624.0}}
-CLUBS = {27: "Bayern", 11: "Arsenal", 281: "City", 583: "PSG", 336: "Sporting", 1237: "Brighton", 1075: "Braga"}
+CLUBS = {27: "Bayern", 11: "Arsenal", 281: "City", 583: "PSG", 131: "Barcelona", 418: "Real Madrid", 336: "Sporting", 1237: "Brighton", 1075: "Braga"}
 snap = (pd.Timestamp("2026-07-07") - store.EPOCH).days
 apps = ctx.appearances.copy(); apps["day"] = apps.game_id.map(ctx.day)
 pl = store.players().set_index("player_id")
@@ -32,11 +32,11 @@ d = pd.DataFrame(R).dropna(); d = d - (d.mean() - d["off"].mean())
 d.to_csv("adhoc/decision_tables.csv")
 club = d.index.map(dict(pids)).map(CLUBS)
 def pick(col):
-    rk = d.groupby(club)[col].rank(ascending=False, method="first"); n = d.groupby(club)[col].transform("size")
-    return set(d.index[(rk <= 5) | (rk > n - 5)])
+    rk = d.groupby(club)[col].rank(ascending=False, method="first")
+    return set(d.index[rk <= 7])
 def table(col, ids, other):
     x = d.loc[list(ids)].sort_values(col, ascending=False)
-    rk = d[col].rank(ascending=False, method="min"); ro = d[other].rank(ascending=False, method="min")
+    rk = x[col].rank(ascending=False, method="min"); ro = d.loc[list(ids), other].rank(ascending=False, method="min")
     rows = []
     for i, (p, r) in enumerate(x[col].items(), 1):
         mv = int(ro[p] - rk[p]) if col != other else 0
@@ -53,16 +53,21 @@ for k in DEC:
     parts.append(f"<h2>{html.escape(k)}</h2><p>Rank correlation with Transfermarkt: off {corr('off'):.3f}, on {corr(k):.3f}. "
                  f"Arrows: places gained (▲) or lost (▼) compared with the other table.</p>"
                  f"<div class=pair><div><h3>Off</h3>{table('off', ids, k)}</div><div><h3>On</h3>{table(k, ids, 'off')}</div></div>")
-css = """:root{--bg:#fff;--fg:#1a1a1a;--mute:#666;--line:#e3e3e3;--up:#1a7f37;--down:#c62828;--head:#f5f5f5}
-@media (prefers-color-scheme:dark){:root{--bg:#161616;--fg:#e8e8e8;--mute:#9a9a9a;--line:#333;--up:#4ac26b;--down:#ff6b6b;--head:#222}}
-body{background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif;margin:0;padding:16px}
+css = """/* layout: one column of decisions, each a pair of tables that stack on phones */
+:root{--bg:#f7f8fa;--fg:#17202b;--mute:#5d6875;--line:#dde2e8;--head:#eceff3;--up:#1a7f37;--down:#c0392b;--accent:#2f5d8a;
+--display:'Space Grotesk',system-ui,sans-serif;--body:'Inter',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161b;--fg:#e6ebf0;--mute:#97a3af;--line:#2b333c;--head:#1b2129;--up:#4cc36f;--down:#ff7a6b;--accent:#7fb0de;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161b;--fg:#e6ebf0;--mute:#97a3af;--line:#2b333c;--head:#1b2129;--up:#4cc36f;--down:#ff7a6b;--accent:#7fb0de;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--body);margin:0;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance}h2{color:var(--accent)}
 h1{font-size:20px}h2{font-size:17px;margin-top:32px}h3{font-size:15px;margin:8px 0}p{color:var(--mute)}
 .pair{display:flex;gap:24px;flex-wrap:wrap}.pair>div{flex:1 1 420px;min-width:0;overflow-x:auto}
 table{border-collapse:collapse;width:100%}th,td{padding:3px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 th{background:var(--head)}.n{text-align:right;font-variant-numeric:tabular-nums}.up{color:var(--up)}.down{color:var(--down)}"""
-page = (f"<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-        f"<title>Decision tables</title><style>{css}</style></head><body><h1>Player rating: each decision off and on</h1>"
+page = (f"<title>Rating Decision Tables</title><meta name=\"claude:viewport-fit-sides\" content=\"cover\">"
+        f"<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;600&display=swap\">"
+        f"<style>{css}</style><h1>Player rating: each decision off and on</h1>"
         f"<p>Previous player_v2 candidate, snapshot 7 July 2026, outfield players of Bayern, Arsenal, PSG, City, Sporting, Brighton, Braga. "
-        f"Each list: the 5 highest and 5 lowest of each club under either version. Ranks are among all {len(d)} outfield players of these clubs. "
-        f"Every version is shifted so the average rating equals the base.</p>{''.join(parts)}</body></html>")
+        f"Each list: the 7 highest-rated outfield players of each club under either version; ranks count only the players listed. "
+        f"Every version is shifted so the average rating equals the base.</p>{''.join(parts)}")
 open("adhoc/decision_tables.html", "w").write(page); print("written")
