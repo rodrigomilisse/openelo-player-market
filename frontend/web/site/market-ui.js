@@ -33,14 +33,14 @@ export async function portfolio() {
 }
 
 /* The box: your squad below, lit by what each player will pay next. */
-export async function boxScene({ next = { href: 'market.html', label: 'Browse players' } } = {}) {
+export async function boxScene() {
   const { rows } = await portfolio();
   const top = Math.max(0, ...rows.map((r) => r.proj?.next || 0));
   const squad = squadFormation(rows.map((r) => ({ position: r.p.position, shares: r.shares, brightness: top ? (r.proj?.next || 0) / top : 0 })));
   immersive({
     formations: [squad, squad, fieldFormation()],
     palette: ['#FFD66B', '#FFD66B', '#7FA7D8'], alt: '#5A7AA8', spark: '#FFE9A8', dim: rows.length ? 0.55 : 0.35, shiftRight: 0,
-    keyframes: BOX, next,
+    keyframes: BOX,
   });
 }
 

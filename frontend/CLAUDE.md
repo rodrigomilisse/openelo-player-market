@@ -116,7 +116,7 @@ Don't reopen these unless asked.
   image rights are an open question.
 - **One app, no mode switch** (25 Nov 2026, replaces "two modes, one site"). A toggle between
   Explore and Market made one product look like two apps. There is one navigation: tabs
-  *Today*, *Rankings*, *Portfolio* (dividends inside it) and *More*, with search always at
+  *This week*, *Rankings*, *Portfolio* (dividends inside it) and *More*, with search always at
   the top. Leagues, Compare, Watchlist, Activity and Browse are screens reached from those
   tabs, not tabs of their own. A *Market* tab is deliberately left out until it has a job
   Rankings and Portfolio don't (the price side: movers by price, new-share pricing,
@@ -172,7 +172,8 @@ shouldn't contain two apps).
   figures outside the mock world.
 - **A new page**: share the shell (`<header data-shell="header">` and `shell()`), put the
   theme script first in `<head>`, copy the meta and Open Graph tags from `index.html`, give
-  it a spot in `STATIONS` and a place in the scroll tour.
+  it a spot in `STATIONS`. If it belongs under a tab, say so in `tabOf()` in `router.js`; if it is about
+  the reader's money, give `<body>` the `quiet` class.
 
 ## 6. Check your work
 

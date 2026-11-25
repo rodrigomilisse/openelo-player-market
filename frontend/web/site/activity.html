@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="mobile.css" media="(max-width: 860px), (max-height: 500px)">
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
-<body class="mode-market">
+<body class="quiet">
 <canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
@@ -46,7 +46,7 @@
   const what = (h) => h.kind === 'dividend' ? `Dividend from ${h.rows.length} player${h.rows.length === 1 ? '' : 's'}`
     : `${h.kind === 'buy' || h.side === 'buy' ? 'Bought' : 'Sold'} ${number.format(h.shares)} shares of <a href="${tradeUrl(h.id)}">${escape(h.name || h.id)}</a>`;
   const draw = () => {
-    boxScene({ next: { href: 'portfolio.html', label: 'Portfolio' } });
+    boxScene();
     const list = wallet().history;
     field('list').innerHTML = list.length ? `<ol class="rows act">${list.map((h) => `<li class="mover"><span>${what(h)}<small>${new Date(h.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</small></span>
       <span class="e ${tone(h.credits)}">${signedCr(h.credits)}</span></li>`).join('')}</ol>`

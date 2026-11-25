@@ -272,7 +272,6 @@ async function buildScene(p) {
       fieldFormation(),
     ],
     palette: ['#FFD66B', '#FFD66B', '#7FA7D8'],
-    next: { href: clubUrl(p.club.id), label: p.club.name },
     keyframes: [
       { at: 0, morph: 0, pos: [-2, 3.2, 21], look: [-2.2, 2.6, -2] },
       { at: 0.12, morph: 0, pos: [1, 3.8, 18], look: [-1.8, 2.6, -2] },

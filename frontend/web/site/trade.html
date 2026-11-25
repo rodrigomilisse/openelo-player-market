@@ -85,7 +85,7 @@
 <link rel="stylesheet" href="mobile.css" media="(max-width: 860px), (max-height: 500px)">
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 </head>
-<body class="mode-market">
+<body class="quiet">
 <canvas id="scene" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="page">
@@ -166,7 +166,7 @@
   const [p, b] = await Promise.all([getPlayer(id), getBook(id)]);
   if (!p) notFound('player');
   else {
-    boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });
+    boxScene();
     const cr = (v) => v.toFixed(2);
     document.title = `Trade ${p.name} | OpenElo`;
     field('who').innerHTML = `<a href="${clubUrl(p.club.id)}">${escape(p.club.name)}</a>, ${p.position.toLowerCase()}${p.age ? `, ${p.age}` : ''}`;
@@ -269,7 +269,7 @@
     slider.addEventListener('change', () => {
       if (+slider.value >= 96 && current && !slider.disabled) {
         recordTrade(p.id, p.name, current);
-        boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } });   // your squad below changes
+        boxScene();   // your squad below changes
         const done = field('done');
         done.textContent = side === 'buy' ? `Bought ${current.shares} shares of ${p.name}.` : `Sold ${current.shares} shares of ${p.name}.`;
         done.classList.remove('flash'); void done.offsetWidth; done.classList.add('flash');
@@ -302,7 +302,7 @@
     checkOrders();
     drawOrders();
     update();
-    document.querySelector('main').addEventListener('pageshow-again', () => { showWatch(); update(); boxScene({ next: { href: playerUrl(p.id), label: `${p.shortName}'s rating` } }); });   // coming back after trading elsewhere
+    document.querySelector('main').addEventListener('pageshow-again', () => { showWatch(); update(); boxScene(); });   // coming back after trading elsewhere
   }
 </script>
 </body>

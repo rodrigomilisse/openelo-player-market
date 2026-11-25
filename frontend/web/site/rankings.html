@@ -6,10 +6,10 @@
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rankings | OpenElo</title>
-<meta name="description" content="Every player's OpenElo rating, filtered by league, club, position and age.">
+<meta name="description" content="Rank players, clubs or leagues by OpenElo, last match, season or price, and filter by league, club, position and age.">
 <meta property="og:site_name" content="OpenElo">
 <meta property="og:title" content="Rankings | OpenElo">
-<meta property="og:description" content="Every player's OpenElo rating, filtered by league, club, position and age.">
+<meta property="og:description" content="Rank players, clubs or leagues by OpenElo, last match, season or price, and filter by league, club, position and age.">
 <meta property="og:image" content="og.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#060B14">
@@ -19,11 +19,19 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="site.css">
 <style>
-  .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px }
-  .filters .field { flex: 1 1 220px; min-width: 0 }
+  .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px }
+  .filters .field { flex: 1 1 150px; min-width: 0 }
+  .rank-by { display: inline-flex; align-items: center; gap: 8px; color: var(--muted) }
+  .check { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer }
+  .check input { width: 18px; height: 18px; accent-color: var(--elo) }
   .count { margin: 14px 0 0; color: var(--muted) }
   .more { margin-top: 16px }
   .empty { padding: 24px; color: var(--muted) }
+  td.spark { width: 110px }
+  td.spark svg { display: block; width: 100px; height: 26px }
+  td .price { font-family: var(--display); font-weight: 800; font-size: 20px }
+  td.pay { color: var(--elo) }
+  .play-note { margin: 10px 0 0 }
 </style>
 <link rel="stylesheet" href="mobile.css" media="(max-width: 860px), (max-height: 500px)">
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
@@ -38,102 +46,206 @@
       <h1>Rankings</h1>
       <p class="lede" data-field="lede">Every rated player, best first.</p>
     </section>
-    <form class="filters" data-field="filters" role="search" aria-label="Filter players">
+    <div class="text-tabs" role="tablist" aria-label="What to rank" data-field="lens">
+      <button type="button" role="tab" data-tab="players" aria-selected="true">Players</button>
+      <button type="button" role="tab" data-tab="clubs" aria-selected="false">Clubs</button>
+      <button type="button" role="tab" data-tab="leagues" aria-selected="false">Leagues</button>
+    </div>
+    <form class="filters" data-field="filters" role="search" aria-label="Rank and filter">
+      <label class="rank-by">Rank by <select id="f-sort" name="sort"></select></label>
       <label class="visually-hidden" for="f-name">Name</label>
       <input class="field" id="f-name" name="name" type="search" placeholder="Filter by name" autocomplete="off">
       <button class="filters-toggle" type="button" data-mobile-only aria-expanded="false" aria-controls="f-more">Filters</button>
       <label class="visually-hidden" for="f-league">League</label>
-      <select id="f-league" name="league"><option value="">All leagues</option></select>
+      <select id="f-league" name="league" data-for="players clubs"><option value="">All leagues</option></select>
       <label class="visually-hidden" for="f-club">Club</label>
-      <select id="f-club" name="club"><option value="">All clubs</option></select>
+      <select id="f-club" name="club" data-for="players"><option value="">All clubs</option></select>
       <label class="visually-hidden" for="f-position">Position</label>
-      <select id="f-position" name="position"><option value="">All positions</option><option>Goalkeeper</option><option>Defender</option><option>Midfielder</option><option>Forward</option></select>
+      <select id="f-position" name="position" data-for="players"><option value="">All positions</option><option>Goalkeeper</option><option>Defender</option><option>Midfielder</option><option>Forward</option></select>
       <label class="visually-hidden" for="f-age">Age</label>
-      <select id="f-age" name="age"><option value="">All ages</option><option value="21">21 and under</option><option value="23">23 and under</option><option value="30">30 and over</option></select>
-      <label class="visually-hidden" for="f-sort">Sort by</label>
-      <select id="f-sort" name="sort" data-mobile-only><option value="rating">Sort: OpenElo</option><option value="week">Sort: last match</option><option value="season">Sort: season</option><option value="age">Sort: age</option></select>
+      <select id="f-age" name="age" data-for="players"><option value="">All ages</option><option value="21">21 and under</option><option value="23">23 and under</option><option value="30">30 and over</option></select>
+      <label class="check" data-for="players"><input type="checkbox" name="watched"> Watched only</label>
     </form>
+    <p class="preview-note play-note" data-field="play-note" hidden><strong>Play money.</strong> Prices and payouts are illustrative practice figures, not real ones.</p>
     <p class="count" data-field="count" role="status"></p>
-    <div class="table-wrap">
-      <table class="stack-rows stack-rank">
-        <thead><tr>
-          <th class="num" scope="col">#</th><th scope="col">Player</th><th scope="col">Club</th><th scope="col">Position</th>
-          <th class="num" scope="col"><button type="button" data-sort="age">Age</button></th>
-          <th class="num" scope="col" aria-sort="descending"><button type="button" data-sort="rating">OpenElo</button></th>
-          <th class="num" scope="col"><button type="button" data-sort="week">Last match</button></th>
-          <th class="num" scope="col"><button type="button" data-sort="season">Season</button></th>
-        </tr></thead>
-        <tbody data-field="rows"></tbody>
-      </table>
-    </div>
+    <div class="table-wrap" role="tabpanel" aria-label="Rankings"><table data-field="table"></table></div>
     <button class="button more" type="button" data-field="more">Show 50 more</button>
   </main>
   <div data-shell="footer"></div>
 </div>
 <script type="module">
   import { immersive, galaxyFormation, fieldFormation } from './scene.js';
-  import { getRankings } from './api.js';
-  import { shell, field, number, signed, direction, escape, playerUrl, clubUrl, param } from './site.js';
+  import { getRankings, getClubs, getLeagues, getMarket, wallet } from './api.js';
+  import { shell, field, number, signed, direction, escape, playerUrl, clubUrl, param, textTabs } from './site.js';
+  import { cr, signedCr, spark } from './market-ui.js';
   shell();
   immersive({
     formations: [galaxyFormation(), galaxyFormation({ center: [0, 2, -8], radius: 12 }), fieldFormation()],
-    palette: ['#FFD66B', '#A9BBD0', '#7FA7D8'], shiftRight: 0.15, next: { href: 'leagues.html', label: 'Leagues' },
+    palette: ['#FFD66B', '#A9BBD0', '#7FA7D8'], shiftRight: 0.15,
     keyframes: [
       { at: 0, morph: 0, pos: [0, 7, 18], look: [0, 2, -4] },
       { at: 0.5, morph: 1, pos: [6, 9, 16], look: [0, 1, -8] },
       { at: 1, morph: 2, pos: [0, 10, 24], look: [0, 0, -14] },
     ],
   });
-  const { players } = await getRankings();
-  const form = field('filters');
-  const leagues = [...new Set(players.map((p) => p.league))].sort();
-  form.league.insertAdjacentHTML('beforeend', leagues.map((l) => `<option>${escape(l)}</option>`).join(''));
-  const fillClubs = () => {
-    const clubs = [...new Map(players.filter((p) => !form.league.value || p.league === form.league.value).map((p) => [p.clubId, p.club])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-    const keep = form.club.value;
-    form.club.innerHTML = '<option value="">All clubs</option>' + clubs.map(([id, name]) => `<option value="${id}">${escape(name)}</option>`).join('');
-    form.club.value = clubs.some(([id]) => id === keep) ? keep : '';
+
+  const [{ players }, clubsRaw, { leagues }, market] = await Promise.all([getRankings(), getClubs(), getLeagues(), getMarket()]);
+  const priced = new Map(market.players.map((m) => [m.id, m]));
+  players.forEach((p) => { p.m = priced.get(p.id) || null; });
+  const hasPrices = players.some((p) => p.m);
+  const clubs = Array.isArray(clubsRaw) ? clubsRaw : clubsRaw.clubs || [];
+  const clubLeague = new Map(players.map((p) => [p.clubId, p.league]));
+
+  // what each lens can be ranked by; `set` picks the columns (the price set replaces age, position and season with price columns)
+  const SORTS = {
+    players: [
+      ['rating', 'OpenElo'], ['week', 'Last match'], ['season', 'Season'], ['age', 'Age'],
+      ...(hasPrices ? [['price', 'Price'], ['rising', 'Price rising this week'], ['payout', 'Best payout for the price']] : []),
+    ],
+    clubs: [['rating', 'OpenElo'], ['week', 'Last match'], ['points', 'Points']],
+    leagues: [['rating', 'Average club rating']],
   };
-  fillClubs();
-  if (param('club')) form.club.value = param('club');
-  let sort = 'rating', shown = 50;
+  const LEDE = { players: 'Every rated player, best first.', clubs: 'Every club, rated by its results.', leagues: 'Leagues by the average rating of their clubs.' };
+  const PRICE_SORTS = ['price', 'rising', 'payout'];
+  const sorters = {
+    rating: (a, b) => b.rating - a.rating, week: (a, b) => b.week - a.week, season: (a, b) => b.season - a.season, age: (a, b) => a.age - b.age, points: (a, b) => b.points - a.points,
+    price: (a, b) => (b.m?.price ?? -1) - (a.m?.price ?? -1),
+    rising: (a, b) => (b.m ? b.m.week / b.m.price : -9) - (a.m ? a.m.week / a.m.price : -9),
+    payout: (a, b) => (b.m ? b.m.payoutDay / b.m.price : -1) - (a.m ? a.m.payoutDay / a.m.price : -1),
+  };
+
+  const form = field('filters');
+  const leagueNames = [...new Set(players.map((p) => p.league))].sort();
+  form.league.insertAdjacentHTML('beforeend', leagueNames.map((l) => `<option>${escape(l)}</option>`).join(''));
+  const fillClubs = () => {
+    const list = [...new Map(players.filter((p) => !form.league.value || p.league === form.league.value).map((p) => [p.clubId, p.club])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const keep = form.club.value;
+    form.club.innerHTML = '<option value="">All clubs</option>' + list.map(([id, name]) => `<option value="${id}">${escape(name)}</option>`).join('');
+    form.club.value = list.some(([id]) => id === keep) ? keep : '';
+  };
+
+  let lens = 'players', sort = 'rating', shown = 50;
+  const tabs = textTabs(field('lens'), (name) => { lens = name; sort = 'rating'; shown = 50; setup(); draw(); });
+  // the controls that make sense for this lens; the sort menu lists what this lens can be ranked by
+  const setup = () => {
+    form.sort.innerHTML = SORTS[lens].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    form.sort.value = sort;
+    form.querySelectorAll('[data-for]').forEach((el) => el.classList.toggle('is-off', !el.dataset.for.split(' ').includes(lens)));
+    field('lede').textContent = LEDE[lens];
+    form.name.placeholder = lens === 'players' ? 'Filter by name' : lens === 'clubs' ? 'Filter by club' : 'Filter by league';
+  };
+  // a view can be linked: ?by=clubs&sort=week&league=...
+  const readUrl = () => {
+    const by = param('by'); if (SORTS[by]) lens = by;
+    const s = param('sort'); if (SORTS[lens].some(([v]) => v === s)) sort = s;
+    if (param('league')) form.league.value = param('league');
+    fillClubs();
+    if (param('club')) form.club.value = param('club');
+    for (const k of ['position', 'age']) if (param(k)) form[k].value = param(k);
+    form.watched.checked = param('watched') === '1';
+    form.name.value = param('q') || '';
+    tabs.select(lens);
+  };
+  const writeUrl = () => {
+    const q = new URLSearchParams();
+    if (lens !== 'players') q.set('by', lens);
+    if (sort !== 'rating') q.set('sort', sort);
+    if (form.name.value.trim()) q.set('q', form.name.value.trim());
+    if (lens !== 'leagues' && form.league.value) q.set('league', form.league.value);
+    if (lens === 'players') {
+      if (form.club.value) q.set('club', form.club.value);
+      if (form.position.value) q.set('position', form.position.value);
+      if (form.age.value) q.set('age', form.age.value);
+      if (form.watched.checked) q.set('watched', '1');
+    }
+    const qs = q.toString();
+    try { history.replaceState(history.state, '', `${location.pathname}${qs ? `?${qs}` : ''}`); } catch { /* the view just isn't linkable */ }
+  };
+
+  const th = (label, key, cls = 'num') => `<th class="${cls}" scope="col" ${key === sort ? `aria-sort="${key === 'age' ? 'ascending' : 'descending'}"` : ''}>${key && SORTS[lens].some(([v]) => v === key) ? `<button type="button" data-sort="${key}">${label}</button>` : label}</th>`;
+  const rowsFor = {
+    players(list) {
+      const priceSet = PRICE_SORTS.includes(sort);
+      const head = priceSet
+        ? `<tr><th class="num" scope="col">#</th><th scope="col">Player</th><th scope="col">Club</th>${th('OpenElo', 'rating')}${th('Price', 'price')}${th('This week', 'rising')}<th scope="col">Season</th>${th('Pays per share a day', 'payout')}</tr>`
+        : `<tr><th class="num" scope="col">#</th><th scope="col">Player</th><th scope="col">Club</th><th scope="col">Position</th>${th('Age', 'age')}${th('OpenElo', 'rating')}${th('Last match', 'week')}${th('Season', 'season')}</tr>`;
+      const body = list.slice(0, shown).map((p) => {
+        const who = `<td class="who"><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation || '')}</small><span class="m-sub">${escape(p.club)}${priceSet ? '' : `, ${p.position.toLowerCase()}${p.age ? `, ${p.age}` : ''}`}</span></td>`;
+        if (priceSet) {
+          const m = p.m;
+          return `<tr><td class="num muted rk">${p.rank}</td>${who}<td class="club"><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
+            <td class="num elo"><span class="e">${number.format(p.rating)}</span></td>
+            <td class="num px">${m ? `<span class="price">${cr(m.price)}</span>` : '–'}</td><td class="num wk ${m ? direction(m.week) : ''}">${m ? signedCr(m.week) : '–'}</td>
+            <td class="spark">${m ? spark(m.spark) : ''}</td><td class="num pay">${m ? cr(m.payoutDay) : '–'}</td></tr>`;
+        }
+        return `<tr><td class="num muted rk">${p.rank}</td>${who}<td class="club"><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
+          <td class="muted pos">${escape(p.position)}</td><td class="num age">${p.age ?? '–'}</td>
+          <td class="num elo"><span class="e">${number.format(p.rating)}</span></td>
+          <td class="num wk ${direction(p.week)}">${signed(p.week)}</td><td class="num ssn ${direction(p.season)}">${signed(p.season)}</td></tr>`;
+      }).join('');
+      return { head, body, cols: 8, table: priceSet ? 'stack-rows stack-price' : 'stack-rows stack-rank' };
+    },
+    clubs(list) {
+      const head = `<tr><th class="num" scope="col">#</th><th scope="col">Club</th><th scope="col">League</th>${th('OpenElo', 'rating')}${th('Last match', 'week')}${th('Points', 'points')}</tr>`;
+      const body = list.slice(0, shown).map((c) => `<tr><td class="num muted rk">${c.rank}</td>
+        <td class="who"><a href="${clubUrl(c.id)}">${escape(c.name)}</a><span class="m-sub">${escape(c.league?.name || '')}</span></td>
+        <td class="club muted">${escape(c.league?.name || '')}</td>
+        <td class="num elo"><span class="e" style="color:var(--club)">${number.format(c.rating)}</span></td>
+        <td class="num wk ${direction(c.week)}">${signed(c.week)}</td><td class="num ssn">${number.format(c.points)}</td></tr>`).join('');
+      return { head, body, cols: 6, table: 'stack-rows stack-rank' };
+    },
+    leagues(list) {
+      const head = `<tr><th class="num" scope="col">#</th><th scope="col">League</th><th scope="col">Country</th><th class="num" scope="col">Clubs</th>${th('Average club rating', 'rating')}</tr>`;
+      const body = list.map((l, i) => `<tr><td class="num muted rk">${i + 1}</td>
+        <td class="who"><a href="leagues.html#${escape(l.id)}">${escape(l.name)}</a><span class="m-sub">${escape(l.country)}, ${l.clubs.length} clubs</span></td>
+        <td class="club muted">${escape(l.country)}</td><td class="num age">${l.clubs.length}</td>
+        <td class="num elo"><span class="e">${number.format(l.rating)}</span></td></tr>`).join('');
+      return { head, body, cols: 5, table: 'stack-rows stack-rank' };
+    },
+  };
   const filtered = () => {
     const name = form.name.value.trim().toLowerCase();
+    if (lens === 'leagues') return leagues.filter((l) => !name || l.name.toLowerCase().includes(name) || l.country.toLowerCase().includes(name)).sort((a, b) => b.rating - a.rating);
+    if (lens === 'clubs') {
+      return clubs.map((c) => ({ ...c, league: c.league || { name: clubLeague.get(c.id) || '' } }))
+        .filter((c) => (!name || c.name.toLowerCase().includes(name)) && (!form.league.value || c.league.name === form.league.value)).sort(sorters[sort] || sorters.rating);
+    }
     const age = +form.age.value;
-    return players.filter((p) => (!name || p.name.toLowerCase().includes(name))
+    const watched = form.watched.checked ? new Set(wallet().watch) : null;
+    return players.filter((p) => (!name || p.name.toLowerCase().includes(name)) && (!watched || watched.has(p.id))
       && (!form.league.value || p.league === form.league.value) && (!form.club.value || p.clubId === form.club.value)
-      && (!form.position.value || p.position === form.position.value)
-      && (!age || (age === 30 ? p.age >= 30 : p.age <= age)))
-      .sort((a, b) => (sort === 'age' ? a.age - b.age : b[sort] - a[sort]));
-  };
-  const draw = () => {
-    const list = filtered();
-    field('count').textContent = `${number.format(list.length)} ${list.length === 1 ? 'player' : 'players'}`;
-    field('rows').innerHTML = list.length ? list.slice(0, shown).map((p) => `<tr>
-      <td class="num muted rk">${p.rank}</td>
-      <td class="who"><a href="${playerUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.nation || '')}</small><span class="m-sub">${escape(p.club)} · ${p.position.toLowerCase()}${p.age ? ` · ${p.age}` : ''}</span></td>
-      <td class="club"><a href="${clubUrl(p.clubId)}">${escape(p.club)}</a></td>
-      <td class="muted pos">${p.position}</td><td class="num age">${p.age ?? '–'}</td>
-      <td class="num elo"><span class="e">${number.format(p.rating)}</span></td>
-      <td class="num wk ${direction(p.week)}">${signed(p.week)}</td><td class="num ssn ${direction(p.season)}">${signed(p.season)}</td></tr>`).join('')
-      : '<tr><td colspan="8" class="empty">No players match these filters. Clear a filter to see more.</td></tr>';
-    field('more').hidden = list.length <= shown;
-    const active = [form.league, form.club, form.position, form.age].filter((x) => x.value).length;
-    toggle.textContent = active ? `Filters · ${active}` : 'Filters';
-    document.querySelectorAll('[data-sort]').forEach((b) => b.closest('th').toggleAttribute('aria-sort', b.dataset.sort === sort));
-    document.querySelector(`[data-sort="${sort}"]`).closest('th').setAttribute('aria-sort', sort === 'age' ? 'ascending' : 'descending');
+      && (!form.position.value || p.position === form.position.value) && (!age || (age === 30 ? p.age >= 30 : p.age <= age))
+      && (!PRICE_SORTS.includes(sort) || p.m)).sort(sorters[sort] || sorters.rating);
   };
   const toggle = form.querySelector('.filters-toggle');
+  const draw = () => {
+    const list = filtered();
+    const unit = { players: ['player', 'players'], clubs: ['club', 'clubs'], leagues: ['league', 'leagues'] }[lens];
+    field('count').textContent = `${number.format(list.length)} ${list.length === 1 ? unit[0] : unit[1]}`;
+    const { head, body, cols, table } = rowsFor[lens](list);
+    const t = field('table');
+    t.className = table;
+    t.innerHTML = `<thead>${head}</thead><tbody>${body || `<tr><td colspan="${cols}" class="empty">${lens === 'players' && form.watched.checked ? 'Nobody watched matches these filters. Star a player on his trade page, or clear a filter.' : 'Nothing matches these filters. Clear a filter to see more.'}</td></tr>`}</tbody>`;
+    field('more').hidden = lens === 'leagues' || list.length <= shown;
+    field('play-note').hidden = !(lens === 'players' && PRICE_SORTS.includes(sort));
+    const active = lens === 'players' ? [form.league, form.club, form.position, form.age].filter((x) => x.value).length + (form.watched.checked ? 1 : 0) : lens === 'clubs' && form.league.value ? 1 : 0;
+    toggle.textContent = active ? `Filters, ${active}` : 'Filters';
+    writeUrl();
+  };
+
   toggle.addEventListener('click', () => { const open = form.classList.toggle('open'); toggle.setAttribute('aria-expanded', open); });
   form.addEventListener('input', (event) => {
     if (event.target === form.league) fillClubs();
-    if (event.target === form.sort) sort = form.sort.value;   // the phone's sort menu (the column buttons are hidden there)
+    if (event.target === form.sort) sort = form.sort.value;
     shown = 50; draw();
   });
   form.addEventListener('submit', (event) => event.preventDefault());
-  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; form.sort.value = sort; draw(); }));
+  field('table').addEventListener('click', (event) => {
+    const b = event.target.closest('[data-sort]');
+    if (b) { sort = b.dataset.sort; form.sort.value = sort; shown = 50; draw(); }
+  });
   field('more').addEventListener('click', () => { shown += 50; draw(); });
-  draw();
+  readUrl(); setup(); draw();
 </script>
 </body>
 </html>

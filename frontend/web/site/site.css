@@ -222,18 +222,10 @@ td small { color: var(--muted); font-size: 14px; margin-left: 6px }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
 
-/* The tour: a veil for arriving and leaving, and the next-stop card at the bottom of every page */
+/* Page changes: the arriving page fades in */
 main { transition: opacity 500ms ease 250ms }
 main.is-arriving { opacity: 0; transition: none }
-.next-stop { display: flex; align-items: center; gap: 18px; width: min(520px, 100%); margin: clamp(40px, 8vw, 96px) auto 24px; padding: 18px 26px 18px 18px;
-  border-radius: 999px; text-decoration: none; transform: translateY(calc(var(--pull, 0) * -6px)) scale(calc(1 + var(--pull, 0) * 0.04)) }
-.next-stop small { display: block; color: var(--muted); font-size: 15px }
-.next-stop strong { display: block; font-family: var(--display); font-weight: 900; font-style: italic; text-transform: uppercase; font-size: clamp(30px, 3.4vw, 44px); line-height: 0.95 }
-.next-ring { width: 52px; height: 52px; flex: none; transform: rotate(-90deg) }
-.next-ring circle { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 3 }
-.next-ring .fill { stroke: var(--elo); stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 0 6px rgba(255, 214, 107, 0.7)) }
-.next-stop.is-going .fill { stroke-dashoffset: 0; transition: stroke-dashoffset 400ms ease }
-@media (prefers-reduced-motion: reduce) { main { transition: none } .next-stop { transform: none } }
+@media (prefers-reduced-motion: reduce) { main { transition: none } }
 
 /* Stages: near-empty stretches of page where the particles play in the open, with one line of caption */
 .stage { min-height: 88vh; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 7vh; pointer-events: none }
@@ -241,19 +233,13 @@ main.is-arriving { opacity: 0; transition: none }
 .stage-caption strong { color: var(--ink); font-weight: 600 }
 .stage-caption .gold { font-weight: 700 }
 
-/* ---------- modes: Explore and Market share the header; the body class picks the nav ---------- */
-.mode-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(var(--well), 0.5); box-shadow: inset 0 1px 2px rgba(var(--shade), calc(0.5 * var(--shade-k))) }
-.mode-switch a { padding: 4px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px }
-body:not(.mode-market) .mode-switch [data-mode="explore"], body.mode-market .mode-switch [data-mode="market"] { background: rgba(255, 255, 255, 0.12); color: var(--ink) }
-.site-header nav.nav-market { display: none }
-body.mode-market .site-header nav.nav-explore { display: none }
-body.mode-market .site-header nav.nav-market { display: flex }
-body.mode-market .header-cta { display: none }
-/* the directors' box: you watch from behind glass, high in the main stand */
-body.mode-market::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+/* ---------- quiet pages ---------- */
+/* Quiet pages (the reader's money): the directors' box, you watch from behind glass, high in the main stand. A setting of the page, `<body class="quiet">`, not a global mode. */
+body.quiet::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
   background: linear-gradient(115deg, transparent 18%, rgba(190, 215, 255, 0.045) 24%, transparent 31%, transparent 62%, rgba(190, 215, 255, 0.03) 67%, transparent 72%),
     linear-gradient(180deg, rgba(var(--well), 0) 60%, rgba(var(--well), 0.35)) }
-body.mode-market h1 { font-style: normal }
+body.quiet h1 { font-style: normal }
+body.quiet .header-cta { display: none }
 .money { font-family: var(--display); font-weight: 800; font-variant-numeric: tabular-nums }
 .gain { color: var(--up) } .loss { color: var(--down) }
 .kpis { display: flex; flex-wrap: wrap; gap: 14px 32px; margin: 0; padding: 18px 22px; border-radius: 20px }
@@ -290,3 +276,23 @@ body.mode-market h1 { font-style: normal }
 
 /* Phone-only controls (bottom tabs, More sheet, search button, Filters button): hidden here, shown by mobile.css. */
 [data-mobile-only], .m-sub { display: none }
+
+/* The More menu: a dropdown under the header on a desktop (mobile.css makes it a sheet above the tab bar) */
+.nav-more { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-weight: 500; cursor: pointer }
+.nav-more:hover, .nav-more[aria-expanded="true"] { color: var(--ink) }
+.more-sheet:not([hidden]) { display: block; position: fixed; top: 76px; right: max(16px, calc((100vw - 1320px) / 2)); z-index: 12; width: 230px; padding: 8px; border-radius: 20px }
+.more-sheet ul { list-style: none; margin: 0; padding: 0 }
+.more-sheet li a { display: block; padding: 9px 12px; border-radius: 12px; color: var(--ink); text-decoration: none; font-weight: 500 }
+.more-sheet li a:hover { background: rgba(var(--well), 0.55) }
+.more-sheet li a[aria-current="page"] { color: var(--elo) }
+.more-actions { display: none }
+
+/* Text tabs with a sliding underline: what a page shows, not where you are in the app */
+.text-tabs { position: relative; display: flex; gap: 6px 26px; margin-top: 22px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none }
+.text-tabs::-webkit-scrollbar { display: none }
+.text-tabs [role="tab"] { flex: none; padding: 10px 0 12px; border: 0; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer }
+.text-tabs [role="tab"]:hover, .text-tabs [role="tab"][aria-selected="true"] { color: var(--ink) }
+.text-tabs .tab-line { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; border-radius: 2px; background: var(--ink); transition: transform 280ms ease, width 280ms ease }
+@media (prefers-reduced-motion: reduce) { .text-tabs .tab-line { transition: none } }
+
+.is-off { display: none !important }

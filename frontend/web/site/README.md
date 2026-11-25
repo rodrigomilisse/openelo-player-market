@@ -14,12 +14,26 @@ python3 -m http.server 8000   # then open http://localhost:8000/site/
 | Page | What it shows |
 |---|---|
 | `index.html` | This week: the matchday's headline mover, biggest risers and fallers, the top ten, clubs that moved |
-| `rankings.html` | Every player: filter by name, league, club, position and age; sort by rating, last match, season, age |
+| `rankings.html` | How you browse. Rank **players, clubs or leagues** (text tabs), by OpenElo, last match, season or age, and for players by price, price rising this week or payout for the price (simulated prices; the columns follow the choice). Filter by name, league, club, position, age, or watched only. The view is in the URL (`?by=clubs&sort=week&league=`) |
 | `player.html?id=` | The rating as an equation (club + selection + goals and assists + national team − absence), his season against his club's (3D behind the hero, 2D chart), **if he moved** (swap in any club's rating, choose how often he'd play), **market price** (simulated preview), matches, the parts explained, ranking neighbours |
 | `club.html?id=` | Club rating and ranks, **who carries the team** (each player's gap above or below the club), the club's season, results |
 | `compare.html?a=&b=` | Two players side by side: verdict, part by part, both seasons on one chart |
 | `leagues.html` | Leagues by average club rating; each league's clubs by rating against their table position |
 | `how.html` | The formula in plain steps, a worked example, how to check it, questions |
+| `portfolio.html` | Your players, next payout and orders (**Holdings** tab), and the pool, how your slice is worked out, a player-by-player projection and payouts received (**Dividends** tab, `#dividends`). Play money |
+| `trade.html?id=` | Buy and sell one player: order book, quote, order form. Reached from his player page or your portfolio |
+| `watchlist.html`, `activity.html` | Players you watch; your trades and payouts. In the More menu |
+| `dividends.html`, `market.html` | Redirects to the Dividends tab and to Rankings, for old links |
+
+## Navigation
+
+One app, one navigation (no Explore/Market mode). Three places and a More menu: **This week**, **Rankings**,
+**Portfolio**, and More (Leagues, Compare, Watchlist, Activity, How it works, About, Privacy, Terms). On a phone
+they are the bottom tab bar; on a desktop the same links sit in the header, with More as a dropdown. Search is
+always in the header. `tabOf()` in `router.js` says which tab a page belongs to (a player or club page lights
+Rankings, a trade screen lights Portfolio). Pages about the reader's money set `<body class="quiet">` (dimmed
+directors'-box scene, upright headings, no waitlist button in the header); it is a setting of the page, not a
+global mode. `textTabs()` in `site.js` is the shared text-tab control with a sliding underline.
 
 Every page shares `site.js` (header with search, mock-data note, waitlist footer, formatters,
 the line chart) and `site.css` (tokens and components).
@@ -88,10 +102,9 @@ Behind every page: the night stadium and about 9,000 particles (4,500 on phones)
   seasons, the matchday's biggest climb.
 - **Physics.** Each particle is sprung to its place in the shape. A pointer swipe kicks the
   particles near its path (along the swipe and outward); they drift back over a few seconds.
-- **The tour.** Every page has a spot in the stadium (`STATIONS`). Keep scrolling at the
-  bottom of a page and the next-stop card's ring fills; the camera flies to the next page's
-  spot and opens it there. Order: this week, rankings, leagues, compare, how it works;
-  a player leads to his club, a club to its league.
+- **Page changes.** Every page has a spot in the stadium (`STATIONS`). Changing page flies the
+  camera from where it is to the new page's spot; the particles stream into the new shapes.
+  There is no scroll-to-the-next-page gesture: pages end where they end.
 - **Liquid glass.** Panels, the header and controls: a refraction filter (Chromium; a plain
   blur elsewhere), a bright edge, and a highlight that follows the pointer.
 - Bloom on larger screens; reduced motion gets still frames and no automatic flights.

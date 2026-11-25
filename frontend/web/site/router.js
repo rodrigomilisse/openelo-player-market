@@ -49,10 +49,19 @@ function saveCurrent() {
   });
 }
 
-function setNav(url) {
-  document.querySelectorAll('.site-header nav a, .tabbar a').forEach((a) => {
-    if (new URL(a.href).pathname === url.pathname) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-  });
+const fileOf = (url) => url.pathname.split('/').pop() || 'index.html';
+// The tab a page belongs to, so the right one is lit on a player page, a generated page or a trade screen.
+export function tabOf(file) {
+  if (/^(index|week-.+)\.html$/.test(file)) return 'index.html';
+  if (/^(rankings(-.+)?|player(-.+)?|club(-.+)?)\.html$/.test(file)) return 'rankings.html';
+  if (/^(portfolio|trade|dividends)\.html$/.test(file)) return 'portfolio.html';
+  return file;
+}
+export function setNav(url) {
+  const file = fileOf(url), tab = tabOf(file);
+  const mark = (a, on) => (on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  document.querySelectorAll('.site-header nav a, .tabbar a').forEach((a) => mark(a, fileOf(new URL(a.href)) === tab));
+  document.querySelectorAll('.more-sheet li a').forEach((a) => mark(a, fileOf(new URL(a.href)) === file));
 }
 
 function swapIn({ main, plate, styles, title, bodyClass, bodyStyle = '' }) {
@@ -63,7 +72,6 @@ function swapIn({ main, plate, styles, title, bodyClass, bodyStyle = '' }) {
   document.body.setAttribute('style', bodyStyle);   // page-set variables, like the player page's plate width
   document.querySelector('.nameplate')?.remove();
   if (plate) document.querySelector('.page').before(plate);
-  document.querySelector('.next-stop')?.remove();
   main.classList.add('is-arriving');
   document.querySelector('main').replaceWith(main);
   requestAnimationFrame(() => requestAnimationFrame(() => main.classList.remove('is-arriving')));

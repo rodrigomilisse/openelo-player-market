@@ -3,113 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Browse players | OpenElo</title>
-<meta name="description" content="Back players with shares that pay out by their OpenElo rating. Play-money preview.">
-<meta property="og:site_name" content="OpenElo">
-<meta property="og:title" content="Browse players | OpenElo">
-<meta property="og:description" content="Back players with shares that pay out by their OpenElo rating. Play-money preview.">
-<meta property="og:image" content="og.png">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#060B14">
+<meta name="description" content="This page moved to Rankings.">
+<meta http-equiv="refresh" content="0; url=rankings.html">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="site.css">
-<style>
-  /* the market: the same night, quieter and denser */
-  .market-head { padding-block: clamp(20px, 4vw, 44px) 0; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px 32px }
-  .market-head h1 { font-style: normal; font-size: clamp(44px, 5.5vw, 84px) }
-  .market-head .lede { margin-top: 10px }
-  .purse { display: flex; gap: 28px; padding: 16px 22px; border-radius: 20px }
-  .purse div { display: flex; flex-direction: column }
-  .purse dt { order: 2; color: var(--muted); font-size: 14px }
-  .purse dd { order: 1; margin: 0; font-family: var(--display); font-weight: 800; font-size: 30px; line-height: 1 }
-  .holdings-empty { margin: 14px 0 0; color: var(--muted) }
-  .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px }
-  .filters .field { flex: 1 1 240px; min-width: 0 }
-  td.spark { width: 110px }
-  td.spark svg { display: block; width: 100px; height: 26px }
-  td .price { font-family: var(--display); font-weight: 800; font-size: 20px }
-  td .pay { color: var(--elo) }
-</style>
-<link rel="stylesheet" href="mobile.css" media="(max-width: 860px), (max-height: 500px)">
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script>location.replace('rankings.html' + location.hash)</script>
 </head>
-<body class="mode-market">
-<canvas id="scene" aria-hidden="true"></canvas>
-<div class="grain" aria-hidden="true"></div>
+<body>
 <div class="page">
-  <header data-shell="header"></header>
   <main>
-    <section class="market-head" aria-labelledby="market-title">
-      <div>
-        <h1 id="market-title">Browse players</h1>
-        <p class="lede">Shares in players pay out every day by their OpenElo rating. Prices are set by fans trading with each other.</p>
-        <p class="preview-note"><strong>Play money.</strong> Practice credits kept in this browser. Prices, payouts and fees are illustrative.</p>
-      </div>
-      <dl class="purse liquid" data-field="purse"></dl>
-    </section>
-
-    <section aria-labelledby="all-title">
-      <h2 id="all-title" class="visually-hidden">All players</h2>
-      <form class="filters" data-field="filters" role="search" aria-label="Filter the market">
-        <label class="visually-hidden" for="m-name">Name or club</label>
-        <input class="field" id="m-name" name="name" type="search" placeholder="Find a player or club" autocomplete="off">
-        <label class="visually-hidden" for="m-sort">Sort by</label>
-        <select id="m-sort" name="sort">
-          <option value="rating">Highest rating</option><option value="payout">Best payout for the price</option>
-          <option value="rising">Rising this week</option><option value="price">Highest price</option>
-        </select>
-      </form>
-      <div class="table-wrap">
-        <table class="stack-rows stack-market">
-          <thead><tr><th scope="col">Player</th><th class="num" scope="col">OpenElo</th><th class="num" scope="col">Price</th>
-            <th class="num" scope="col">This week</th><th scope="col">Season</th><th class="num" scope="col">Pays per share a day</th><th class="num" scope="col">Holders</th></tr></thead>
-          <tbody data-field="rows"></tbody>
-        </table>
-      </div>
-      <button class="button" type="button" data-field="more" style="margin-top:16px">Show 50 more</button>
+    <section class="page-head">
+      <h1>Browse players</h1>
+      <p class="lede">This page moved to <a href="rankings.html">Rankings</a>.</p>
     </section>
   </main>
-  <div data-shell="footer"></div>
 </div>
-<script type="module">
-  import { getMarket } from './api.js';
-  import { shell, field, number, escape, direction } from './site.js';
-  import { boxScene, portfolio, cr, signedCr, spark, tradeUrl } from './market-ui.js';
-  shell();
-  const { players } = await getMarket();
-  const purse = async () => {
-    boxScene({ next: { href: 'portfolio.html', label: 'Your portfolio' } });
-    const { w, rows, proj, value } = await portfolio();
-    field('purse').innerHTML = [[cr(w.credits), 'Credits to spend'], [cr(value), `In ${rows.length} player${rows.length === 1 ? '' : 's'}`], [cr(proj.next), 'Next payout']]
-      .map(([v, l]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join('');
-  };
-  purse();
-  document.querySelector('main').addEventListener('pageshow-again', purse);   // coming back after a trade
-  const form = field('filters');
-  let shown = 50;
-  const draw = () => {
-    const q = form.name.value.trim().toLowerCase();
-    const sorters = { rating: (a, b) => b.rating - a.rating, payout: (a, b) => b.payoutDay / b.price - a.payoutDay / a.price, rising: (a, b) => b.week / b.price - a.week / a.price, price: (a, b) => b.price - a.price };
-    const list = players.filter((p) => !q || p.name.toLowerCase().includes(q) || p.club.toLowerCase().includes(q)).sort(sorters[form.sort.value]);
-    field('rows').innerHTML = list.slice(0, shown).map((p) => `<tr>
-      <td class="who"><a href="${tradeUrl(p.id)}">${escape(p.name)}</a><small>${escape(p.club)}</small><span class="m-sub">${escape(p.club)} · OpenElo ${number.format(p.rating)}</span></td>
-      <td class="num elo"><span class="e">${number.format(p.rating)}</span></td>
-      <td class="num price"><span class="price">${cr(p.price)}</span></td>
-      <td class="num wk ${direction(p.week)}">${signedCr(p.week)}</td>
-      <td class="spark">${spark(p.spark)}</td>
-      <td class="num pay">${cr(p.payoutDay)}</td>
-      <td class="num muted holders">${number.format(p.holders)}</td></tr>`).join('');
-    field('more').hidden = list.length <= shown;
-  };
-  form.addEventListener('input', () => { shown = 50; draw(); });
-  form.addEventListener('submit', (e) => e.preventDefault());
-  field('more').addEventListener('click', () => { shown += 50; draw(); });
-  draw();
-</script>
 </body>
 </html>

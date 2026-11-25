@@ -45,7 +45,7 @@ Decided with the owner during the design round of November 2026:
 - **Money in whole hundredths of a credit**, never floats (`ticket.js`).
 - **One app, one navigation** (25 November 2026). No Explore/Market toggle: a toggle makes an
   app contain two apps. Bottom tabs on a phone, the same links in the header on a desktop:
-  *Today* (the matchday's winners and losers), *Rankings*, *Portfolio* (with dividends) and
+  *This week* (the matchday's winners and losers), *Rankings*, *Portfolio* (with dividends) and
   *More*. Search stays at the top. Leagues, Compare and Watchlist are screens, not tabs.
   Rankings is also how you browse: change what you rank (players, clubs, leagues), how
   (rating, last match, season, price, payout) and the filters. A Market tab waits until

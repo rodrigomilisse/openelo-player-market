@@ -3,98 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('openelo-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch{document.documentElement.dataset.theme='dark'}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dividends | OpenElo</title>
-<meta name="description" content="How the daily payout is shared out, and what your players will earn next. Play-money preview.">
-<meta property="og:site_name" content="OpenElo">
-<meta property="og:title" content="Dividends | OpenElo">
-<meta property="og:description" content="How the daily payout is shared out, and what your players will earn next. Play-money preview.">
-<meta property="og:image" content="og.png">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#060B14">
+<meta name="description" content="This page moved to your portfolio.">
+<meta http-equiv="refresh" content="0; url=portfolio.html#dividends">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="site.css">
-<style>
-  .pool { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px }
-  .pool .glass-panel { margin-top: 0 }
-  .pool strong { display: block; font-family: var(--display); font-weight: 800; font-size: 34px; font-variant-numeric: tabular-nums }
-  .pool span { color: var(--muted) }
-  .formula { font-family: var(--display); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); margin: 12px 0 0 }
-  .formula .t { color: var(--elo) }
-  .explain p { color: var(--muted); max-width: 70ch }
-  td small { display: block; color: var(--muted) }
-  td.bar { min-width: 140px }
-</style>
-<link rel="stylesheet" href="mobile.css" media="(max-width: 860px), (max-height: 500px)">
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script>location.replace('portfolio.html#dividends' + location.hash)</script>
 </head>
-<body class="mode-market">
-<canvas id="scene" aria-hidden="true"></canvas>
-<div class="grain" aria-hidden="true"></div>
+<body>
 <div class="page">
-  <header data-shell="header"></header>
   <main>
-    <section class="mhead" aria-labelledby="dv-title">
-      <div>
-        <h1 id="dv-title">Dividends</h1>
-        <p class="lede">One pool pays the whole market. Each day a small share of it goes out, split by every held share's rating weight.</p>
-        <p class="preview-note"><strong>Mock model.</strong> Pool size, drain and payouts are illustrative. The real rules are still being set.</p>
-      </div>
-    </section>
-
-    <div class="pool" data-field="pool"></div>
-
-    <section class="glass-panel explain" aria-labelledby="how-title">
-      <h2 id="how-title">How your slice is worked out</h2>
-      <p class="formula">his weight = 10<sup>rating ÷ 400</sup> &nbsp;·&nbsp; your payout = <span class="t">today's payout × your weight ÷ all weight held</span></p>
-      <p>A player rated 400 points higher pays ten times as much per share. What you paid for the share doesn't matter, only his rating, and how much weight everyone else holds. When more fans buy, each share's slice gets a little thinner; when ratings across the market fall, a share in a player who held his rating is worth relatively more.</p>
-    </section>
-
-    <section class="glass-panel" aria-labelledby="proj-title">
-      <div class="section-head"><h2 id="proj-title">Your next payout, player by player</h2></div>
-      <p class="section-lede">If ratings stay as they are until the payout. The bar shows what one typical match (about 14 points either way) would do.</p>
-      <div data-field="proj"></div>
-    </section>
-
-    <section class="glass-panel" aria-labelledby="hist-title">
-      <h2 id="hist-title">Payouts received</h2>
-      <div data-field="history"></div>
+    <section class="page-head">
+      <h1>Dividends</h1>
+      <p class="lede">This page moved to <a href="portfolio.html#dividends">your portfolio</a>.</p>
     </section>
   </main>
-  <div data-shell="footer"></div>
 </div>
-<script type="module">
-  import { shell, field, escape, number } from './site.js';
-  import { getPool } from './api.js';
-  import { boxScene, portfolio, cr, tradeUrl } from './market-ui.js';
-  shell();
-  const draw = async () => {
-    boxScene({ next: { href: 'portfolio.html', label: 'Portfolio' } });
-    const { w, rows, proj } = await portfolio();
-    const pool = await getPool(proj.myWeight);
-    field('pool').innerHTML = [[cr(pool.balance), 'credits in the pool'], [`${(pool.drain * 100).toFixed(2)}%`, 'of the pool paid out each day'],
-      [cr(pool.payoutToday), "today's payout to all holders"], [`${(proj.weightShare * 100).toFixed(3)}%`, 'of it is yours']]
-      .map(([v, l]) => `<div class="glass-panel"><strong>${v}</strong><span>${l}</span></div>`).join('');
-    const hi = Math.max(0.01, ...proj.rows.map((r) => r.high));
-    field('proj').innerHTML = proj.rows.length ? `<div class="table-wrap"><table><thead><tr><th scope="col">Player</th><th class="num" scope="col">Shares</th>
-      <th class="num" scope="col">Weight share</th><th scope="col">One match either way</th><th class="num" scope="col">Next payout</th></tr></thead><tbody>${proj.rows.sort((a, b) => b.next - a.next).map((r) => `<tr>
-      <td><a href="${tradeUrl(r.id)}">${escape(r.name)}</a><small>${escape(r.club)} · ${number.format(r.rating)}</small></td><td class="num">${number.format(r.shares)}</td>
-      <td class="num muted">${(r.weightShare * 100).toFixed(4)}%</td>
-      <td class="bar"><div class="range-bar" title="${cr(r.low)} to ${cr(r.high)}"><i style="left:${r.low / hi * 100}%;right:${100 - r.high / hi * 100}%"></i><b style="left:${r.next / hi * 100}%"></b></div></td>
-      <td class="num gold money">${cr(r.next)}</td></tr>`).join('')}
-      <tr><td><strong>Total</strong></td><td></td><td class="num muted">${(proj.weightShare * 100).toFixed(4)}%</td><td class="muted">${cr(proj.low)} to ${cr(proj.high)}</td><td class="num gold money">${cr(proj.next)}</td></tr></tbody></table></div>`
-      : '<p class="empty">Nothing to pay yet. <a href="market.html">Back a player</a> and his next payout shows here.</p>';
-    const paid = w.history.filter((h) => h.kind === 'dividend');
-    field('history').innerHTML = paid.length ? `<ol class="rows">${paid.map((h) => `<li class="mover"><span>${new Date(h.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-      <small>${h.rows.length} player${h.rows.length === 1 ? '' : 's'}</small><span class="e gold">+${cr(h.credits)}</span></li>`).join('')}</ol>`
-      : '<p class="empty">No payouts yet. On the portfolio page you can simulate one to see how it lands.</p>';
-  };
-  await draw();
-  document.querySelector('main').addEventListener('pageshow-again', draw);
-</script>
 </body>
 </html>

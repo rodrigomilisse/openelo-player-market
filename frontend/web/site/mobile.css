@@ -9,7 +9,6 @@ body { font-size: 16px }
 body .site-header { top: calc(8px + env(safe-area-inset-top)); flex-wrap: nowrap; gap: 8px; padding: 8px 12px; border-radius: 20px; transition: transform 0.28s ease }
 body .site-header nav { display: none !important }
 body .site-header .logo { font-size: 22px }
-body .mode-switch a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-size: 14px }
 body .header-end { margin-left: auto; width: auto; gap: 6px }
 body .theme-toggle, body .header-cta { display: none }
 body .m-search-btn { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(var(--well), 0.35); color: var(--muted); padding: 0; cursor: pointer }
@@ -31,18 +30,15 @@ body .mock-note.open span { white-space: normal }
 /* ---- bottom tabs and the More sheet ---- */
 body .tabbar, body .more-sheet, body .site-header { background: rgba(var(--pane-2), 0.88); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px) }
 body .tabbar { display: block; position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 30; padding: 5px; border-radius: 24px }
-body .tabbar > div { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px }
-body .tabbar .tabs-market { display: none }
-body.mode-market .tabbar .tabs-explore { display: none }
-body.mode-market .tabbar .tabs-market { display: grid }
+body .tabbar > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px }
 body .tabbar a, body .tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 6px 2px; border: 0; border-radius: 18px;
   background: none; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent }
 body .tabbar svg { width: 22px; height: 22px }
 body .tabbar a[aria-current="page"], body .tabbar button[aria-expanded="true"] { color: var(--ink); background: rgba(var(--well), 0.55) }
 body .tabbar a[aria-current="page"] svg { color: var(--elo) }
-body .more-sheet:not([hidden]) { display: block; position: fixed; left: 10px; right: 10px; bottom: calc(var(--tab-h) + 22px + env(safe-area-inset-bottom)); z-index: 29; padding: 8px; border-radius: 22px }
+body .more-sheet:not([hidden]) { display: block; position: fixed; top: auto; width: auto; left: 10px; right: 10px; bottom: calc(var(--tab-h) + 22px + env(safe-area-inset-bottom)); z-index: 29; padding: 8px; border-radius: 22px; max-height: calc(100svh - var(--tab-h) - 110px); overflow-y: auto }
 body .more-sheet ul { list-style: none; margin: 0; padding: 0 }
-body .more-sheet li a { display: block; padding: 13px 12px; border-radius: 12px; color: var(--ink); font-weight: 600; text-decoration: none }
+body .more-sheet li a { padding: 12px 12px; font-weight: 600 }
 body .more-sheet li a:active { background: rgba(var(--well), 0.55) }
 body .more-actions { display: flex; gap: 8px; padding: 8px 4px 4px }
 body .more-actions .button { flex: 1; min-height: 44px; padding: 11px 14px; text-align: center }
@@ -53,7 +49,6 @@ body .page-head { padding-block: 14px 0; gap: 10px }
 body .page-head h1 { font-size: clamp(42px, 13vw, 56px) }
 body .lede { font-size: 17px }
 body .stage { min-height: 42svh; padding-bottom: 3svh }
-body .next-stop { margin-top: 32px; padding: 14px 18px 14px 14px }
 body button, body .button, body select, body .field, body input { min-height: 44px }
 body input, body select, body textarea { font-size: 16px }
 
@@ -64,6 +59,10 @@ body .filters .filters-toggle { display: inline-flex; align-items: center; flex:
 body .filters .filters-toggle[aria-expanded="true"] { color: var(--elo); border-color: var(--elo) }
 body .filters select { display: none }
 body .filters.open select { display: block; flex: 1 1 calc(50% - 4px); min-width: 0; padding: 0 14px }
+body .filters .rank-by { order: -1; flex: 1 1 100%; justify-content: space-between }
+body .filters .rank-by select { display: block; flex: 1; min-width: 0; padding: 0 14px }
+body .filters .check { display: none }
+body .filters.open .check { display: inline-flex; flex: 1 1 100%; min-height: 44px }
 
 /* ---- long lists become rows: who he is, and the number that matters ---- */
 body .table-wrap { border-radius: 18px }
@@ -85,6 +84,13 @@ body table.stack-rank .who { grid-area: who }
 body table.stack-rank .elo { grid-area: elo; text-align: right }
 body table.stack-rank .wk { grid-area: wk }
 body table.stack-rank .club, body table.stack-rank .pos, body table.stack-rank .age, body table.stack-rank .ssn { display: none }
+
+body table.stack-price tr { grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "rk who px" "rk who wk" }
+body table.stack-price .rk { grid-area: rk; font-size: 15px }
+body table.stack-price .who { grid-area: who }
+body table.stack-price td.px { grid-area: px; text-align: right }
+body table.stack-price .wk { grid-area: wk }
+body table.stack-price .club, body table.stack-price .elo, body table.stack-price .spark, body table.stack-price .pay { display: none }
 
 body table.stack-market tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who px" "who wk" }
 body table.stack-market .who { grid-area: who }

@@ -1,9 +1,9 @@
 // The site's living backdrop: the night stadium, with thousands of particles that assemble into each
 // page's data, morph as the page scrolls, and scatter when the pointer swipes through them, drifting
-// back over a few seconds. Every page has its own spot in the stadium; scrolling past the end of a
-// page flies the camera to the next page's spot and opens it there.
+// back over a few seconds. Every page has its own spot in the stadium, and the camera flies there
+// when you change page.
 //
-//   immersive({ formations: [A, B, C], keyframes: [{ at, morph, pos, look }], palette, alt, next, shiftRight })
+//   immersive({ formations: [A, B, C], keyframes: [{ at, morph, pos, look }], palette, alt, shiftRight })
 //
 // A formation is a Float32Array of xyz points, or { points, tags } where tag 1 takes the `alt` colour.
 // Positions in formations and keyframes are relative to the page's spot (STATIONS).
@@ -13,7 +13,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addStadium } from '../design/stadium.js';
-import { go, rememberScene, prefetch } from './router.js';
+import { rememberScene } from './router.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // A phone, as mobile.css defines it. Everything phone-specific below is behind this, so desktop paths are unchanged.
@@ -39,17 +39,14 @@ const clamp01 = (t) => Math.min(1, Math.max(0, t));
 export const STATIONS = {
   'index.html': [0, 0, -12], 'rankings.html': [0, 0, -40], 'leagues.html': [22, 0, -18],
   'compare.html': [0, 0, 16], 'how.html': [-22, 0, -18], 'player.html': [10, 0, 2], 'club.html': [-10, 0, 2],
-  // Market mode: every page is the directors' box, high in the main stand over the halfway line.
-  'portfolio.html': [0, 0, -8], 'market.html': [0, 0, -8], 'trade.html': [0, 0, -8],
-  'dividends.html': [0, 0, -8], 'watchlist.html': [0, 0, -8], 'activity.html': [0, 0, -8],
+  // Quiet pages (your money): the directors' box, high in the main stand over the halfway line.
+  'portfolio.html': [0, 0, -8], 'trade.html': [0, 0, -8], 'watchlist.html': [0, 0, -8], 'activity.html': [0, 0, -8],
 };
 // Generated pages (player-<id>.html, club-<id>.html, rankings-…, week-…) stand where their template does.
 const pageOf = (href) => {
   const file = new URL(href, location.href).pathname.split('/').pop() || 'index.html';
   return file.replace(/^(player|club)-.+\.html$/, '$1.html').replace(/^rankings-.+\.html$/, 'rankings.html').replace(/^week-.+\.html$/, 'index.html');
 };
-// The pose every page is approached from: in front of its spot, looking at it.
-const arrivalPose = (station) => ({ pos: [station[0], station[1] + 4.5, station[2] + 24], look: [station[0], station[1] + 3, station[2]] });
 
 const VERTEX = /* glsl */`
   attribute vec4 aRand; attribute vec3 aTag; attribute vec2 aDyn;
@@ -159,7 +156,7 @@ function createWorld({ count } = {}) {
   window.addEventListener('themechange', applyTheme);
 
   // what the current page sets
-  let station = [0, 0, 0], shiftRight = 0.2, keys = [], next = null;
+  let station = [0, 0, 0], shiftRight = 0.2, keys = [];
   let target = 0, progress = 0, lastShift = null;
   let arrival = null, boostStart = -1e9, pageDim = 1;
   const applyDim = () => { uniforms.uDim.value = pageDim * (small() ? PHONE.dim : 1); };
@@ -223,9 +220,6 @@ function createWorld({ count } = {}) {
   }, { passive: true });
   document.addEventListener('pointerleave', () => { ndc.set(9, 9); hasHit = false; });
 
-  // the tour: keep scrolling at the bottom of a page to fly to the next page's spot
-  const tour = createTour((href) => go(href));
-
   const tmp = new THREE.Vector3(), rel = new THREE.Vector3();
   const clock = new THREE.Clock();
   function frame(time, dt) {
@@ -241,12 +235,6 @@ function createWorld({ count } = {}) {
       camera.fov = 50 + Math.sin(u * Math.PI) * arrival.swell;
       lastShift = null;
       if (t >= 1) { arrival = null; camera.fov = 50; }
-    }
-    const pull = next && !reducedMotion ? tour.pull() : 0;   // a preview of the flight while the reader keeps scrolling
-    if (pull) {
-      const a = arrivalPose(STATIONS[pageOf(next.href)] || station);
-      pos = pos.clone().lerp(new THREE.Vector3(...a.pos), pull * 0.18);
-      look = look.clone().lerp(new THREE.Vector3(...a.look), pull * 0.25);
     }
     if (small()) pos = look.clone().add(tmp.copy(pos).sub(look).multiplyScalar(phoneDolly(camera.aspect)));
     const sh = small() ? 0 : p.shift;   // the scene sits right of hero text, centred on stages
@@ -334,12 +322,11 @@ function createWorld({ count } = {}) {
 
   const api = {
     started: false,
-    // point the running scene at a page: its spot, shapes, colours, camera path and next stop
-    apply({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight: sr = 0.2, next: nx = null, dim = 1 }, transition) {
+    // point the running scene at a page: its spot, shapes, colours, camera path
+    apply({ formations, keyframes, palette = ['#FFD66B', '#FFD66B', '#7FA7D8'], alt = '#A9BBD0', spark = '#FFFFFF', shiftRight: sr = 0.2, dim = 1 }, transition) {
       pageDim = dim; applyDim();
       station = STATIONS[pageOf(location.href)] || [0, 0, 0];
       shiftRight = sr;
-      next = nx;
       [0, 1, 2].forEach((i) => resample(formations[Math.min(i, formations.length - 1)], home[i], i));
       uniforms.uColorA.value.set(palette[0]); uniforms.uColorB.value.set(palette[1]); uniforms.uColorC.value.set(palette[2]);
       uniforms.uSpark.value.set(spark); uniforms.uAlt.value.set(alt);
@@ -347,7 +334,6 @@ function createWorld({ count } = {}) {
       resolveKeys();
       readScroll();
       progress = target;
-      tour.card(next);
       if (transition && !reducedMotion) {
         // fly from where the camera is; particles keep their places and stream to the new shape
         arrival = { pos: camera.position.clone(), look: currentLook.clone(), start: performance.now(), duration: 1700, arc: 5, swell: 12 };
@@ -376,53 +362,6 @@ function createWorld({ count } = {}) {
     },
   };
   return api;
-}
-
-/* The next stop: a card at the very bottom of the page. Keep scrolling (wheel or touch) at the bottom
-   and its ring fills; full, the camera flies to the next page. Clicking it does the same. */
-function createTour(onDepart) {
-  const NEED = 900;
-  let charge = 0, lastInput = 0, touchY = null, lastPull = performance.now(), current = null, ring = null, el = null;
-  const atBottom = () => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
-  const feed = (amount) => {
-    if (!current || reducedMotion) return;
-    charge = Math.min(NEED, charge + amount);
-    lastInput = performance.now();
-    if (charge >= NEED && !el.classList.contains('is-going')) { el.classList.add('is-going'); onDepart(current.href); }
-  };
-  window.addEventListener('wheel', (e) => { if (atBottom() && e.deltaY > 0) feed(e.deltaY * (e.deltaMode === 1 ? 33 : 1)); }, { passive: true });
-  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
-  window.addEventListener('touchmove', (e) => {
-    if (touchY === null || !atBottom() || small()) return;
-    const d = touchY - e.touches[0].clientY;
-    if (d > 0) { feed(d * 2.2); touchY = e.touches[0].clientY; }
-  }, { passive: true });
-  return {
-    card(next) {
-      document.querySelector('.next-stop')?.remove();
-      current = next; charge = 0; el = null; ring = null;
-      if (!next) return;
-      const page = document.querySelector('.page') || document.body;
-      el = document.createElement('a');
-      el.className = 'next-stop liquid';
-      el.href = next.href;
-      el.innerHTML = `<svg class="next-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19"/><circle class="fill" cx="22" cy="22" r="19" pathLength="1"/></svg>
-        <span><small>${reducedMotion || small() ? 'Next stop' : 'Keep scrolling to fly to'}</small><strong>${next.label}</strong></span>`;
-      page.append(el);
-      ring = el.querySelector('.fill');
-    },
-    pull() {
-      if (!el) return 0;
-      const now = performance.now();
-      if (now - lastInput > 450 && !el.classList.contains('is-going')) charge *= Math.pow(0.9, (now - lastPull) / 16.7);   // eases back in about a second
-      lastPull = now;
-      const pull = charge / NEED;
-      if (pull > 0.2) prefetch(current.href);   // the reader is heading there: fetch it now
-      ring.style.strokeDashoffset = String(1 - pull);
-      el.style.setProperty('--pull', pull.toFixed(3));
-      return pull;
-    },
-  };
 }
 
 /* ---------- formations ---------- */

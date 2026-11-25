@@ -8,7 +8,7 @@ the mechanics (fees, drain, pool, issuance) are placeholders to be replaced by t
 - [ ] **Wallet balance, deposits, withdrawals.** Play money starts at 1,000 credits. Needed: real or play balances, top-ups, KYC hooks if real money.
 - [ ] **Reset practice account** (Activity). Keep for a play-money mode.
 
-## Trading (Trade, Browse)
+## Trading (Trade, Rankings)
 - [ ] **Order book per player** (`getBook`): bids, asks, last price, new-share price.
 - [ ] **Quotes** (`getQuote(id, side, amount)`): fills from fans, then new shares on the curve; fees; average price.
 - [ ] **Order execution** (`recordTrade`): atomic fill, balance and position update, fee accounting. Today it trusts the quote.
@@ -22,7 +22,7 @@ the mechanics (fees, drain, pool, issuance) are placeholders to be replaced by t
 - [ ] **Dividends received per position** and in total.
 - [ ] **Valuation** at last price (or mid / best bid: decide).
 
-## Dividends (Portfolio, Dividends)
+## Dividends (Portfolio, Dividends tab)
 - [ ] **Dividend engine**: pool balance, drain per day, inflows (fees, new-share money), payout per share = drain × pool × w / Σ held weight, w = 10^(rating/400) (ADR-0019).
 - [ ] **Pool stats** (`getPool`): balance, drain, today's payout, total held weight, next payout time.
 - [ ] **Projection** (`getProjection(positions)`): next payout if ratings stay as they are, per position and total, and the reader's share of held weight.

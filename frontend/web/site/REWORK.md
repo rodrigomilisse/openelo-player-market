@@ -1,6 +1,6 @@
 # Rework: one app, one navigation
 
-Status: planned, nothing built (25 November 2026). Decisions are recorded in
+Status: built on branch `claude/one-app-navigation` (25 November 2026), one Rankings layout (the tabs layout, *A*; the sentence-style *B* was not built). The scroll-to-next-page tour was also removed, and the first tab stays "This week". Decisions are recorded in
 `../design/README.md` ("Design language") and `../../CLAUDE.md` (section 4). This file is the
 plan to carry them out.
 
@@ -15,7 +15,7 @@ with one navigation and let each page decide how loud it is.
 
 | Tab | Page | Holds |
 |---|---|---|
-| Today | `index.html` | The latest matchday: winners and losers, top ten, clubs that moved |
+| This week | `index.html` | The latest matchday: winners and losers, top ten, clubs that moved |
 | Rankings | `rankings.html` | Everything browsable (below) |
 | Portfolio | `portfolio.html` | Holdings, next payout, **dividends** (payout projection and history), open orders |
 | More | sheet on a phone, menu on a desktop | Watchlist, Activity, Compare, How it works, About, theme, waitlist, legal |
@@ -23,7 +23,7 @@ with one navigation and let each page decide how loud it is.
 Search is in the header on every page (a button that opens the field on a phone).
 No Market tab for now. Revisit when the price side has enough to fill a page (movers by price,
 new-share pricing against rating, the activity feed). Until then price movers can be a second
-list on Today and "price" can be a way to rank.
+list on This week and "price" can be a way to rank.
 
 Screens, not tabs: `leagues.html`, `compare.html`, `watchlist.html`, `activity.html`,
 `dividends.html` (until it is folded into Portfolio), `trade.html`, `player.html`, `club.html`.
@@ -50,7 +50,7 @@ simulated prices, is client-side on top. Query-string pages are already always n
 
 ## What changes in the code
 
-- `site.js`: delete the mode pill, `MARKET_NAV` and `TABS_MARKET`. One `NAV` (Today, Rankings,
+- `site.js`: delete the mode pill, `MARKET_NAV` and `TABS_MARKET`. One `NAV` (This week, Rankings,
   Portfolio) and one tab bar with a More button; extend `MORE_LINKS`. Check the header CTA, which
   `body.mode-market` hides today.
 - `site.css`, `mobile.css`: remove the `mode-switch` and `nav-explore`/`nav-market` rules.
@@ -100,8 +100,6 @@ publish lines change.
 
 ## Open questions for the owner
 
-- Label for the first tab: "Today" (as chosen) or "This week", since the page shows the latest
-  matchday.
-- Dividends as a section or text tab inside Portfolio, or kept as its own screen linked from it.
-- Whether Compare and Leagues also get a line in More, or are reached only from Rankings and
-  player pages.
+- Settled: the first tab is "This week"; dividends are a tab inside Portfolio; everything else (Leagues,
+  Compare, Watchlist, Activity, How it works, About, legal) is in More.
+- Still open: a Market tab (see above), and whether the sentence-style Rankings picker (*B*) is worth building.

@@ -1,6 +1,6 @@
 // Shared shell for every page: header with search, mock-data note, waitlist footer, formatters, chart.
 import { search, isMock } from './api.js';
-import { install } from './router.js';
+import { install, tabOf } from './router.js';
 import { CONFIG } from './config.js';
 
 export const number = new Intl.NumberFormat('en-GB');
@@ -16,15 +16,46 @@ export const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 export const field = (name, root = document) => root.querySelector(`[data-field="${name}"]`);
 export const param = (name) => new URLSearchParams(location.search).get(name);
 
-// Two modes on one site: Explore (the ratings, loud) and Market (your money, quiet). Each has its own nav.
-const NAV = [
-  ['index.html', 'This week'], ['rankings.html', 'Rankings'], ['leagues.html', 'Leagues'],
-  ['compare.html', 'Compare'], ['how.html', 'How it works'],
+// One navigation for the whole app: three places and a More menu (header on a desktop, tab bar on a phone). Everything else is a
+// screen reached from them. Pages about the reader's money set `class="quiet"` on <body> (see site.css); there is no global mode.
+const NAV = [['index.html', 'This week'], ['rankings.html', 'Rankings'], ['portfolio.html', 'Portfolio']];
+const MORE_LINKS = [
+  ['leagues.html', 'Leagues'], ['compare.html', 'Compare'], ['watchlist.html', 'Watchlist'], ['activity.html', 'Activity'],
+  ['how.html', 'How it works'], ['about.html', 'About'], ['privacy.html', 'Privacy'], ['terms.html', 'Terms'],
 ];
-const MARKET_NAV = [
-  ['portfolio.html', 'Portfolio'], ['market.html', 'Browse'], ['dividends.html', 'Dividends'],
-  ['watchlist.html', 'Watchlist'], ['activity.html', 'Activity'],
-];
+
+/* Text tabs with a sliding underline. `root` holds <button role="tab" data-tab="x"> children; returns { select(name) }.
+   onChange(name) runs when the reader picks one (by click or arrow keys), not on the first select(). */
+export function textTabs(root, onChange) {
+  const buttons = [...root.querySelectorAll('[role="tab"]')];
+  const line = document.createElement('i');
+  line.className = 'tab-line'; line.setAttribute('aria-hidden', 'true');
+  root.append(line);
+  const place = () => {
+    const on = buttons.find((b) => b.getAttribute('aria-selected') === 'true');
+    if (!on || !on.offsetWidth) return;
+    line.style.width = `${on.offsetWidth}px`; line.style.transform = `translateX(${on.offsetLeft}px)`;
+  };
+  const select = (name, notify = false) => {
+    const hit = buttons.find((b) => b.dataset.tab === name) || buttons[0];
+    buttons.forEach((b) => { const on = b === hit; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+    place();
+    if (notify) onChange?.(hit.dataset.tab);
+  };
+  buttons.forEach((b, i) => {
+    b.addEventListener('click', () => select(b.dataset.tab, true));
+    b.addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const to = buttons[(i + step + buttons.length) % buttons.length];
+      to.focus(); select(to.dataset.tab, true);
+    });
+  });
+  window.addEventListener('resize', place);
+  document.fonts?.ready.then(place);
+  return { select };
+}
 
 export function shell() {
   install();
@@ -32,7 +63,8 @@ export function shell() {
   const header = document.querySelector('[data-shell="header"]');
   if (header.dataset.ready) return;   // a page change without reload: the header and footer stay
   header.dataset.ready = '1';
-  const here = location.pathname.split('/').pop() || 'index.html';
+  const file = location.pathname.split('/').pop() || 'index.html';
+  const here = tabOf(file);
   header.className = 'site-header liquid';
   document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <filter id="liquid-refraction" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
@@ -43,9 +75,7 @@ export function shell() {
   wireLight();
   header.innerHTML = `
     <a class="logo" href="index.html">OpenElo</a>
-    <div class="mode-switch" role="group" aria-label="Mode"><a href="index.html" data-mode="explore">Explore</a><a href="portfolio.html" data-mode="market">Market</a></div>
-    <nav aria-label="Main" class="nav-explore">${NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
-    <nav aria-label="Market" class="nav-market">${MARKET_NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+    <nav aria-label="Main">${NAV.map(([href, label]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a>`).join('')}<button type="button" class="nav-more" data-more aria-expanded="false" aria-haspopup="true" aria-controls="more-menu">More</button></nav>
     <div class="header-end">
       <button class="theme-toggle" type="button" data-theme-toggle></button>
       <div class="search" role="search">
@@ -63,7 +93,7 @@ export function shell() {
   header.after(note);
   wireSearch(header);
   wireTheme(header);
-  buildTabs(here);
+  buildTabs(here, file);
   wireMobile(header, note);
   const footer = document.querySelector('[data-shell="footer"]');
   footer.innerHTML = `
@@ -260,26 +290,19 @@ const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON = {
   search: ico('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   week: ico('<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'), rankings: ico('<path d="M5 20V10M12 20V4M19 20v-7"/>'),
-  leagues: ico('<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4v1a4 4 0 0 0 4 4M16 6h4v1a4 4 0 0 1-4 4M12 13v4M8 20h8"/>'), compare: ico('<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>'),
+  portfolio: ico('<path d="M12 3v9h9a9 9 0 1 1-9-9zM15 3.5A9 9 0 0 1 20.5 9H15z"/>'),
   more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
-  portfolio: ico('<path d="M12 3v9h9a9 9 0 1 1-9-9zM15 3.5A9 9 0 0 1 20.5 9H15z"/>'), browse: ico('<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>'),
-  dividends: ico('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M9.5 9.7c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.7-1 1.4-2.5 1.7-2.5.7-2.5 1.8 1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/>'),
-  watchlist: ico('<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'),
 };
-const TABS_EXPLORE = [['index.html', 'This week', 'week'], ['rankings.html', 'Rankings', 'rankings'], ['leagues.html', 'Leagues', 'leagues'], ['compare.html', 'Compare', 'compare']];
-const TABS_MARKET = [['portfolio.html', 'Portfolio', 'portfolio'], ['market.html', 'Browse', 'browse'], ['dividends.html', 'Dividends', 'dividends'], ['watchlist.html', 'Watchlist', 'watchlist']];
-const MORE_LINKS = [['how.html', 'How it works'], ['about.html', 'About'], ['activity.html', 'Market activity'], ['privacy.html', 'Privacy'], ['terms.html', 'Terms']];
+const TABS = [['index.html', 'This week', 'week'], ['rankings.html', 'Rankings', 'rankings'], ['portfolio.html', 'Portfolio', 'portfolio']];
 
-function buildTabs(here) {
-  const tabs = (list) => list.map(([href, label, icon]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${ICON[icon]}<span>${label}</span></a>`).join('');
+function buildTabs(here, file) {
   document.body.insertAdjacentHTML('beforeend', `
-    <div class="more-sheet liquid" data-mobile-only data-more-sheet hidden>
-      <ul>${MORE_LINKS.map(([href, label]) => `<li><a href="${href}">${label}</a></li>`).join('')}</ul>
+    <div class="more-sheet liquid" id="more-menu" data-more-sheet hidden>
+      <ul>${MORE_LINKS.map(([href, label]) => `<li><a href="${href}"${href === file ? ' aria-current="page"' : ''}>${label}</a></li>`).join('')}</ul>
       <div class="more-actions"><button type="button" class="button" data-sheet-theme></button><a class="button button-gold" href="#waitlist" data-sheet-waitlist>Join the waitlist</a></div>
     </div>
     <nav class="tabbar liquid" data-mobile-only aria-label="Pages">
-      <div class="tabs-explore">${tabs(TABS_EXPLORE)}<button type="button" data-more aria-expanded="false">${ICON.more}<span>More</span></button></div>
-      <div class="tabs-market">${tabs(TABS_MARKET)}<button type="button" data-more aria-expanded="false">${ICON.more}<span>More</span></button></div>
+      <div>${TABS.map(([href, label, icon]) => `<a href="${href}"${href === here ? ' aria-current="page"' : ''}>${ICON[icon]}<span>${label}</span></a>`).join('')}<button type="button" data-more aria-expanded="false" aria-haspopup="true" aria-controls="more-menu">${ICON.more}<span>More</span></button></div>
     </nav>`);
 }
 
