@@ -1,4 +1,4 @@
-"""python -m apisports_loader <migrate|status|history|recent|rebuild>"""
+"""python -m apisports_loader <migrate|status|history|recent|rebuild|import-research>"""
 
 import argparse
 import datetime as dt
@@ -78,6 +78,16 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_import_research(args) -> int:
+    from pathlib import Path
+    from . import research_import
+    conn = db.connect()
+    store = Path(args.store) if args.store else research_import.DEFAULT_STORE
+    print(f"importing {store} into schema research")
+    research_import.import_store(conn, store, args.replace or [])
+    return 0
+
+
 def cmd_rebuild(args) -> int:
     conn = db.connect()
     db.migrate(conn)
@@ -116,6 +126,11 @@ def main() -> None:
     p = sub.add_parser("status", help="what is in Postgres and what is missing")
     p.add_argument("--offline", action="store_true", help="do not call the API for the quota")
     p.set_defaults(func=cmd_status)
+
+    p = sub.add_parser("import-research", help="copy the research store (Transfermarkt data the model uses) into Postgres schema `research`")
+    p.add_argument("--store", help="path to openelo_research.sqlite3 (default: research/data/raw/)")
+    p.add_argument("--replace", action="append", help="EXPLICIT: reload this table with no primary key (transfer, international_result)")
+    p.set_defaults(func=cmd_import_research)
 
     p = sub.add_parser("rebuild", help="re-derive tables from stored payloads (no API requests)")
     p.set_defaults(func=cmd_rebuild)

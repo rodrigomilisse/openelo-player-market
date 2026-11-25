@@ -156,3 +156,22 @@ def test_rebuild_needs_no_requests(conn):
     jobs.rebuild(conn, log=silent)
     assert len(api.calls) == before
     assert conn.execute("SELECT count(*) FROM appearance WHERE started").fetchone()[0] == 4
+
+
+def test_research_import_is_idempotent(conn, tmp_path):
+    import sqlite3
+    from apisports_loader import research_import
+    store = tmp_path / "r.sqlite3"
+    lite = sqlite3.connect(store)
+    lite.executescript("""
+        CREATE TABLE game (game_id INTEGER PRIMARY KEY, date TEXT NOT NULL, national INTEGER NOT NULL);
+        CREATE TABLE transfer (player_id INTEGER NOT NULL, date TEXT NOT NULL, fee_eur INTEGER);
+        INSERT INTO game VALUES (1, '2026-07-06', 0), (2, '2026-07-05', 0);
+        INSERT INTO transfer VALUES (7, '2026-01-01', 100);""")
+    lite.commit()
+    first = research_import.import_store(conn, store, log=silent)
+    assert first["added"] == {"game": 2, "transfer": 1} and first["newest"] == "2026-07-06"
+    lite.execute("INSERT INTO game VALUES (3, '2026-07-07', 0)")
+    lite.commit()
+    second = research_import.import_store(conn, store, log=silent)
+    assert second["added"] == {"game": 1, "transfer": 0}       # only the new match

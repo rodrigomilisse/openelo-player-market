@@ -19,6 +19,7 @@ export APISPORTS_KEY='...'                 # not needed where a proxy injects it
 | `history` | Adds completed seasons, newest first, one league-season at a time: its fixture list (1 request), then each played match's players and minutes (1 request each). Stops when the budget or the day's quota runs out. Run it again tomorrow and it carries on where it stopped. |
 | `recent` | Adds the latest matches: one request per day for the fixtures of every competition, then the players of each played match in the tracked leagues. A day is final once all its matches are over; an open day is asked again next time, a finished one never. |
 | `status` | Per league and season: played matches, matches with players stored, matches still missing; the day's API quota. |
+| `import-research` | Copies the research store (the Transfermarkt data the Elo model was built on: matches, line-ups, minutes, valuations, transfers, national teams, ~6 million rows) into Postgres schema `research`, with the model's own ids. Safe to repeat: rows already there are skipped, so after `make update` in `research/` it adds only what is new. `--replace transfer` reloads a table that has no primary key. |
 | `rebuild` | Re-derives the tables from the stored responses. No API requests. |
 | `migrate` | Creates or updates the tables. |
 
@@ -42,6 +43,11 @@ response. The per-minute limit is respected by waiting.
 - Not complete, so asked again: a day's fixtures while a match that day is not over, and for `recent` an empty players answer until the match is 72 hours old (line-ups can arrive late).
 
 ## Data
+
+Two sources, two schemas, because their ids differ. Schema `research` is the scraped Transfermarkt data the
+model uses today, up to the newest club match in the research store (2026-07-06 at the time of writing).
+Schema `public` is API-Football (licensed), filled by `history` and `recent`. ADR-0017 keeps scraped data out of
+the production path, so treat `research` as the model's training and validation set until the licence question is settled.
 
 Tables: `league`, `team`, `player`, `fixture` (score after extra time, never shoot-out kicks; `extra_time`, `shootout`),
 `appearance` (one row per player listed in a match: `started`, `minutes`, `goals`, `assists`, `position`; unused substitutes have 0 minutes).
