@@ -43,6 +43,14 @@ Decided with the owner during the design round of November 2026:
 - **Glass panels** (blurred, translucent) carry all UI over the 3D scene.
 - **Type**: Barlow Condensed for display, Barlow Semi Condensed for UI, tabular figures.
 - **Money in whole hundredths of a credit**, never floats (`ticket.js`).
+- **One app, one navigation** (25 November 2026). No Explore/Market toggle: a toggle makes an
+  app contain two apps. Bottom tabs on a phone, the same links in the header on a desktop:
+  *Today* (the matchday's winners and losers), *Rankings*, *Portfolio* (with dividends) and
+  *More*. Search stays at the top. Leagues, Compare and Watchlist are screens, not tabs.
+  Rankings is also how you browse: change what you rank (players, clubs, leagues), how
+  (rating, last match, season, price, payout) and the filters. A Market tab waits until
+  there is a price-side job for it. Quiet pages (Portfolio, Dividends, trading) keep the
+  dimmed directors'-box scene, but as a per-page setting, not a global mode.
 
 Rejected in the same round: consumer-fintech and sports-editorial looks (kept on the Archive
 page of the design canvas, linked below).

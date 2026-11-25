@@ -114,9 +114,16 @@ Don't reopen these unless asked.
   tinted in the page colour, with the surname set vertically in outlined italic capitals
   (the player-page nameplate). The stand-in photo must be replaced before launch: player
   image rights are an open question.
-- **Two modes, one site.** *Explore* (the ratings) is loud: italic display type and a living
-  scene whose particles form the page's data. *Market* (your money) is quiet: the directors'
-  box, a dimmed and still scene, upright headings.
+- **One app, no mode switch** (25 Nov 2026, replaces "two modes, one site"). A toggle between
+  Explore and Market made one product look like two apps. There is one navigation: tabs
+  *Today*, *Rankings*, *Portfolio* (dividends inside it) and *More*, with search always at
+  the top. Leagues, Compare, Watchlist, Activity and Browse are screens reached from those
+  tabs, not tabs of their own. A *Market* tab is deliberately left out until it has a job
+  Rankings and Portfolio don't (the price side: movers by price, new-share pricing,
+  activity); revisit then. The loud/quiet contrast stays as a property of the page, not a
+  global mode: ratings pages are loud (italic display type, a living scene whose particles
+  form the page's data); pages about the reader's money are quiet (the directors' box, a
+  dimmed and still scene, upright headings). Plan: `frontend/web/site/REWORK.md`.
 - **Interaction.** Fewer buttons, more motion: text tabs with a sliding underline, sliders,
   slide-to-confirm or hold-to-confirm, charts you scrub that drive the headline numbers.
 - **Motion.** Real 3D, never video scrubbing. Scroll drives the camera, eased; the pointer
@@ -125,7 +132,8 @@ Don't reopen these unless asked.
 
 **Rejected**: the consumer-fintech and sports-editorial looks (on the design canvas's
 Archive page); the light neobank-style app design ("the dark one is the keeper"); the grey
-dusk light theme; the lifted dark navy.
+dusk light theme; the lifted dark navy; an Explore/Market mode toggle (bad UX: an app
+shouldn't contain two apps).
 
 **How the owner likes to work** (from the commit history):
 
