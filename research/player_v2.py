@@ -138,6 +138,10 @@ class Context:
         self.team_matches = pd.DataFrame(rows, columns=["game_id", "team_id", "day", "rating", "swing", "surprise",
                                                         "spread", "length", "expected", "team_gd", "importance", "opp_rating"]).sort_values(["day", "game_id"])
         self.by_team = {t: g.reset_index(drop=True) for t, g in self.team_matches.groupby("team_id")}
+        # the same schedules as plain arrays and row tuples, so series() slices them without pandas
+        self.team_days = {t: g.day.to_numpy() for t, g in self.by_team.items()}
+        self.team_level = {t: (g.rating + g.swing).to_numpy() for t, g in self.by_team.items()}
+        self.team_rows = {t: list(g.itertuples()) for t, g in self.by_team.items()}
         self.length = dict(zip(self.team_matches.game_id, self.team_matches.length))
         self.day = dict(zip(self.team_matches.game_id, self.team_matches.day))
         lineups = store.lineups()
@@ -172,7 +176,8 @@ class Context:
         self.ga_rate_all = float((apps.goals.sum() + apps.assists.sum()) / (apps.minutes.sum() / 90))
         self.squad_mean = {}
         self._listing_cache = {}
-        self._empty_listing = {}
+        self._listing_frames = {}
+        self._listing_columns = {}
         self.nation_days = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
 
@@ -300,10 +305,28 @@ class Context:
         """Every club match the player was listed for: minutes (filled for starters
         without minutes when `fill`), and whether he started or sat on the bench.
         Built once for all players (one vectorised pass) and looked up per player."""
-        table = self._listing_table(fill)
-        return table.get(player, self._empty_listing[fill])
+        frames = self._listing_frames.get(fill)
+        if frames is None:
+            rows = self._listing_rows(fill)
+            frames = self._listing_frames[fill] = {p: g for p, g in rows.groupby("player_id", sort=False)}
+        return frames.get(player, self._listing_rows(fill).iloc[:0])
 
-    def _listing_table(self, fill: bool) -> dict:
+    LISTING_COLUMNS = ("game_id", "team_id", "minutes", "goals", "assists", "starter", "length",
+                       "minutes_on", "goals_for", "goals_against", "team_gd", "day")
+
+    def listing_columns(self, player: int, fill: bool):
+        """The same rows as `listings`, as plain lists in LISTING_COLUMNS order (None if he has none)."""
+        if fill not in self._listing_columns:
+            rows = self._listing_rows(fill)
+            ids = rows.player_id.to_numpy()
+            edges = np.flatnonzero(ids[1:] != ids[:-1]) + 1
+            starts, ends = np.concatenate(([0], edges)), np.concatenate((edges, [len(ids)]))
+            columns = [rows[name].tolist() for name in self.LISTING_COLUMNS]
+            self._listing_columns[fill] = {
+                int(ids[a]): tuple(c[a:b] for c in columns) for a, b in zip(starts.tolist(), ends.tolist())} if len(ids) else {}
+        return self._listing_columns[fill].get(player)
+
+    def _listing_rows(self, fill: bool) -> pd.DataFrame:
         if fill in self._listing_cache:
             return self._listing_cache[fill]
         apps = self.appearances[["game_id", "player_id", "team_id", "minutes", "goals", "assists"]]
@@ -323,9 +346,7 @@ class Context:
         on = self.onpitch[["game_id", "player_id", "minutes_on", "goals_for", "goals_against"]]
         rows = rows.merge(on, on=["game_id", "player_id"], how="left")
         rows["team_gd"] = [self.team_gd.get((g, t), 0) for g, t in zip(rows.game_id, rows.team_id)]
-        rows = rows.sort_values(["player_id", "day", "game_id"], kind="stable")
-        self._empty_listing[fill] = rows.iloc[:0]
-        self._listing_cache[fill] = {p: g for p, g in rows.groupby("player_id", sort=False)}
+        self._listing_cache[fill] = rows.sort_values(["player_id", "day", "game_id"], kind="stable")
         return self._listing_cache[fill]
 
 
@@ -399,12 +420,16 @@ def tournament_elo(games: pd.DataFrame) -> dict:
 
 def stints(listings: pd.DataFrame) -> list[tuple[int, int, int]]:
     """(team, first day, last day) for each consecutive run at one club."""
+    return stints_of(listings.team_id.tolist(), listings.day.tolist())
+
+
+def stints_of(teams: list, days: list) -> list[tuple[int, int, int]]:
     runs = []
-    for row in listings.itertuples():
-        if runs and runs[-1][0] == row.team_id:
-            runs[-1][2] = int(row.day)
+    for team_id, day in zip(teams, days):
+        if runs and runs[-1][0] == team_id:
+            runs[-1][2] = int(day)
         else:
-            runs.append([int(row.team_id), int(row.day), int(row.day)])
+            runs.append([int(team_id), int(day), int(day)])
     return [tuple(r) for r in runs]
 
 
@@ -472,10 +497,10 @@ class Player:
         self.team = row.team_id
         if not self.v.absence:
             self.apply_decay(row.day)
-        usual = np.mean(self.window) if self.window else share
         if self.v.direct:
             self.level = self.v.team_anchor + self.v.team_weight * (row.rating + row.swing - self.v.team_anchor)
         elif self.v.split:
+            usual = np.mean(self.window) if self.window else share
             self.level += row.swing + LEVEL_RATE * share * (row.rating - self.level)
             if self.v.weighted:
                 self.weighted_evidence(row, share - usual)
@@ -697,31 +722,51 @@ class Player:
         return self._team_share.get(day, 0.0) if hasattr(self, "_team_share") else 0.0
 
 
+SERIES_COLUMNS = ["day", "player_id", "rating", "team_id", "team_rating"]
+
+
 def series(player_id: int, variant: Variant, context: Context, snapshot_days: list[int]) -> pd.DataFrame:
     """The player's published rating at each snapshot day, with his team's rating."""
-    listings = context.listings(player_id, variant.fill)
-    if listings.empty:
-        return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])
+    return pd.DataFrame(series_rows(player_id, variant, context, snapshot_days), columns=SERIES_COLUMNS)
+
+
+def series_rows(player_id: int, variant: Variant, context: Context, snapshot_days: list[int]) -> list[tuple]:
+    """`series` as a list of (day, player_id, rating, team_id, team_rating) tuples."""
+    cols = context.listing_columns(player_id, variant.fill)
+    if cols is None:
+        return []
+    game_ids, team_ids, all_minutes, all_goals, all_assists, starters, lengths, minutes_on, goals_for, goals_against, \
+        team_gds, days_listed = cols
     listed = {}
-    for r in listings.itertuples():
+    for game_id, team_id, minutes, goals, assists, starter, length, m_on, g_for, g_against, team_gd in zip(
+            game_ids, team_ids, all_minutes, all_goals, all_assists, starters, lengths,
+            minutes_on, goals_for, goals_against, team_gds):
         on = None
-        if r.minutes_on == r.minutes_on and r.length:      # not NaN: he was on the pitch
-            on = (float(r.minutes_on), (r.goals_for - r.goals_against) - r.minutes_on / r.length * r.team_gd)
-        elif r.minutes == r.minutes:
+        if m_on == m_on and length:      # not NaN: he was on the pitch
+            on = (float(m_on), (g_for - g_against) - m_on / length * team_gd)
+        elif minutes == minutes:
             on = (0.0, 0.0)
-        listed[(int(r.game_id), int(r.team_id))] = (float(r.minutes), r.starter, float(r.goals), float(r.assists), on)
-    timeline = []
-    for team, first, last in stints(listings):
-        schedule = context.by_team.get(team)
-        if schedule is None:
+        listed[(int(game_id), int(team_id))] = (float(minutes), starter, float(goals), float(assists), on)
+    runs = stints_of(team_ids, days_listed)
+    events = []
+    for team, first, last in runs:
+        days = context.team_days.get(team)
+        if days is None:
             continue
         end = last
-        if variant.absence_mode != "capped" and (team, first, last) == stints(listings)[-1]:
-            end = int(schedule.day.max())      # matches he missed since his last appearance still count
-        timeline.append(schedule[(schedule.day >= first) & (schedule.day <= end)])
-    if not timeline:
-        return pd.DataFrame(columns=["day", "player_id", "rating", "team_id", "team_rating"])
-    timeline = pd.concat(timeline).sort_values(["day", "game_id"]).drop_duplicates("game_id")
+        if variant.absence_mode != "capped" and (team, first, last) == runs[-1]:
+            end = int(days.max())      # matches he missed since his last appearance still count
+        lo, hi = np.searchsorted(days, first, side="left"), np.searchsorted(days, end, side="right")
+        events.extend(context.team_rows[team][lo:hi])
+    if not events:
+        return []
+    events.sort(key=lambda e: (e.day, e.game_id))      # stable, so a game seen twice keeps its first row
+    seen, unique = set(), []
+    for e in events:
+        if e.game_id not in seen:
+            seen.add(e.game_id)
+            unique.append(e)
+    events = unique
     state = Player(variant)
     state.call_ups = context.national_call_ups.get(int(player_id), [])
     state.keeper = int(player_id) in context.keepers
@@ -729,7 +774,6 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
     own_shares = deque()
     rows = []
     position = 0
-    events = list(timeline.itertuples())
     for snapshot in snapshot_days:
         while position < len(events) and events[position].day < snapshot:
             row = events[position]
@@ -748,10 +792,10 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
         while own_shares and own_shares[0][0] < snapshot - 365:
             own_shares.popleft()
         team_rows = [s for d, s, t in own_shares if t == state.team]
-        team_count = int(((context.by_team[state.team].day >= snapshot - 365) & (context.by_team[state.team].day < snapshot)).sum())
+        days = context.team_days[state.team]
+        before = int(np.searchsorted(days, snapshot, side="left"))
+        team_count = before - int(np.searchsorted(days, snapshot - 365, side="left"))
         state._team_share = {snapshot: (sum(team_rows) / team_count) if team_count else 0.0}
-        team_now = context.by_team[state.team]
-        before = team_now[team_now.day < snapshot]
-        team_rating = float(before.rating.iloc[-1] + before.swing.iloc[-1]) if len(before) else np.nan
+        team_rating = float(context.team_level[state.team][before - 1]) if before else np.nan
         rows.append((snapshot, player_id, state.published(snapshot, context), state.team, team_rating))
-    return pd.DataFrame(rows, columns=["day", "player_id", "rating", "team_id", "team_rating"])
+    return rows
