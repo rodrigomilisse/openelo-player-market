@@ -689,12 +689,21 @@ class Player:
         mine = {c[0]: c for c in calls if c[5] == nation and c[0] >= window[0]}
         total = 0.0
         counted = len(window)
-        cd = np.array(self.club_days) if self.v.nt_skip_injured else None
+        cd = set(self.club_days) if self.v.nt_skip_injured else None
+        sched = context.by_team.get(self.team) if cd is not None else None
+        sdays = sched.day.to_numpy() if sched is not None else np.array([])
         for d in window:
+            if cd is not None and len(sdays):
+                # out of his club's squad for the club matches just before and just after: injured then,
+                # so this international counts for neither selection nor non-selection
+                i = np.searchsorted(sdays, d)
+                before = sdays[i - 1] if i > 0 else None
+                after = sdays[i] if i < len(sdays) and sdays[i] < day else None
+                if (before is None or before not in cd) and (after is None or after not in cd) and (before is not None or after is not None):
+                    counted -= 1
+                    continue
             c = mine.get(int(d))
             if c is None:
-                if cd is not None and not ((cd >= d - 14) & (cd <= d + 14)).any():
-                    counted -= 1          # out of every club squad around then: injured, not dropped
                 continue
             value = max(self.share_of(c[1], c[7] == 1, c[1] > 0), self.v.nt_credit)
             if self.v.national == "flat":
