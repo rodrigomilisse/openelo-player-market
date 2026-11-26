@@ -47,21 +47,21 @@ def run_at(cfg, ctx, day):
     return pd.Series(r)
 CLUB_OF = {}
 cur = run_at(REC, new_ctx, SNAP_NEW); old_club = dict(CLUB_OF); CLUB_OF.clear()
-# custom match weights for the minutes window: Champions League 4; domestic league by league strength
+# custom match weights for the minutes window: Champions League 4 (knockouts and final 8); domestic league by league strength
 # (strongest league 4, then 3, 2, 1, and 1 for every league after); everything else 1
-games = store.query("SELECT g.game_id, g.competition_id, co.type, co.country FROM game g JOIN competition co USING(competition_id)")
+games = store.query("SELECT g.game_id, g.competition_id, g.stage, co.type, co.country FROM game g JOIN competition co USING(competition_id)")
 tmx = new_ctx.team_matches.merge(games, on="game_id", how="left")
 recent = tmx[(tmx.day >= (pd.Timestamp("2026-07-07") - store.EPOCH).days - 730) & (tmx.type == "domestic_league")]
 lg = recent.groupby("country").rating.mean().sort_values(ascending=False)
 lg = lg[recent.groupby("country").team_id.nunique().reindex(lg.index) >= 10]
 LW = {k: w for k, w in zip(lg.index, [4.0, 3.0, 2.0])}
 print("league order:", [(k, round(v)) for k, v in lg.head(6).items()])
-w = np.where(tmx.competition_id == "CL", 4.0, np.where(tmx.type == "domestic_league", tmx.country.map(LW).fillna(1.0), 1.0))
+w = np.where((tmx.competition_id == "CL") & tmx.stage.isin(["continental_knockout", "continental_final"]), 8.0, np.where(tmx.competition_id == "CL", 4.0, np.where(tmx.type == "domestic_league", tmx.country.map(LW).fillna(1.0), 1.0)))
 import copy
 wctx = copy.copy(new_ctx); wctx.team_matches = new_ctx.team_matches.copy(); wctx.team_matches["importance"] = w
 wctx.by_team = {t: g.reset_index(drop=True) for t, g in wctx.team_matches.groupby("team_id")}
 REC2 = {**REC, "squad_top": 5, "goal_scale": 158.0 * 0.75, "assist_scale": 79.0 * 0.75, "nt_skip_injured": True, "weighted_reference": True}
-res = {"Champions League 4 and leagues 4-3-2-1, reference top 5, goals -25%, injured national matches skipped, weighted reference": run_at(REC2, wctx, SNAP_NEW)}; new_club = dict(CLUB_OF)
+res = {"Champions League 4 and leagues 4-3-2-1, reference top 5, goals -25%, injured national matches skipped, weighted reference, CL knockouts 8": run_at(REC2, wctx, SNAP_NEW)}; new_club = dict(CLUB_OF)
 print(f"players {time.time() - t0:.0f}s", flush=True)
 tmS = pd.Series(tmv)
 def table(d, col, other, ids):
@@ -88,7 +88,7 @@ for k, v in res.items():
 css = open("adhoc/decision_tables.py").read().split('css = """')[1].split('"""')[0]
 page = (f"<title>Candidate With Match Weights</title><meta name=\"claude:viewport-fit-sides\" content=\"cover\">"
         f"<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;600&display=swap\">"
-        f"<style>{css}</style><h1>Match weights 4-3-2-1, top-5 reference, goals cut 25%, injury-aware national term, weighted reference</h1>"
+        f"<style>{css}</style><h1>Match weights 4-3-2-1, top-5 reference, goals cut 25%, injury-aware national term, weighted reference, Champions League knockouts ×8</h1>"
         f"<p>Current: league redistribution (0.3, zero-sum), minutes weighted by competition and opponent, minutes scaled by the club where earned "
         f"relative to his current club, goals and assists weighted by opposition and cut by 30% (158 and 79 per 90), absence term on. "
         f"Snapshot 7 July 2026 (data ends early July 2026). Top 7 outfield players of each club under either version; ranks count only the players listed.</p>"
