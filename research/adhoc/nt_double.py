@@ -44,14 +44,15 @@ tmS = pd.Series(tmv)
 def table(d, col, other, ids):
     x = d.loc[list(ids)].sort_values(col, ascending=False)
     rk = x[col].rank(ascending=False, method="min"); ro = x[other].rank(ascending=False, method="min")
+    tr = pd.Series({p: tmv.get(p, np.nan) for p in x.index}).rank(ascending=False, method="min")
     rows = []
     for p, r in x[col].items():
         mv = int(ro[p] - rk[p]); cls = "up" if mv > 0 else "down" if mv < 0 else ""
         arrow = f"▲{mv}" if mv > 0 else f"▼{-mv}" if mv < 0 else ""
         tm = "" if pd.isna(tmv.get(p)) else f"{tmv.get(p):g}"
         rows.append(f"<tr><td class=n>{int(rk[p])}</td><td>{html.escape(str(pl.name.get(p)))}</td><td>{CLUBS[dict(pids)[p]]}</td>"
-                    f"<td class=n>{r:.0f}</td><td class='n {cls}'>{arrow}</td><td class=n>{tm}</td></tr>")
-    return "<table><tr><th>#</th><th>Player</th><th>Club</th><th>Rating</th><th>vs other</th><th>TM €m</th></tr>" + "".join(rows) + "</table>"
+                    f"<td class=n>{r:.0f}</td><td class='n {cls}'>{arrow}</td><td class=n>{tm}</td><td class=n>{'' if pd.isna(tr[p]) else int(tr[p])}</td></tr>")
+    return "<table><tr><th>#</th><th>Player</th><th>Club</th><th>Rating</th><th>vs other</th><th>TM €m</th><th>TM rank</th></tr>" + "".join(rows) + "</table>"
 parts = []
 for k, v in res.items():
     d = pd.DataFrame({"cur": cur, "var": v}).dropna(); club = d.index.map(dict(pids)).map(CLUBS)
