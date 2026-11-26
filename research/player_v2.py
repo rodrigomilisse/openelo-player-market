@@ -738,8 +738,8 @@ class Player:
                 # out of his club's squad for the club matches just before and just after: injured then,
                 # so this international counts for neither selection nor non-selection
                 i = np.searchsorted(sdays, d)
-                before = sdays[i - 1] if i > 0 else None
-                after = sdays[i] if i < len(sdays) and sdays[i] < day else None
+                before = sdays[i - 1] if i > 0 and d - sdays[i - 1] <= 21 else None
+                after = sdays[i] if i < len(sdays) and sdays[i] < day and sdays[i] - d <= 21 else None   # not across a summer break
                 if (before is None or before not in cd) and (after is None or after not in cd) and (before is not None or after is not None):
                     counted -= 1
                     continue
