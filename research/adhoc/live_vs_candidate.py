@@ -71,7 +71,7 @@ import copy
 wctx = copy.copy(new_ctx); wctx.team_matches = new_ctx.team_matches.copy(); wctx.team_matches["importance"] = w
 wctx.by_team = {t: g.reset_index(drop=True) for t, g in wctx.team_matches.groupby("team_id")}
 REC2 = {**REC, "squad_top": 5, "goal_scale": 158.0 * 0.75, "assist_scale": 79.0 * 0.75, "nt_skip_injured": True, "weighted_reference": True}
-res = {"Current candidate (4-3-2-1, CL 4, knockouts 8, national Elo)": run_at({**REC2, "national": "elo"}, wctx, SNAP_NEW)}; new_club = dict(CLUB_OF)
+res = {"Current candidate (4-3-2-1, CL 4, knockouts 8, national Elo)": run_at({**REC2, "national": "elo", "squad_top": 16, "per_match_reference": True, "nt_window_injury": True}, wctx, SNAP_NEW)}; new_club = dict(CLUB_OF)
 print(f"players {time.time() - t0:.0f}s", flush=True)
 tmS = pd.Series(tmv)
 def table(d, col, other, ids):
