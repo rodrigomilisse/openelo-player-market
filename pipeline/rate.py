@@ -11,6 +11,8 @@ Snapshots are provisional: floats, not the exact integer reference, and nothing
 settles money on them. Each run appends a snapshot; nothing is overwritten.
 """
 import argparse
+import multiprocessing
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -64,6 +66,40 @@ CREATE TABLE IF NOT EXISTS rating.player_ratings (
 """
 
 
+_CONTEXT = None      # set before the pool forks, so workers share it copy-on-write
+_AS_OF_DAY = None
+
+
+def _rate_players(player_ids: list[int]) -> list[tuple]:
+    rows = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)   # empty national-team data: means of nothing
+        for player_id in player_ids:
+            series = v2.series(int(player_id), PLAYER, _CONTEXT, [_AS_OF_DAY])
+            for row in series.itertuples():
+                if pd.notna(row.rating) and pd.notna(row.team_rating):
+                    rows.append((int(player_id), int(row.team_id), float(row.rating), float(row.team_rating)))
+    return rows
+
+
+def rate_players(context, as_of_day: int, workers: int) -> list[tuple]:
+    """Players are independent once the context is built: rate them in `workers`
+    processes (fork), keeping the serial order of the results."""
+    global _CONTEXT, _AS_OF_DAY
+    _CONTEXT, _AS_OF_DAY = context, as_of_day
+    ids = [int(p) for p in sorted(context.lineups.player_id.unique())]
+    if ids:                                                       # build the shared tables before forking
+        context.listings(ids[0], PLAYER.fill)
+        for team in context.by_team:
+            context.squad_mean_at(team, 0, PLAYER.squad_top, PLAYER.share_rule, PLAYER.sub_credit)
+    if workers <= 1 or len(ids) < 2 * workers or "fork" not in multiprocessing.get_all_start_methods():
+        return _rate_players(ids)
+    chunks = [ids[i::workers * 8] for i in range(workers * 8)]
+    with multiprocessing.get_context("fork").Pool(workers) as pool:
+        results = pool.map(_rate_players, chunks, chunksize=1)
+    return sorted((row for chunk in results for row in chunk), key=lambda r: r[0])
+
+
 def as_dict(constants) -> dict:
     return {k: v for k, v in vars(constants).items()}
 
@@ -72,6 +108,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--as-of", help="YYYY-MM-DD; default: the day after the last finished match")
     parser.add_argument("--teams-only", action="store_true")
+    parser.add_argument("--workers", type=int, default=os.cpu_count() or 1,
+                        help="processes for the player ratings (default: all cores; 1 = serial)")
     args = parser.parse_args()
 
     games = store_pg.club_games()
@@ -90,11 +128,7 @@ def main() -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)   # empty national-team data: means of nothing
             context = v2.Context(TEAM)
-            for player_id in sorted(context.lineups.player_id.unique()):
-                series = v2.series(int(player_id), PLAYER, context, [as_of_day])
-                for row in series.itertuples():
-                    if pd.notna(row.rating) and pd.notna(row.team_rating):
-                        player_rows.append((int(player_id), int(row.team_id), float(row.rating), float(row.team_rating)))
+        player_rows = rate_players(context, as_of_day, args.workers)
 
     with db.connect() as conn:
         db.create_schema(conn)

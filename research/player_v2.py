@@ -171,6 +171,8 @@ class Context:
         self.ga_rate = ((per_pos.goals + per_pos.assists) / (per_pos.minutes / 90)).to_dict()
         self.ga_rate_all = float((apps.goals.sum() + apps.assists.sum()) / (apps.minutes.sum() / 90))
         self.squad_mean = {}
+        self._listing_cache = {}
+        self._empty_listing = {}
         self.nation_days = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
 
@@ -296,10 +298,17 @@ class Context:
 
     def listings(self, player: int, fill: bool) -> pd.DataFrame:
         """Every club match the player was listed for: minutes (filled for starters
-        without minutes when `fill`), and whether he started or sat on the bench."""
-        apps = self.appearances[self.appearances.player_id == player][["game_id", "team_id", "minutes", "goals", "assists"]]
-        lins = self.lineups[self.lineups.player_id == player][["game_id", "team_id", "starter"]]
-        rows = apps.merge(lins, on=["game_id", "team_id"], how="outer")
+        without minutes when `fill`), and whether he started or sat on the bench.
+        Built once for all players (one vectorised pass) and looked up per player."""
+        table = self._listing_table(fill)
+        return table.get(player, self._empty_listing[fill])
+
+    def _listing_table(self, fill: bool) -> dict:
+        if fill in self._listing_cache:
+            return self._listing_cache[fill]
+        apps = self.appearances[["game_id", "player_id", "team_id", "minutes", "goals", "assists"]]
+        lins = self.lineups[["game_id", "player_id", "team_id", "starter"]]
+        rows = apps.merge(lins, on=["game_id", "player_id", "team_id"], how="outer")
         rows["day"] = rows.game_id.map(self.day)
         rows = rows.dropna(subset=["day"])
         rows["length"] = rows.game_id.map(self.length)
@@ -311,10 +320,13 @@ class Context:
         rows["goals"] = rows.goals.fillna(0)
         rows["assists"] = rows.assists.fillna(0)
         rows["starter"] = rows.starter.fillna(-1)  # no line-up: unknown, minutes decide
-        on = self.onpitch[self.onpitch.player_id == player][["game_id", "minutes_on", "goals_for", "goals_against"]]
-        rows = rows.merge(on, on="game_id", how="left")
+        on = self.onpitch[["game_id", "player_id", "minutes_on", "goals_for", "goals_against"]]
+        rows = rows.merge(on, on=["game_id", "player_id"], how="left")
         rows["team_gd"] = [self.team_gd.get((g, t), 0) for g, t in zip(rows.game_id, rows.team_id)]
-        return rows.sort_values(["day", "game_id"])
+        rows = rows.sort_values(["player_id", "day", "game_id"], kind="stable")
+        self._empty_listing[fill] = rows.iloc[:0]
+        self._listing_cache[fill] = {p: g for p, g in rows.groupby("player_id", sort=False)}
+        return self._listing_cache[fill]
 
 
 # K by kind of international (World Football Elo style), set by hand.
