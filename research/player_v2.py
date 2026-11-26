@@ -91,7 +91,8 @@ class Variant:
     strength_relative: bool = False
     nt_skip_injured: bool = False
     weighted_reference: bool = False
-    per_match_reference: bool = False  # reference = the top players' share in that same match (missed matches drop out of both sides)  # squad reference weighted by the same match weights as the player's share     # a national match he missed while out of every club squad (±14 days) is left out, not counted as 0   # factor against his current club's rating instead of strength_r0
+    per_match_reference: bool = False
+    nt_window_injury: bool = False   # in an international window, matches after one he played and then left the squad count as injury  # reference = the top players' share in that same match (missed matches drop out of both sides)  # squad reference weighted by the same match weights as the player's share     # a national match he missed while out of every club squad (±14 days) is left out, not counted as 0   # factor against his current club's rating instead of strength_r0
     goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
     goal_d: float = 400.0
     goal_r0: float = 2000.0
@@ -711,7 +712,28 @@ class Player:
         cd = set(self.club_days) if self.v.nt_skip_injured else None
         sched = context.by_team.get(self.team) if cd is not None else None
         sdays = sched.day.to_numpy() if sched is not None else np.array([])
+        window_injured = set()
+        if self.v.nt_window_injury:
+            # an international window = his nation's matches with no club match of his club in between
+            sd = context.by_team.get(self.team)
+            cdays = sd.day.to_numpy() if sd is not None else np.array([])
+            groups, cur = [], []
+            for d in window:
+                if cur and ((cdays > cur[-1]) & (cdays < d)).any():
+                    groups.append(cur); cur = []
+                cur.append(int(d))
+            if cur: groups.append(cur)
+            for g in groups:
+                played = False
+                for d in g:
+                    if d in mine:
+                        played = True
+                    elif played:
+                        window_injured.add(d)      # was in the camp, then out of the squad: injured
         for d in window:
+            if d in window_injured:
+                counted -= 1
+                continue
             if cd is not None and len(sdays):
                 # out of his club's squad for the club matches just before and just after: injured then,
                 # so this international counts for neither selection nor non-selection
