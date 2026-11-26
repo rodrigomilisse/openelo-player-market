@@ -88,7 +88,8 @@ class Variant:
     minutes_strength: bool = False    # credit each match at the strength of the club where it was earned
     strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
     strength_r0: float = 2000.0
-    strength_relative: bool = False   # factor against his current club's rating instead of strength_r0
+    strength_relative: bool = False
+    nt_skip_injured: bool = False     # a national match he missed while out of every club squad (±14 days) is left out, not counted as 0   # factor against his current club's rating instead of strength_r0
     goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
     goal_d: float = 400.0
     goal_r0: float = 2000.0
@@ -417,6 +418,7 @@ class Player:
         self.team = None
         self.last_played = None
         self.last_listed = None
+        self.club_days = []
         self.last_offset_day = None
 
     def rating(self) -> float:
@@ -516,6 +518,7 @@ class Player:
             self.last_played = row.day
         if listed:
             self.last_listed = row.day
+            self.club_days.append(row.day)
 
     def weighted_evidence(self, row, deviation: float) -> None:
         """A Kalman step on the team's surprise: his deviation from his usual share
@@ -658,9 +661,13 @@ class Player:
             return 0.0
         mine = {c[0]: c for c in calls if c[5] == nation and c[0] >= window[0]}
         total = 0.0
+        counted = len(window)
+        cd = np.array(self.club_days) if self.v.nt_skip_injured else None
         for d in window:
             c = mine.get(int(d))
             if c is None:
+                if cd is not None and not ((cd >= d - 14) & (cd <= d + 14)).any():
+                    counted -= 1          # out of every club squad around then: injured, not dropped
                 continue
             value = max(self.share_of(c[1], c[7] == 1, c[1] > 0), self.v.nt_credit)
             if self.v.national == "flat":
@@ -672,7 +679,7 @@ class Player:
                 # how far his club sits below the clubs of the team-mates he is picked with
                 strength += self.v.nt_relative * max(0.0, c[4] - c[6]) / 200.0
             total += value * strength
-        return self.v.national_scale * total / len(window)
+        return self.v.national_scale * total / max(counted, 1)
 
     def bonus(self, day: int, context: Context) -> float:
         if self.team is None:
