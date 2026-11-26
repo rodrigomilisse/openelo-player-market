@@ -89,7 +89,8 @@ class Variant:
     strength_d: float = 400.0         # the credit doubles every strength_d points of that club's rating
     strength_r0: float = 2000.0
     strength_relative: bool = False
-    nt_skip_injured: bool = False     # a national match he missed while out of every club squad (±14 days) is left out, not counted as 0   # factor against his current club's rating instead of strength_r0
+    nt_skip_injured: bool = False
+    weighted_reference: bool = False  # squad reference weighted by the same match weights as the player's share     # a national match he missed while out of every club squad (±14 days) is left out, not counted as 0   # factor against his current club's rating instead of strength_r0
     goal_scaling: str = ""            # tokens joined by +: club (his club's rating), opp (the opposition's), comp (competition weight)
     goal_d: float = 400.0
     goal_r0: float = 2000.0
@@ -287,6 +288,32 @@ class Context:
         schedule = self.by_team.get(int(teams[i]))
         before = schedule[schedule.day < day]
         return float(before.rating.iloc[-1] + before.swing.iloc[-1]) if len(before) else None
+
+    def weighted_squad_mean_at(self, team: int, day: int, top: int, rule: str, credit: float, big_game: bool, power: float) -> float:
+        """The squad reference with each match weighted like the player's share: importance ** power,
+        × 2 (1 − expected) with big_game. The `top` players by share over the 365 days before `day`."""
+        cache = self.__dict__.setdefault("_wref", {})
+        key = (team, day, top, rule, credit, big_game, power)
+        if key in cache:
+            return cache[key]
+        group = self.played_for(rule, credit).get(team)
+        sched = self.by_team.get(team)
+        if group is None or sched is None:
+            cache[key] = 0.4; return 0.4
+        m = sched[(sched.day >= day - 365) & (sched.day < day)]
+        if m.empty:
+            cache[key] = 0.4; return 0.4
+        w = m.importance.to_numpy() ** power if "importance" in m else np.ones(len(m))
+        if big_game:
+            w = w * 2.0 * (1.0 - m.expected.to_numpy())
+        wd = dict(zip(m.day, w))
+        g = group[(group.day >= day - 365) & (group.day < day)]
+        best = g.groupby("player_id").share.sum().nlargest(top or 10 ** 6).index
+        g = g[g.player_id.isin(best)]
+        num = float((g.share * g.day.map(wd).fillna(0)).sum())
+        value = num / (len(best) * float(sum(wd.values()))) if len(best) else 0.4
+        cache[key] = value
+        return value
 
     def squad_mean_at(self, team: int, day: int, top: int = 0, rule: str = "minutes", credit: float = 0.0) -> float:
         key = (team, top, rule, credit if rule == "starter_fixed" else 0.0)
@@ -758,7 +785,10 @@ def series(player_id: int, variant: Variant, context: Context, snapshot_days: li
             ref = None
             if variant.minutes_strength:
                 ref = 1.0 if (variant.gk_reference and state.keeper) else \
-                    context.squad_mean_at(int(row.team_id), int(row.day), variant.squad_top, variant.share_rule, variant.sub_credit)
+                    (context.weighted_squad_mean_at(int(row.team_id), int(row.day), variant.squad_top, variant.share_rule, variant.sub_credit,
+                                                    variant.big_game, variant.importance_power)
+                     if variant.weighted_reference else
+                     context.squad_mean_at(int(row.team_id), int(row.day), variant.squad_top, variant.share_rule, variant.sub_credit))
             state.match(row, is_listed, minutes, None if started not in (0, 1) else bool(started), goals, assists, onp, ref)
             own_shares.append((row.day, min(minutes, row.length) / row.length, row.team_id))
         if state.level is None:
