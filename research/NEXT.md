@@ -1,5 +1,8 @@
 # Player rating: where we are (2026-11-23)
 
+> **Current brief: `research/BRIEF-player-rating.md` (2026-11-26).** The sections below are the earlier working log.
+
+
 > **⚠ PRINCIPLE: NO SYSTEMATIC MISPRICING BY GROUP.** The rating sets dividends, so a
 > whole class of player rated too high or too low is a mispricing traders will exploit.
 > Random misses inside a group are acceptable; a group-wide bias is not. Judge every

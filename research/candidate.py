@@ -205,3 +205,56 @@ def metrics(snapshots: pd.DataFrame) -> dict:
         "mean days between events": float(np.mean(gaps)), "p90 days between": float(np.percentile(gaps, 90)),
         "longest stretch (days)": int(np.max(gaps))}
     return result
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Player-rating candidate as of 2026-11-26 (research/BRIEF-player-rating.md). Team model: current_team_constants()
+# plus league redistribution of European results (0.3, zero-sum). Player model: player_v2 with the variant below,
+# on a context whose match importance is replaced by candidate_match_weights().
+
+def candidate_team_constants() -> te.TeamConstants:
+    return current_team_constants().with_(league_share=0.3, league_zero_sum=True)
+
+
+CANDIDATE_PLAYER = dict(
+    direct=True, selection=True, window=50, squad_window=True, team_weight=0.7,
+    # minutes: share of each match (start = full match, sub = minutes / length), weighted by candidate_match_weights()
+    # x opponent strength, against the top-16 players' share in that same match; minutes earned at another club
+    # rescaled by 2^((that club - current club) / 400)
+    share_rule="starter", gk_reference=True, bonus_scale=400.0, squad_top=16, match_importance=True, big_game=True,
+    minutes_strength=True, strength_d=400.0, strength_relative=True, weighted_reference=True, per_match_reference=True,
+    # goals and assists per 90 (prior 5 x 90), weighted by opposition strength centred on the average goal
+    output="weighted", goal_scale=118.5, assist_scale=59.25, goal_scaling="opp", goal_d=400.0, goal_r0=1624.0,
+    # national term: last 20 covered matches within 2 years, strength from national-team Elo; internationals missed
+    # while injured (out of the club squad either side, or left a camp after playing) count for neither side
+    national="elo", national_scale=100.0, nt_matches=20, nt_days=730, nt_credit=0.2, nt_skip_injured=True,
+    nt_window_injury=True,
+    # no absence term (open question: injury should not be free)
+    absence=True, absence_mode="window", absence_window=150, absence_scale=0.0,
+)
+
+
+def candidate_match_weights(context, day: int) -> np.ndarray:
+    """Minutes-window weight per team match: Champions League 4 (knockouts and final 8); domestic league 4 for the
+    strongest league by average club rating over the two years before `day`, then 3, 2, and 1 for every other league;
+    everything else 1."""
+    games = store.query("SELECT g.game_id, g.competition_id, g.stage, co.type, co.country FROM game g "
+                        "JOIN competition co USING(competition_id)")
+    tm = context.team_matches.merge(games, on="game_id", how="left")
+    recent = tm[(tm.day >= day - 730) & (tm.day < day) & (tm.type == "domestic_league")]
+    strength = recent.groupby("country").rating.mean().sort_values(ascending=False)
+    strength = strength[recent.groupby("country").team_id.nunique().reindex(strength.index) >= 10]
+    league_weight = dict(zip(strength.index, [4.0, 3.0, 2.0]))
+    knockout = (tm.competition_id == "CL") & tm.stage.isin(["continental_knockout", "continental_final"])
+    return np.where(knockout, 8.0, np.where(tm.competition_id == "CL", 4.0,
+                    np.where(tm.type == "domestic_league", tm.country.map(league_weight).fillna(1.0), 1.0)))
+
+
+def candidate_context(context, day: int):
+    """A shallow copy of a player_v2 Context with candidate_match_weights() as match importance."""
+    import copy
+    weighted = copy.copy(context)
+    weighted.team_matches = context.team_matches.copy()
+    weighted.team_matches["importance"] = candidate_match_weights(context, day)
+    weighted.by_team = {t: g.reset_index(drop=True) for t, g in weighted.team_matches.groupby("team_id")}
+    return weighted
