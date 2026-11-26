@@ -5,6 +5,11 @@ Sources, all static and offline (Spec §5):
 - transfermarkt-datasets (github.com/dcaribou/transfermarkt-datasets, CC0):
   games, minutes, lineups, players, market values and transfers, 2012/13 to
   2025/26, scraped from Transfermarkt.
+- transfermarkt-recent (research use only): matches after the dataset's last rebuild,
+  scraped by tm_recent.py into CSVs of the same shape. Loaded after the main dataset;
+  the main dataset wins on any game or player id it also has, so a match drops out of
+  the scraped set by itself once upstream catches up. Rebuilding the store keeps them:
+  they live in downloads/, not only in the store.
 - Club-Football-Match-Data (github.com/xgabora/Club-Football-Match-Data, MIT):
   football-data.co.uk results with corners, cards and bookmaker odds, and
   clubelo.com rating snapshots. Used only as references and for the tier-2
@@ -35,6 +40,11 @@ TMD_TABLES = [
     "appearances", "game_lineups", "player_valuations", "transfers",
 ]
 
+# Written by tm_recent.py; optional. Shared with it through the CSV format only, not imports.
+TMR_DIR = DOWNLOADS / "transfermarkt-recent"
+TMR_KEYS = {"games": "game_id", "game_events": "game_id", "appearances": "game_id",
+            "game_lineups": "game_id", "players": "player_id"}
+
 CFMD_DIR = DOWNLOADS / "club-football-match-data"
 CFMD_URL = "https://raw.githubusercontent.com/xgabora/Club-Football-Match-Data/main/data/{name}"
 CFMD_FILES = ["Matches.csv", "EloRatings.csv"]
@@ -54,6 +64,13 @@ DIVISION_TO_COMPETITION = {
 }
 
 NATIONAL_TEAM_COMPETITIONS = {"FIWC", "EURO", "COPA", "AFAC", "AFCN"}
+NATIONAL_TYPE = "national_team_competition"
+
+
+def is_national(competition_ids: pd.Series, competition_types: pd.Series) -> pd.Series:
+    """The five tournaments, and any other national-team competition the scraped rows bring
+    (Nations League, qualifiers, friendlies), which carry competition_type."""
+    return competition_ids.isin(NATIONAL_TEAM_COMPETITIONS) | (competition_types.fillna("") == NATIONAL_TYPE)
 
 # Host nations play at home; every other national-team tournament match is neutral.
 TOURNAMENT_HOSTS = {
@@ -116,15 +133,18 @@ CREATE INDEX valuation_player ON valuation (player_id);
 """
 
 
-def fetch() -> None:
+def fetch(refresh: bool = False) -> None:
+    """Download what is missing. With `refresh`, download the Transfermarkt tables again
+    (the upstream dataset is rebuilt about weekly); the other sources are static."""
     for table in TMD_TABLES:
-        download(TMD_URL.format(table=table), TMD_DIR / f"{table}.csv.gz")
+        download(TMD_URL.format(table=table), TMD_DIR / f"{table}.csv.gz", force=refresh)
     for name in CFMD_FILES:
         download(CFMD_URL.format(name=name), CFMD_DIR / name)
 
 
-def download(url: str, target: Path) -> None:
-    if target.exists():
+def download(url: str, target: Path, force: bool = False) -> None:
+    """Download to a .part file and rename, so a failed refresh keeps the previous file."""
+    if target.exists() and not force:
         print(f"[skip] {target.name} already downloaded")
         return
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -169,6 +189,34 @@ def write(conn: sqlite3.Connection, table: str, frame: pd.DataFrame) -> None:
     print(f"{table}: {len(frame)} rows")
 
 
+_MAIN_GAME_IDS: set = set()
+
+
+def main_game_ids() -> set:
+    if not _MAIN_GAME_IDS:
+        _MAIN_GAME_IDS.update(pd.read_csv(TMD_DIR / "games.csv.gz", usecols=["game_id"]).game_id)
+    return _MAIN_GAME_IDS
+
+
+def read_tm(table: str, usecols: list | None = None) -> pd.DataFrame:
+    """A transfermarkt-datasets table plus the rows tm_recent.py scraped for ids it lacks."""
+    main = pd.read_csv(TMD_DIR / f"{table}.csv.gz", usecols=usecols)
+    scraped_path = TMR_DIR / f"{table}.csv.gz"
+    if table not in TMR_KEYS or not scraped_path.exists():
+        return main
+    key = TMR_KEYS[table]
+    # A game the main dataset has is entirely the main dataset's, even in a table where it
+    # has no rows for it (a match without line-ups stays without them).
+    known = main_game_ids() if key == "game_id" else set(main[key])
+    columns = None if usecols is None else list(dict.fromkeys(usecols + [key]))
+    scraped = pd.read_csv(scraped_path, usecols=columns)
+    scraped = scraped[~scraped[key].isin(known)]
+    if usecols is not None:
+        scraped = scraped[usecols]
+    print(f"[recent] {table}: {len(scraped)} scraped rows added")
+    return pd.concat([main, scraped], ignore_index=True)
+
+
 def load_competitions() -> pd.DataFrame:
     raw = pd.read_csv(TMD_DIR / "competitions.csv.gz")
     return pd.DataFrame({
@@ -180,16 +228,16 @@ def load_competitions() -> pd.DataFrame:
 def load_teams() -> pd.DataFrame:
     clubs = pd.read_csv(TMD_DIR / "clubs.csv.gz")
     nations = pd.read_csv(TMD_DIR / "national_teams.csv.gz")
-    games = pd.read_csv(TMD_DIR / "games.csv.gz", usecols=[
-        "home_club_id", "away_club_id", "home_club_name", "away_club_name", "competition_id"])
+    games = read_tm("games", usecols=[
+        "home_club_id", "away_club_id", "home_club_name", "away_club_name", "competition_id", "competition_type"])
     named = pd.concat([
         pd.DataFrame({"team_id": clubs.club_id, "name": clubs["name"],
                       "domestic_competition_id": clubs.domestic_competition_id}),
         pd.DataFrame({"team_id": nations.national_team_id, "name": nations["name"],
                       "domestic_competition_id": None}),
     ]).drop_duplicates("team_id")
-    national_ids = set(games.loc[games.competition_id.isin(NATIONAL_TEAM_COMPETITIONS), "home_club_id"]) | set(
-        games.loc[games.competition_id.isin(NATIONAL_TEAM_COMPETITIONS), "away_club_id"])
+    national_games = is_national(games.competition_id, games.competition_type)
+    national_ids = set(games.loc[national_games, "home_club_id"]) | set(games.loc[national_games, "away_club_id"])
     from_games = pd.concat([
         games[["home_club_id", "home_club_name"]].set_axis(["team_id", "name"], axis=1),
         games[["away_club_id", "away_club_name"]].set_axis(["team_id", "name"], axis=1),
@@ -201,16 +249,21 @@ def load_teams() -> pd.DataFrame:
 
 
 def load_games(competitions: pd.DataFrame, teams: pd.DataFrame) -> pd.DataFrame:
-    raw = pd.read_csv(TMD_DIR / "games.csv.gz")
+    raw = read_tm("games")
     raw = raw[raw.date >= FIRST_SEASON_START].copy()
     raw = raw.merge(competitions[["competition_id", "type", "sub_type"]], on="competition_id", how="left")
     raw = remove_shootout_goals(raw)
-    raw["national"] = raw.competition_id.isin(NATIONAL_TEAM_COMPETITIONS).astype(int)
-    raw["stage"] = [stage_of(c, t, r) for c, t, r in zip(raw.competition_id, raw["type"], raw["round"])]
+    raw["national"] = is_national(raw.competition_id, raw.competition_type).astype(int)
+    raw["stage"] = [stage_of(c, t, r, n) for c, t, r, n in zip(raw.competition_id, raw["type"], raw["round"], raw.national)]
     raw = pair_legs(raw)
     raw["neutral"] = neutral_venues(raw, teams)
     raw["goal_difference"] = result_goal_difference(raw)
-    raw["data_issue"] = None
+    # Scraped matches arrive with the validation rules they broke (tm_recent.derive); the
+    # checks below overwrite them where they apply.
+    if "data_issue" in raw:
+        raw["data_issue"] = raw.data_issue.astype(object).where(raw.data_issue.notna(), None)
+    else:
+        raw["data_issue"] = None
     corrected_difference = raw.home_goals - raw.away_goals
     raw.loc[(raw.shootout == 1) & (corrected_difference != raw.goal_difference), "data_issue"] = "incomplete_shootout_events"
     duplicates = duplicate_team_days(raw)
@@ -225,7 +278,7 @@ def load_games(competitions: pd.DataFrame, teams: pd.DataFrame) -> pd.DataFrame:
 def remove_shootout_goals(games: pd.DataFrame) -> pd.DataFrame:
     """The dataset adds scored shoot-out kicks to the match score (a 0-0 won 5-3 on
     penalties is stored as 5:3). The score after extra time is the score less them."""
-    events = pd.read_csv(TMD_DIR / "game_events.csv.gz", usecols=["game_id", "type", "club_id", "description"])
+    events = read_tm("game_events", usecols=["game_id", "type", "club_id", "description"])
     kicks = events[events["type"] == "Shootout"]
     scored = kicks[kicks.description.fillna("").str.contains("Scored")]
     scored_by_club = scored.groupby(["game_id", "club_id"]).size()
@@ -254,10 +307,10 @@ def result_goal_difference(games: pd.DataFrame) -> pd.Series:
     return difference.astype(int)
 
 
-def stage_of(competition_id: str, competition_type: str, round_name: str) -> str:
+def stage_of(competition_id: str, competition_type: str, round_name: str, national: int = 0) -> str:
     """Competition stage, the input to match importance."""
-    name = (round_name or "").lower()
-    if competition_id in NATIONAL_TEAM_COMPETITIONS:
+    name = (round_name or "").lower() if isinstance(round_name, str) else ""
+    if competition_id in NATIONAL_TEAM_COMPETITIONS or national:
         return "national_knockout" if not is_group_round(name) else "national_group"
     if competition_type == "domestic_league" or competition_id in {"BPO4", "EJPL", "POBE"}:
         return "league"
@@ -309,6 +362,9 @@ def neutral_venues(games: pd.DataFrame, teams: pd.DataFrame) -> pd.Series:
     name_of = dict(zip(teams.team_id, teams["name"]))
     neutral = []
     for row in games.itertuples():
+        if row.national and row.competition_id not in NATIONAL_TEAM_COMPETITIONS:
+            neutral.append(0)  # qualifiers, Nations League, friendlies: played at the home side's ground
+            continue
         if row.national:
             hosts = TOURNAMENT_HOSTS.get((row.competition_id, row.season), set())
             neutral.append(int(name_of.get(row.home_club_id) not in hosts))
@@ -331,7 +387,7 @@ def duplicate_team_days(games: pd.DataFrame) -> set:
 
 
 def load_appearances(games: pd.DataFrame) -> pd.DataFrame:
-    raw = pd.read_csv(TMD_DIR / "appearances.csv.gz", usecols=[
+    raw = read_tm("appearances", usecols=[
         "game_id", "player_id", "player_club_id", "minutes_played", "goals", "assists", "yellow_cards", "red_cards"])
     raw = raw[raw.game_id.isin(games.game_id)].drop_duplicates(["game_id", "player_id"])
     return pd.DataFrame({
@@ -342,7 +398,7 @@ def load_appearances(games: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_lineups(games: pd.DataFrame) -> pd.DataFrame:
-    raw = pd.read_csv(TMD_DIR / "game_lineups.csv.gz", usecols=["game_id", "player_id", "club_id", "type", "position"])
+    raw = read_tm("game_lineups", usecols=["game_id", "player_id", "club_id", "type", "position"])
     raw = raw[raw.game_id.isin(games.game_id)].drop_duplicates(["game_id", "player_id"])
     return pd.DataFrame({
         "game_id": raw.game_id, "player_id": raw.player_id, "team_id": raw.club_id,
@@ -351,10 +407,10 @@ def load_lineups(games: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_players() -> pd.DataFrame:
-    raw = pd.read_csv(TMD_DIR / "players.csv.gz")
+    raw = read_tm("players")
     return pd.DataFrame({
         "player_id": raw.player_id, "name": raw["name"], "position": raw.position,
-        "sub_position": raw.sub_position, "date_of_birth": raw.date_of_birth.str[:10],
+        "sub_position": raw.sub_position, "date_of_birth": raw.date_of_birth.astype("string").str[:10],
         "citizenship": raw.country_of_citizenship,
     })
 
@@ -451,10 +507,14 @@ def report(conn: sqlite3.Connection) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--fetch", action="store_true", help="download any raw file that is missing first")
+    parser.add_argument("--refresh", action="store_true",
+                        help="download the Transfermarkt tables again to pick up new matches (implies --fetch)")
+    parser.add_argument("--no-build", action="store_true", help="download only, leave the store as it is")
     args = parser.parse_args()
-    if args.fetch:
-        fetch()
-    build()
+    if args.fetch or args.refresh:
+        fetch(refresh=args.refresh)
+    if not args.no_build:
+        build()
 
 
 if __name__ == "__main__":

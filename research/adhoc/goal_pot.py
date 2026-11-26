@@ -10,8 +10,11 @@ import numpy as np, pandas as pd
 d = pd.read_csv("adhoc/nt_players_zero_sum.csv")
 club = d.groupby("club").agg(level=("base", "max"), goal_points=("goals", "sum"), minutes=("club_minutes", "sum"))
 b = np.polyfit(club.level, club.goal_points, 1); club["expected"] = np.polyval(b, club.level); club["excess"] = club.goal_points - club.expected
-w = d.club_minutes / d.groupby("club").club_minutes.transform("sum")
-d["transfer"] = -w * d.club.map(club.excess)
+# split by minutes not backed by goals: minutes x (1 - his goal points / the club's top goal points), times STRENGTH
+STRENGTH = 2.0
+nb = d.club_minutes * (1 - d.goals / d.groupby("club").goals.transform("max")).clip(lower=0)
+w = nb / nb.groupby(d.club).transform("sum")
+d["transfer"] = -STRENGTH * w * d.club.map(club.excess)
 d["new"] = d.current + d.transfer
 print(club.round(0).sort_values("excess").to_string())
 d["rk_cur"] = d.current.rank(ascending=False).astype(int); d["rk_new"] = d.new.rank(ascending=False).astype(int)
@@ -31,8 +34,8 @@ page = (f"<title>Goal Pot By Club Elo</title><meta name=\"claude:viewport-fit-si
         f"<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;600&display=swap\">"
         f"<style>{css}.wide{{overflow-x:auto}}.narrow{{max-width:620px}}</style><h1>Club Elo sets the goal points a club gives out</h1>"
         f"<p>Each club's total goal-and-assist points are compared with what its club level predicts (straight-line fit across these 10 clubs). "
-        f"A club above its prediction pays the excess back from its squad in proportion to minutes, so scorers gain on the rest; a club below it "
-        f"hands the shortfall to its squad by minutes, so its defenders and regulars gain. Everything else as the current rating "
+        f"A club above its prediction pays twice the excess back from the players whose minutes are not backed by goals (minutes × (1 − his goal points ÷ the club's top scorer's)), so scorers gain on the rest; "
+        f"a club below it hands twice the shortfall to those same players, so its defenders gain. Everything else as the current rating "
         f"(assists in, no absence, national term from club ratings). Snapshot 7 July 2026. Top 7 of each club under either version; ranks count only the players listed.</p>"
         f"<h2>Clubs</h2><div class=narrow><table><tr><th>Club</th><th>Club level</th><th>Goal points</th><th>Expected from Elo</th><th>Excess</th></tr>{crow}</table></div>"
         f"<h2>Players</h2><div class=wide><table><tr>{''.join(f'<th>{h}</th>' for h in hdr)}</tr>{rows}</table></div>")
