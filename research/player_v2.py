@@ -26,7 +26,7 @@ Constants here are set by hand for the comparison, not fitted.
 """
 
 import math
-from collections import deque
+from collections import namedtuple, deque
 from dataclasses import dataclass
 
 import numpy as np
@@ -114,6 +114,22 @@ class Variant:
         return " + ".join(parts) or ("baseline" if self.fill else "baseline, no fill")
 
 
+def split_by(frame: pd.DataFrame, key: str, order: list[str], reset: bool = False) -> dict:
+    """{key value: its rows} with the rows ordered by `order` (stable), as slices of one sorted
+    frame: what `{k: g for k, g in frame.groupby(key)}` gives, without one groupby chop per key."""
+    frame = frame.sort_values([key] + order, kind="stable") if order else frame.sort_values(key, kind="stable")
+    keys = frame[key].to_numpy()
+    if not len(keys):
+        return {}
+    edges = np.flatnonzero(keys[1:] != keys[:-1]) + 1
+    starts, ends = np.concatenate(([0], edges)).tolist(), np.concatenate((edges, [len(keys)])).tolist()
+    out = {}
+    for k, a, b in zip(keys[starts].tolist(), starts, ends):
+        part = frame.iloc[a:b]
+        out[k] = part.reset_index(drop=True) if reset else part
+    return out
+
+
 class Context:
     """Everything a player's computation reads: team matches with the team's rating,
     swing and surprise, each player's listings (start, bench, minutes), and each
@@ -137,11 +153,14 @@ class Context:
                              sign * m.goal_difference, team_constants.stage_weights.get(m.stage, 1.0), opp))
         self.team_matches = pd.DataFrame(rows, columns=["game_id", "team_id", "day", "rating", "swing", "surprise",
                                                         "spread", "length", "expected", "team_gd", "importance", "opp_rating"]).sort_values(["day", "game_id"])
-        self.by_team = {t: g.reset_index(drop=True) for t, g in self.team_matches.groupby("team_id")}
+        self.by_team = split_by(self.team_matches, "team_id", [], reset=True)    # keeps the (day, game) order
         # the same schedules as plain arrays and row tuples, so series() slices them without pandas
         self.team_days = {t: g.day.to_numpy() for t, g in self.by_team.items()}
         self.team_level = {t: (g.rating + g.swing).to_numpy() for t, g in self.by_team.items()}
-        self.team_rows = {t: list(g.itertuples()) for t, g in self.by_team.items()}
+        columns = [c for c in self.team_matches.columns]
+        row_type = namedtuple("TeamMatch", ["Index"] + columns)     # one class for every team
+        self.team_rows = {t: list(map(row_type._make, zip(range(len(g)), *[g[c].tolist() for c in columns])))
+                          for t, g in self.by_team.items()}
         self.length = dict(zip(self.team_matches.game_id, self.team_matches.length))
         self.day = dict(zip(self.team_matches.game_id, self.team_matches.day))
         lineups = store.lineups()
@@ -151,7 +170,7 @@ class Context:
         played["day"] = played.game_id.map(self.day)
         played = played.dropna(subset=["day"])
         played["share"] = np.minimum(played.minutes, played.game_id.map(self.length)) / played.game_id.map(self.length)
-        self.played_by_team = {t: g[["day", "player_id", "share"]].sort_values("day") for t, g in played.groupby("team_id")}
+        self.played_by_team = split_by(played[["team_id", "day", "player_id", "share"]], "team_id", ["day"])
         rows = appearances[["game_id", "player_id", "team_id", "minutes"]].merge(
             lineups[["game_id", "player_id", "team_id", "starter"]], on=["game_id", "player_id", "team_id"], how="outer")
         rows["day"] = rows.game_id.map(self.day)
@@ -178,6 +197,7 @@ class Context:
         self._listing_cache = {}
         self._listing_frames = {}
         self._listing_columns = {}
+        self._lookup_keys = {}
         self.nation_days = {}
         self.national_call_ups = self.call_ups(appearances, lineups)
 
@@ -196,7 +216,7 @@ class Context:
                 share = np.where((r.starter == 1) | (r.minutes > 0), 1.0, 0.0)
             rows = r.assign(share=share)
             rows = rows[rows.share > 0]
-            self._played[key] = {t: g[["day", "player_id", "share"]].sort_values("day") for t, g in rows.groupby("team_id")}
+            self._played[key] = split_by(rows[["team_id", "day", "player_id", "share"]], "team_id", ["day"])
         return self._played[key]
 
     def squad_means(self, team: int, top: int = 0, rule: str = "minutes", credit: float = 0.0):
@@ -208,12 +228,14 @@ class Context:
         group = self.played_for(rule, credit).get(team)
         if group is None:
             return np.array([]), np.array([])
-        days = np.sort(group.day.unique())
-        per_day = {d: list(zip(g.player_id, g.share)) for d, g in group.groupby("day")}
+        days, first = np.unique(group.day.to_numpy(), return_index=True)      # rows are sorted by day
+        bounds = first.tolist() + [len(group)]
+        players, shares = group.player_id.tolist(), group.share.tolist()
         sums, counts, start, result = {}, {}, 0, []
         for i, d in enumerate(days):
             while days[start] < d - 365:
-                for p, share in per_day[days[start]]:
+                for j in range(bounds[start], bounds[start + 1]):
+                    p, share = players[j], shares[j]
                     sums[p] -= share
                     counts[p] -= 1
                     if counts[p] == 0:
@@ -227,7 +249,8 @@ class Context:
                 result.append(sum(values) / (matches * len(values)))
             else:
                 result.append(np.nan)
-            for p, share in per_day[d]:
+            for j in range(bounds[i], bounds[i + 1]):
+                p, share = players[j], shares[j]
                 sums[p] = sums.get(p, 0.0) + share
                 counts[p] = counts.get(p, 0) + 1
         return days, np.array(result)
@@ -239,12 +262,14 @@ class Context:
         extra_games, extra_lineups, extra_minutes = store.national_extra()
         games = pd.concat([games, extra_games[extra_games.in_store == 0]], ignore_index=True)
         elo = national_elo(games)
-        club_rows = appearances[appearances.game_id.isin(self.day.keys()) & (appearances.minutes > 0)].copy()
+        listed = pd.concat([lineups[lineups.game_id.isin(games.game_id)], extra_lineups]) \
+            .drop_duplicates(["game_id", "player_id"])
+        # only players with a national-team call-up are ever looked up in club_of
+        club_rows = appearances[appearances.game_id.isin(self.day.keys()) & (appearances.minutes > 0)
+                                & appearances.player_id.isin(listed.player_id)].copy()
         club_rows["day"] = club_rows.game_id.map(self.day)
         club_rows = club_rows.sort_values("day")
         club_of = {p: (g.day.to_numpy(), g.team_id.to_numpy()) for p, g in club_rows.groupby("player_id")}
-        listed = pd.concat([lineups[lineups.game_id.isin(games.game_id)], extra_lineups]) \
-            .drop_duplicates(["game_id", "player_id"])
         played = pd.concat([appearances[appearances.game_id.isin(games.game_id)], extra_minutes]) \
             .drop_duplicates(["game_id", "player_id"])
         minutes = played.set_index(["game_id", "player_id"]).minutes
@@ -320,11 +345,24 @@ class Context:
             rows = self._listing_rows(fill)
             ids = rows.player_id.to_numpy()
             edges = np.flatnonzero(ids[1:] != ids[:-1]) + 1
-            starts, ends = np.concatenate(([0], edges)), np.concatenate((edges, [len(ids)]))
-            columns = [rows[name].tolist() for name in self.LISTING_COLUMNS]
-            self._listing_columns[fill] = {
-                int(ids[a]): tuple(c[a:b] for c in columns) for a, b in zip(starts.tolist(), ends.tolist())} if len(ids) else {}
-        return self._listing_columns[fill].get(player)
+            starts, ends = np.concatenate(([0], edges)).tolist(), np.concatenate((edges, [len(ids)])).tolist()
+            ranges = dict(zip(ids[starts].tolist(), zip(starts, ends))) if len(ids) else {}
+            self._listing_columns[fill] = ([rows[name].tolist() for name in self.LISTING_COLUMNS], ranges)
+        columns, ranges = self._listing_columns[fill]
+        span = ranges.get(player)
+        return None if span is None else tuple(c[span[0]:span[1]] for c in columns)
+
+    def _lookup(self, game_ids: np.ndarray, values: dict):
+        """`values[game_id]` for every id as an array, and which ids were found (a vectorised Series.map)."""
+        keys = self._lookup_keys.get(id(values))
+        if keys is None:
+            order = np.array(sorted(values))
+            keys = self._lookup_keys[id(values)] = (order, np.array([values[k] for k in order.tolist()]))
+        order, found = keys
+        at = np.minimum(np.searchsorted(order, game_ids), max(len(order) - 1, 0))
+        ok = (order[at] == game_ids) if len(order) else np.zeros(len(game_ids), bool)
+        out = found[at] if len(order) else np.zeros(len(game_ids))
+        return (out if ok.all() else out.astype(float)), ok
 
     def _listing_rows(self, fill: bool) -> pd.DataFrame:
         if fill in self._listing_cache:
@@ -332,9 +370,11 @@ class Context:
         apps = self.appearances[["game_id", "player_id", "team_id", "minutes", "goals", "assists"]]
         lins = self.lineups[["game_id", "player_id", "team_id", "starter"]]
         rows = apps.merge(lins, on=["game_id", "player_id", "team_id"], how="outer")
-        rows["day"] = rows.game_id.map(self.day)
-        rows = rows.dropna(subset=["day"])
-        rows["length"] = rows.game_id.map(self.length)
+        game_ids = rows.game_id.to_numpy()
+        day, ok = self._lookup(game_ids, self.day)
+        rows["day"] = day
+        rows = rows[ok]                                   # matches the team model does not know are dropped
+        rows["length"] = self._lookup(rows.game_id.to_numpy(), self.length)[0]
         missing = rows.minutes.isna()
         rows.loc[missing & (rows.starter == 1), "minutes"] = rows.length if fill else np.nan
         if not fill:
@@ -345,7 +385,9 @@ class Context:
         rows["starter"] = rows.starter.fillna(-1)  # no line-up: unknown, minutes decide
         on = self.onpitch[["game_id", "player_id", "minutes_on", "goals_for", "goals_against"]]
         rows = rows.merge(on, on=["game_id", "player_id"], how="left")
-        rows["team_gd"] = [self.team_gd.get((g, t), 0) for g, t in zip(rows.game_id, rows.team_id)]
+        gd = self.team_matches[["game_id", "team_id", "team_gd"]].drop_duplicates(["game_id", "team_id"], keep="last")
+        rows = rows.merge(gd, on=["game_id", "team_id"], how="left")
+        rows["team_gd"] = rows.team_gd.fillna(0).astype(gd.team_gd.dtype)
         self._listing_cache[fill] = rows.sort_values(["player_id", "day", "game_id"], kind="stable")
         return self._listing_cache[fill]
 
